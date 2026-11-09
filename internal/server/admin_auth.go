@@ -36,9 +36,7 @@ func (s *Server) adminAuth(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	token := newSessionToken()
-	s.mu.Lock()
-	s.adminSessions[token] = s.now()
-	s.mu.Unlock()
+	s.withLock(func() { s.adminSessions[token] = s.now() })
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    token,
@@ -70,15 +68,24 @@ func (s *Server) providedMasterKey(r *http.Request) string {
 // whether the admin_session cookie names a live session. The admin page uses
 // it to log in again after a reload.
 func (s *Server) adminCheckSession(w http.ResponseWriter, r *http.Request) error {
-	cookie, err := r.Cookie(sessionCookie)
-	if err != nil || cookie.Value == "" {
+	if cookie, err := r.Cookie(sessionCookie); err != nil || cookie.Value == "" {
 		return writeJSON(w, http.StatusUnauthorized, map[string]any{"valid": false, "reason": "No session cookie"})
 	}
-	s.mu.Lock()
-	_, valid := s.adminSessions[cookie.Value]
-	s.mu.Unlock()
-	if !valid {
+	if !s.validSession(r) {
 		return writeJSON(w, http.StatusUnauthorized, map[string]any{"valid": false, "reason": "Invalid session"})
 	}
 	return writeJSON(w, http.StatusOK, map[string]any{"valid": true, "message": "Session is valid"})
+}
+
+// validSession tells whether the request's admin_session cookie names a live
+// session. It takes mu.
+func (s *Server) validSession(r *http.Request) bool {
+	cookie, err := r.Cookie(sessionCookie)
+	if err != nil || cookie.Value == "" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.adminSessions[cookie.Value]
+	return ok
 }

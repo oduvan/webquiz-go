@@ -89,8 +89,8 @@ export interface AdminBoot {
   downloadable_quizzes: DownloadableQuiz[];
   version: string;
   tunnel_public_key: string; // "" without a tunnel
-  repo_url: string; // https://github.com/oduvan/webquiz-go: releases and the "new version" check
-  pages_url: string; // the online documentation
+  repo_url: string; // the project's repository (internal/version RepoURL): releases and the "new version" check
+  pages_url: string; // the online documentation (internal/version PagesURL)
 }
 
 // The values of the config form.

@@ -26,6 +26,11 @@
 //		_ = data
 //	}
 //
+// Request bodies are encoded with encoding/json: a whole float such as 1.0
+// goes out as 1. To send 1.0 (a test of "1 and 1.0 differ") put
+// json.Number("1.0") in the body, or send the JSON text as a string. Quiz and
+// config values are written with YAML (like PyYAML), which keeps 1.0 a float.
+//
 // Tests that need the real program use BuildBinary.
 package testutil
 
@@ -69,6 +74,12 @@ type Options struct {
 	// (seconds, like Python's float()) and WEBQUIZ_MASTER_KEY. Another name
 	// fails the test: use BuildBinary for those.
 	Env map[string]string
+
+	// ServerOptions go to server.New as they are: for example Now (a test
+	// clock) or FlushInterval (a short CSV flush, so a test need not wait
+	// 5 s for the CSV files). A nil Logger means the test log. Values from
+	// Env win over Grace and CheckInterval set here.
+	ServerOptions server.Options
 }
 
 // TestServer is a server running in this process with its own temp folder.
@@ -186,7 +197,10 @@ func StartServer(t testing.TB, opts Options) *TestServer {
 	}
 	cfg.ConfigPath = configPath
 
-	serverOpts := server.Options{Logger: testLogger(t)}
+	serverOpts := opts.ServerOptions
+	if serverOpts.Logger == nil {
+		serverOpts.Logger = testLogger(t)
+	}
 	applyEnv(t, opts.Env, cfg, &serverOpts)
 
 	srv, err := server.New(cfg, serverOpts)

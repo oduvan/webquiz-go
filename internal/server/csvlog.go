@@ -18,7 +18,7 @@ func (s *Server) startCSVFilesLocked(quizFilename string) {
 
 // flushResponsesToCSV writes the answers waiting in s.userResponses to the
 // answers CSV (and the answers_with_users CSV). The flush loop calls it
-// every 5 seconds and Close calls it once more.
+// every s.flushInterval (5 s) and Close calls it once more.
 func (s *Server) flushResponsesToCSV() error {
 	return nil
 }

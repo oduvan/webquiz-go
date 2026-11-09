@@ -105,19 +105,11 @@ func (s *Server) adminAuthRequired(h handlerFunc) handlerFunc {
 		if s.isTrustedIP(getClientIP(r)) {
 			return h(w, r)
 		}
-		hasKey := s.masterKey != ""
-		s.mu.Lock()
-		valid := false
-		if cookie, err := r.Cookie(sessionCookie); err == nil && cookie.Value != "" {
-			_, valid = s.adminSessions[cookie.Value]
-		}
-		invalidText := s.translations["server_invalid_session"]
-		s.mu.Unlock()
-		if !hasKey {
+		if s.masterKey == "" {
 			return writeError(w, http.StatusForbidden, noMasterKeyText)
 		}
-		if !valid {
-			return writeError(w, http.StatusUnauthorized, invalidText)
+		if !s.validSession(r) {
+			return writeError(w, http.StatusUnauthorized, s.text("server_invalid_session"))
 		}
 		return h(w, r)
 	}
@@ -128,14 +120,16 @@ func (s *Server) adminAuthRequired(h handlerFunc) handlerFunc {
 const noMasterKeyText = "Admin functionality disabled - no master key set"
 
 // isTrustedIP tells whether the address is in admin.trusted_ips. Like
-// Python's "client_ip in trusted_ips" it compares the text exactly.
+// Python's "client_ip in trusted_ips" it compares the text exactly. It takes
+// mu: inside a locked section read s.cfg.Admin.TrustedIPs instead.
 func (s *Server) isTrustedIP(clientIP string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return slices.Contains(s.cfg.Admin.TrustedIPs, clientIP)
 }
 
-// text returns a text of the interface language (translations.py).
+// text returns a text of the interface language (translations.py). It
+// takes mu: inside a locked section use s.translations[key] instead.
 func (s *Server) text(key string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

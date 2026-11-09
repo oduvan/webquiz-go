@@ -77,6 +77,11 @@ func (r *Response) Decode(t testing.TB, v any) {
 // Do sends a request and reads the whole response. body may be nil (no
 // body), a string or []byte (sent as it is), or any other value (sent as
 // JSON with Content-Type application/json). path starts with "/".
+//
+// JSON bodies are encoded with encoding/json's Marshal, which writes a whole
+// float64 without a fraction: 1.0 goes out as 1, while Python's json.dumps
+// sent 1.0. The server reads numbers as written (UseNumber), so for 1.0 use
+// json.Number("1.0") in the body, or send the JSON text as a string.
 func (c *Client) Do(t testing.TB, method, path string, body any, opts ...RequestOption) *Response {
 	t.Helper()
 	var reader io.Reader
