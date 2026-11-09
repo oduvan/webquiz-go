@@ -148,8 +148,8 @@ Merges happen only on `claude/gracious-edison-r3buih`, done by the controller, i
 ### Task 7: Student flow
 
 **Files:**
-- Modify/Create in `internal/server/`: `student.go` (register with `registration_token`, update-registration, verify-user, question-start, submit-answer with the full order from `CLAUDE.md` "Quiz time limits", `_record_answer`, `_end_whole_quiz`), `timing.go`, `stats.go` (`calculate_and_store_user_stats`, `all_students_completed`, `get_user_final_results`, force flag), `csvlog.go` (CSV paths with shared `NNNN`, 5 s flush, users CSV, answers_with_users CSV, fsync), `livestats.go` (live stats WebSocket, two groups, broadcast), `quizload.go` (load questions, ids, randomization per user, explanations HTML per question, checker load warnings), `watcher.go`.
-- Python sources: server.py 721-1047, 1148-1244, 1368-1910, 1911-2840.
+- Modify/Create in `internal/server/`: `student.go` (register with `registration_token`, update-registration, verify-user, question-start, submit-answer with the full order from `CLAUDE.md` "Quiz time limits", `_record_answer`, `_end_whole_quiz`), `timing.go`, `stats.go` (`calculate_and_store_user_stats`, `all_students_completed`, `get_user_final_results`, force flag), `csvlog.go` (CSV paths with shared `NNNN`, 5 s flush, users CSV, answers_with_users CSV, fsync), `livestats.go` (live stats WebSocket, two groups, broadcast), `quizload.go` (load questions, ids, randomization per user, explanations HTML per question, checker load warnings), `watcher.go`; also the student-flow parts of the admin side: `PUT /api/admin/approve-user`, `POST /api/admin/switch-quiz` with start settings (`_validate_start_settings`, `_apply_start_settings`, `switch_quiz`), and `/ws/admin` with the registration/approval broadcasts (Tasks 8-9 add their own messages to it).
+- Python sources: server.py 721-1047, 1148-1244, 1368-1910, 1911-2840, `admin_approve_user` (2989-3058), `admin_switch_quiz` (2869-2900), `websocket_admin` (4802-4842).
 
 **Interfaces:**
 - Consumes: Task 6 skeleton and helpers.
@@ -163,8 +163,8 @@ Merges happen only on `claude/gracious-edison-r3buih`, done by the controller, i
 ### Task 8: Admin API — quizzes
 
 **Files:**
-- Modify/Create in `internal/server/`: `admin_quiz.go` (auth + session cookies, check-session, approve-user + admin WebSocket notifications, force-show-answers, list-quizzes with titles, switch-quiz with start settings `_validate_start_settings`/`_apply_start_settings`, get/create/update/delete quiz with rename and backups, unite, validate-quiz, preview-explanation, list-images, list-files, list-checker-templates), `websocket.go` admin socket.
-- Python sources: server.py 939-1047, 2840-3500, 3780-3847, 4802-4842.
+- Modify/Create in `internal/server/`: `admin_quiz.go` (force-show-answers, list-quizzes with titles, get/create/update/delete quiz with rename and backups, unite, validate-quiz, preview-explanation, list-images, list-files, list-checker-templates), `websocket.go` admin socket.
+- Python sources: server.py 2840-3500, 3780-3847 (auth, check-session, approve-user, switch-quiz with start settings and `/ws/admin` are already built by Tasks 6-7; this task ports their tests).
 
 **Interfaces:**
 - Consumes: `SwitchQuiz` and state from Task 7.
