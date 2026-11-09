@@ -3,6 +3,7 @@ package testutil
 import (
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -151,4 +152,24 @@ func TestQuizzesAsRawText(t *testing.T) {
 	if !strings.Contains(string(data), "correct_answer: 1.0") {
 		t.Errorf("raw text changed: %s", data)
 	}
+}
+
+func TestBuildBinary(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds the program")
+	}
+	path := BuildBinary(t)
+	if again := BuildBinary(t); again != path {
+		t.Errorf("BuildBinary built twice: %s and %s", path, again)
+	}
+	output, err := exec.Command(path, "--version").CombinedOutput()
+	if err != nil || !strings.HasPrefix(string(output), "webquiz ") {
+		t.Errorf("%s --version: %v %q", path, err, output)
+	}
+}
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	RemoveBinary()
+	os.Exit(code)
 }
