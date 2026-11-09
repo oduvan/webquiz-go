@@ -1,0 +1,928 @@
+## Quiz File Format (quiz.yaml)
+
+Tests in **WebQuiz** are stored in YAML format.
+Each file contains a title, description (optional), and a list of questions.
+You can create your own tests by placing them in the **`quizzes/`** folder.
+
+---
+
+### File Structure
+
+The basic structure of a test file looks like this:
+
+```
+title: "Test Title"
+description: "Test description (optional)"
+show_right_answer: false
+show_final_list: true        # false to hide question list on results screen
+randomize_questions: false  # true for randomized question order for each student
+show_explanation: false     # true to show question explanations after the answer
+questions:
+  - question: "Question text"
+    options:
+      - "Option 1"
+      - "Option 2"
+      - "Option 3"
+    correct_answer: 0
+```
+
+> **Note:** The on/off settings (`show_right_answer`, `show_answers_on_completion`, `show_final_list`, `randomize_questions`, `show_explanation`) take `true` or `false` **without quotes**. With quotes, `"false"` is text, not an on/off value, and the admin panel will not save the test.
+
+---
+
+### Main Test Parameters
+
+#### `title` (required)
+
+The test title displayed in the web interface and admin panel.
+
+```
+title: "Math Test"
+```
+
+---
+
+#### `description` (optional)
+
+A short description of the test. May contain information about the topic, difficulty, or other details.
+
+```
+description: "Basic arithmetic operations for 5th grade students"
+```
+
+---
+
+#### `show_right_answer` (optional)
+
+Determines whether to show the user the correct answer after submitting their choice, as well as the behavior for progressing to the next question.
+
+- **`true`** (default) — after answering, the user sees visual feedback (green/red colors), the correct answer, and must click the **"Continue"** button to proceed to the next question
+- **`false`** — the user **does not see** the correct answer, there is no visual feedback, and **the quiz automatically advances to the next question** immediately after submitting the answer (no button click needed)
+
+```
+show_right_answer: false  # Automatic progression to the next question
+```
+
+> **Tip:** Using `show_right_answer: false` creates a fast, seamless quiz-taking experience without interruptions, which is useful for quick surveys or tests where students should not see correct answers during the testing process.
+
+---
+
+#### `show_answers_on_completion` (optional)
+
+Determines whether to show correct answers after **all** students complete the quiz. Works in combination with `show_right_answer: false`.
+
+- **`true`** — correct answers are dynamically revealed only after all students finish the quiz
+- **`false`** (default) — correct answers are never shown (if `show_right_answer: false`)
+
+```
+show_right_answer: false            # Hide answers during quiz
+show_answers_on_completion: true    # Reveal after all complete
+```
+
+**How it works:**
+
+1. During the quiz, students **do not see** correct answers
+2. After completing the quiz, students see their results but **without correct answers**
+3. Students see a message: _"Correct answers will be available after all students complete. Reload the page later."_
+4. Once **all registered students** finish the quiz, correct answers become visible
+5. If a new student registers later, answers are hidden again until they complete
+
+> **Tip:** Using `show_answers_on_completion: true` is useful for group learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
+
+> **Manual Control:** Administrators can force reveal answers without waiting for stragglers using the "Show Answers for All" button in the admin panel. See the "Administrative Interface" section for details.
+
+> ⚠️ **Important:** If approval mode is enabled (`registration.approve: true`), only **approved** students are counted. Students waiting for approval do not affect answer visibility.
+
+---
+
+#### `show_final_list` (optional)
+
+Controls whether the question-by-question results table is displayed on the final results screen.
+
+- **`true`** (default) — shows the score summary and a table with each question, the student's answer, and correctness
+- **`false`** — shows only the score summary (e.g., "3/5 (60%)")
+
+```
+show_final_list: false  # Only show score, hide question list
+```
+
+> **Tip:** Use `show_final_list: false` when you want students to see only their overall score without reviewing individual questions.
+
+---
+
+#### `show_explanation` (optional)
+
+Shows the explanation of a question right after the student answers it (default: `false`). Each question can have an `explanation` (see "Question Explanation" below).
+
+```yaml
+show_right_answer: true
+show_explanation: true
+```
+
+- The explanation is its own step: after the answer feedback, the student presses **"Continue"**, reads the explanation, and presses **"Next"** to open the next question (after the last question, the results).
+- Only questions with an explanation get this step; the others go straight on.
+- Explanations work only together with `show_right_answer: true`. When correct answers are hidden, no explanations are shown, also not on the results screen.
+- When the whole-test time runs out, the results open at once, without an explanation.
+
+---
+
+#### `randomize_questions` (optional)
+
+Determines whether each student receives a unique randomized question order. This is useful for preventing cheating and ensuring fair testing.
+
+- **`true`** — each student receives a unique randomized question order that persists throughout the entire session
+- **`false`** (default) — questions are displayed in the order defined in the YAML file
+
+```
+randomize_questions: true  # Each student gets a unique question order
+```
+
+> **Tip:** Using `randomize_questions: true` helps ensure fair testing, as students sitting next to each other will receive questions in different orders. The question order is generated server-side during student registration and persists throughout the entire session, even after page reloads.
+
+---
+
+#### `time_limit` (optional)
+
+Limits how much time students have. Choose **one** of two modes. All values are whole seconds, and `0` always means "no limit".
+
+**Mode 1: per question.** `per_question` is the default limit for every question. A question can set its own `time_limit`:
+
+```
+time_limit:
+  per_question: 60      # every question: 60 seconds
+questions:
+  - question: "2+2?"
+    time_limit: 20      # this question: 20 seconds
+  - question: "Explain your answer"
+    time_limit: 0       # this question: no limit
+  - question: "3+3?"    # uses the default: 60 seconds
+```
+
+With `per_question: 0`, questions have no limit, except the ones that set their own `time_limit`.
+
+**Mode 2: whole quiz.** One limit for the whole quiz. Question `time_limit` values are ignored:
+
+```
+time_limit:
+  whole_quiz: 900       # 15 minutes for the whole test
+```
+
+How the limit for a question is chosen:
+
+| Test `time_limit` | Question `time_limit` | Result |
+|---|---|---|
+| not set | anything | no limit (the question value is ignored) |
+| `per_question: D` | not set | `D` seconds |
+| `per_question: D` | `T` | `T` seconds |
+| `whole_quiz: W` | anything | the question has no own limit; the whole test has `W` seconds |
+
+> **Note:** A question's `time_limit` works only when the test has `time_limit: {per_question: ...}`. Without it, the question value is kept in the file but ignored.
+
+**What the student sees:** a countdown (⏱ Time left 0:42) on each question with a limit, or one countdown for the whole test at the top of the page. It turns red in the last 10 seconds. When it reaches zero, the student sees "Time is up". The question counts as failed, and the test moves on (or, for the whole test, the results open). On the results screen, such questions show "⏱ Time is up".
+
+**How time is counted:**
+
+- The clock for a question starts when the student's page shows it. Reloading the page does not restart it. The server keeps the time, so blocking the page's requests does not help: an answer without that "question shown" notice is timed from the moment the question became available.
+- An answer that reaches the server up to 5 seconds after the limit still counts, so a slow Wi-Fi connection does not cost the student an answer sent in time.
+- When time runs out, the question is stored with **no answer** and counts as failed. In the answers CSV this is a row with an empty `selected_answer`.
+- In whole-test mode, if the student closes the page, the server still finishes their test 5 seconds after the time is up: all unanswered questions are stored as timed out.
+- In per-question mode, if the student closes the page, the server still marks the open question as timed out. In per-question mode, the next question never opens, so the student stays unfinished. Use the **"Show Answers for All"** button for such students when `show_answers_on_completion: true` is set.
+
+---
+
+#### `stick_to_the_previous` (optional, per question)
+
+Determines whether a question should stay adjacent to the previous question during randomization. This is useful for related questions that must appear consecutively (e.g., a reading passage followed by questions about it).
+
+- **`true`** — question always follows directly after the previous one (forms a group)
+- **`false`** (default) — question can be shuffled independently
+
+```yaml
+questions:
+  - question: "Read the text and answer questions 1-3"
+    options:
+      - "A"
+      - "B"
+      - "C"
+    correct_answer: 0
+  - question: "Question 2 about the text"
+    options:
+      - "A"
+      - "B"
+      - "C"
+    correct_answer: 1
+    stick_to_the_previous: true
+  - question: "Question 3 about the text"
+    options:
+      - "A"
+      - "B"
+      - "C"
+    correct_answer: 2
+    stick_to_the_previous: true
+```
+
+> **How it works:** Questions with `stick_to_the_previous: true` form groups with their predecessors. During randomization, groups are shuffled as whole blocks while preserving internal order. For example, if Q1→Q2→Q3 form a group, they will always appear in that order, but the group can end up anywhere in the quiz.
+
+> ⚠️ **Important:** The first question cannot have `stick_to_the_previous: true` (no previous question to stick to).
+
+> **In the admin panel:** Questions with `stick_to_the_previous: true` are marked with a 🔗 indicator in collapsed view.
+
+---
+
+### `questions` Section
+
+The `questions` section contains a list of test questions.
+Each question is a separate list item with its own parameters.
+
+---
+
+#### Basic Single-Choice Question
+
+The simplest form of question with text, answer options, and the correct answer index:
+
+```yaml
+- question: "What is 2 + 2?"
+  options:
+    - "3"
+    - "4"
+    - "5"
+    - "6"
+  correct_answer: 1
+```
+
+- **question** — question text
+- **options** — list of possible answers (array of strings)
+- **correct_answer** — index of correct answer (starts from 0)
+
+In this example, the correct answer is `"4"` (index 1).
+
+---
+
+#### Question Points
+
+Each question can have its own point value using the **`points`** parameter.
+By default, each question is worth **1 point**.
+
+```yaml
+- question: "Difficult question"
+  options:
+    - "A"
+    - "B"
+    - "C"
+    - "D"
+  correct_answer: 2
+  points: 3  # This question is worth 3 points
+```
+
+Points can also be decimal numbers with **at most two decimal places**:
+
+```yaml
+- question: "Worth half a point"
+  options:
+    - "A"
+    - "B"
+  correct_answer: 0
+  points: 0.5
+
+- question: "Worth one and a quarter points"
+  options:
+    - "A"
+    - "B"
+  correct_answer: 1
+  points: 1.25
+```
+
+**Rules for `points`:**
+- Must be a number greater than 0
+- At most two decimal places. `1.234` is rejected when the quiz is saved
+- The admin quiz editor shows an error naming the question instead of rounding the value for you
+- The default is `1`
+
+**Features:**
+- Points are displayed in **live stats** as earned/total points
+- **Final results** show earned points
+- **Users CSV file** includes `earned_points` and `total_points` columns
+- Questions whose value is not 1 point show a 🏆 indicator during the quiz
+
+---
+
+#### Multiple Correct Answers Question
+
+WebQuiz supports questions with multiple correct answers.
+In this case, the user must select **all correct options**.
+
+```yaml
+- question: "Which of these are programming languages?"
+  options:
+    - "Python"
+    - "HTML"
+    - "JavaScript"
+    - "CSS"
+  correct_answer: [0, 2]
+```
+
+In this example, the correct answers are `"Python"` (index 0) and `"JavaScript"` (index 2).
+
+> ⚠️ **Important:** By default, the user must select **all correct answers** to get a positive result.
+
+---
+
+#### Question with Minimum Number of Correct Answers
+
+If you want the question to be considered correct when selecting a **minimum number** of all correct answers, use the **`min_correct`** parameter:
+
+```yaml
+- question: "Select at least 2 primary colors:"
+  options:
+    - "Red"
+    - "Green"
+    - "Blue"
+    - "Yellow"
+  correct_answer: [0, 2, 3]
+  min_correct: 2
+```
+
+In this example:
+- Correct answers: `"Red"` (0), `"Blue"` (2), `"Yellow"` (3)
+- User must select **at least 2** of them
+- If the user selects `"Red"` and `"Blue"`, the answer will be counted as correct
+
+---
+
+#### Question with Image
+
+You can add an image to a question using the **`image`** parameter.
+Images should be stored in the **`quizzes/imgs/`** folder.
+
+```yaml
+- question: "What is the capital of Ukraine?"
+  image: "/imgs/ukraine_map.png"
+  options:
+    - "Kyiv"
+    - "Lviv"
+    - "Odesa"
+    - "Kharkiv"
+  correct_answer: 0
+```
+
+The image path is specified relative to the web root (`/imgs/`).
+
+---
+
+#### Image-Only Question (Without Text)
+
+If a question consists only of an image (e.g., "What is shown in the picture?"), you can **omit the `question` field**:
+
+```yaml
+- image: "/imgs/coordinate_system.png"
+  options:
+    - "MGRS"
+    - "UTM"
+    - "UCS-2000"
+    - "WGS84"
+  correct_answer: 2
+```
+
+In this case, the user will see only the image and answer options.
+
+---
+
+#### Question with Image-Based Answer Options
+
+Answer options can also be images.
+To do this, instead of text in the `options` list, specify paths to images:
+
+```
+- question: "Which symbol indicates the correct answer?"
+  options:
+    - "/imgs/checkmark.png"
+    - "/imgs/cross.png"
+    - "/imgs/question.png"
+  correct_answer: 0
+```
+
+---
+
+#### Combined Question: Image + Text Options
+
+You can combine an image in the question with text answer options:
+
+```yaml
+- question: "What coordinate system is shown in the picture?"
+  image: "/imgs/coordinate_grid.png"
+  options:
+    - "Cartesian"
+    - "Polar"
+    - "Cylindrical"
+    - "Spherical"
+  correct_answer: 1
+```
+
+---
+
+#### Question with Downloadable File
+
+You can add a downloadable file to a question using the **`file`** parameter.
+Files should be stored in the **`quizzes/attach/`** folder.
+
+```yaml
+- question: "Analyze the data from the file and find the average"
+  file: "data.xlsx"
+  options:
+    - "42"
+    - "56"
+    - "78"
+    - "91"
+  correct_answer: 1
+```
+
+Students will see a download button next to the question text.
+Clicking it will automatically download the file to the student's device.
+
+---
+
+#### Question Explanation
+
+A question can have an `explanation`: a short text the student reads after answering, to remember the right answer. It is written in **Markdown**: bold, lists, tables, links, code and images. Images come from the `quizzes/imgs/` folder, written the same way as question images.
+
+```yaml
+show_right_answer: true
+show_explanation: true
+questions:
+  - question: "Which planet is the largest?"
+    options: ["Mars", "Jupiter", "Earth"]
+    correct_answer: 1
+    explanation: |
+      **Jupiter** is the largest planet of the Solar System.
+
+      ![Jupiter](/imgs/jupiter.png)
+```
+
+- Write the text after `explanation: |` on new lines, indented, so Markdown line breaks are kept.
+- For an image name with spaces, use angle brackets: `![](</imgs/my picture.png>)`.
+- HTML in the text is shown as text, not run. Links open in a new tab.
+- The explanation is shown only when the test has `show_explanation: true` and `show_right_answer: true`.
+
+#### Combined Question: Image + File
+
+You can combine an image and a file in the same question:
+
+```yaml
+- question: "Compare the diagram with the data in the file"
+  image: "/imgs/diagram.png"
+  file: "analysis.csv"
+  options:
+    - "Data matches"
+    - "Data differs"
+    - "Insufficient data"
+  correct_answer: 0
+```
+
+---
+
+#### Text Input Questions
+
+In addition to multiple choice questions, WebQuiz supports text input questions where students type their answer. Questions with `checker` field are automatically detected as text input questions:
+
+```
+- question: "What is 2+2?"
+  default_value: ""
+  correct_value: "4"
+  checker: "assert user_answer.strip() == '4', 'Expected 4'"
+  points: 1
+```
+
+**Text Question Fields:**
+- **question** — question text
+- **checker** — required to identify as text question (can be empty for exact match)
+- **default_value** — initial value shown in the textarea (optional)
+- **correct_value** — correct answer shown when student is wrong (optional)
+- **points** — points for correct answer, a number with at most 2 decimals (default: 1)
+
+**Checker Code:**
+- Uses variable `user_answer` (the student's text input)
+- Available: `math` module (use `math.sqrt`, `math.sin`, etc.)
+- Available helper functions:
+  - `to_int(str)` — Convert string to integer (strips whitespace)
+  - `distance(str)` — Parse distance with units: "2000", "2000m", "2км", "2km" all return 2000
+  - `direction_angle(str)` — Parse direction angle: "20" returns 2000, "20-30" returns 2030
+- If the code raises any exception, the answer is marked incorrect
+- If checker is empty, exact match with `correct_value` is used (with whitespace stripped)
+
+Example with math validation:
+
+```
+- question: "Calculate the square root of 16"
+  correct_value: "4"
+  checker: |
+    result = float(user_answer)
+    assert abs(result - sqrt(16)) < 0.01, f'Expected 4, got {result}'
+  points: 2
+```
+
+---
+
+#### Checker Templates
+
+You can configure checker code templates in your `webquiz.yaml`:
+
+```
+checker_templates:
+  - name: "Exact Match"
+    code: "assert user_answer.strip() == 'expected', 'Wrong answer'"
+  - name: "Numeric Check"
+    code: "assert float(user_answer) == 42, 'Expected 42'"
+  - name: "Contains Check"
+    code: "assert 'keyword' in user_answer.lower(), 'Must contain keyword'"
+```
+
+Templates are available in the admin quiz editor for quick insertion.
+
+---
+
+### Complete Test File Example
+
+Below is an example of a complete test file with different types of questions:
+
+```
+title: "Comprehensive Test with Various Question Types"
+description: "Example test demonstrating all formatting capabilities"
+show_right_answer: true
+show_answers_on_completion: false  # Show answers after all students complete
+randomize_questions: false  # Set to true for randomized question order
+
+questions:
+  # Simple question with one correct option
+  - question: "What is 5 × 3?"
+    options:
+      - "8"
+      - "12"
+      - "15"
+      - "18"
+    correct_answer: 2
+
+  # Question with multiple correct answers
+  - question: "Which of these are programming languages?"
+    options:
+      - "Python"
+      - "HTML"
+      - "JavaScript"
+      - "CSS"
+      - "Ruby"
+    correct_answer: [0, 2, 4]
+
+  # Question with minimum number of correct answers
+  - question: "Select at least 2 European capitals:"
+    options:
+      - "Paris"
+      - "New York"
+      - "London"
+      - "Tokyo"
+      - "Berlin"
+    correct_answer: [0, 2, 4]
+    min_correct: 2
+
+  # Question with image
+  - question: "Which country is shown on the map?"
+    image: "/imgs/france_map.png"
+    options:
+      - "Germany"
+      - "France"
+      - "Spain"
+      - "Italy"
+    correct_answer: 1
+
+  # Image-only question (no text)
+  - image: "/imgs/python_logo.png"
+    options:
+      - "Java"
+      - "Python"
+      - "Ruby"
+      - "JavaScript"
+    correct_answer: 1
+
+  # Question with image-based answer options
+  - question: "Which flag belongs to Ukraine?"
+    options:
+      - "/imgs/flag_poland.png"
+      - "/imgs/flag_ukraine.png"
+      - "/imgs/flag_russia.png"
+    correct_answer: 1
+
+  # Question with downloadable file
+  - question: "Analyze the data from the spreadsheet"
+    file: "sales_data.xlsx"
+    options:
+      - "Growth 15%"
+      - "Growth 25%"
+      - "Decline 10%"
+    correct_answer: 1
+```
+
+---
+
+### Rules and Recommendations
+
+#### Index Numbering
+
+Indexes in `correct_answer` always start from **0**.
+
+| Index | Answer Option |
+|-------|---------------|
+| 0     | First option  |
+| 1     | Second option |
+| 2     | Third option  |
+| 3     | Fourth option |
+
+---
+
+#### Saving Images
+
+All images should be stored in the **`quizzes/imgs/`** folder.
+Image paths in the test file are specified as `/imgs/filename.png`.
+
+Supported formats:
+- PNG (.png)
+- JPEG (.jpg, .jpeg)
+- GIF (.gif)
+- SVG (.svg)
+
+---
+
+#### File Encoding
+
+Test files should be saved in **UTF-8** encoding to correctly display text in Ukrainian, Russian, and other languages with Cyrillic characters.
+
+---
+
+#### Syntax Validation
+
+**Recommended method:** Use the **administrator web interface** to create and edit tests.
+The admin panel automatically validates YAML syntax before saving the file and shows errors if any exist.
+
+If you're editing files manually and the test doesn't load after editing, check:
+- Correct indentation (YAML requires exact indentation)
+- Quotes around text values with special characters
+- Index correspondence in `correct_answer` to the number of options in `options`
+
+---
+
+### Creating a New Test
+
+#### Through Admin Interface (Recommended)
+
+1. Open the admin panel at `http://localhost:8080/admin/`
+2. Enter the master key for access
+3. Use the built-in editor to create a new test
+4. The editor will automatically validate syntax before saving
+5. If there are errors in the file, you'll see messages about them
+
+#### Manually Through File System
+
+1. Open the **`quizzes/`** folder in your WebQuiz working directory.
+2. Create a new file with `.yaml` extension, for example `my_test.yaml`.
+3. Fill the file according to the structure described above.
+4. Save the file in UTF-8 encoding.
+5. Restart the WebQuiz server or switch tests in the admin panel.
+
+The new test will appear in the list of available tests in the **Administration** section.
+
+---
+
+### Editing Existing Tests
+
+#### Through Admin Interface (Recommended)
+
+1. Open the admin panel
+2. Select a test to edit
+3. Make changes in the built-in editor
+4. Click "Save" — validation will happen automatically
+5. If there are errors, they will be displayed on screen
+
+#### Manually Through File System
+
+1. Open the corresponding `.yaml` file in the **`quizzes/`** folder in a text editor.
+2. Make the necessary changes.
+3. Save the file.
+4. In the admin panel, switch to a different test and then back to the edited one — changes will apply automatically.
+
+> **Tip:** Use the **administrator web interface** to create and edit tests — it has built-in YAML validation and will warn you about errors before saving.
+
+---
+
+### Common Errors
+
+#### Incorrect Indentation
+
+YAML is sensitive to indentation. All elements at the same level must have the same indentation.
+
+**Incorrect:**
+```yaml
+questions:
+- question: "Text"
+   options:
+     - "A"
+     - "B"
+  correct_answer: 0
+```
+
+**Correct:**
+```yaml
+questions:
+  - question: "Text"
+    options:
+      - "A"
+      - "B"
+    correct_answer: 0
+```
+
+---
+
+#### Index Mismatch
+
+If `correct_answer` specifies an index that doesn't exist in `options`, the test won't load.
+
+**Incorrect:**
+```yaml
+options:
+  - "A"
+  - "B"
+  - "C"
+correct_answer: 3  # Index 3 doesn't exist (only 0, 1, 2)
+```
+
+**Correct:**
+```yaml
+options:
+  - "A"
+  - "B"
+  - "C"
+correct_answer: 2  # Index 2 = option "C"
+```
+
+---
+
+#### Missing Quotes in Text with Special Characters
+
+If question or option text contains special characters (`:`, `#`, `{`, `}`), it must be enclosed in quotes.
+
+**Incorrect:**
+```
+question: What is 2:1?
+```
+
+**Correct:**
+```
+question: "What is 2:1?"
+```
+
+> **Tip:** The admin interface will automatically detect these errors and show them before saving the file.
+
+---
+
+### Additional Features
+
+#### Downloading Tests Through Admin Interface
+
+If the `config.yaml` configuration file has the **`quizzes`** section filled in, the administrator can download tests directly from the web interface.
+
+Example section in `config.yaml`:
+
+```
+quizzes:
+  - name: "Geography Test"
+    download_path: "https://example.com/tests/geography.zip"
+    folder: "geography/"
+```
+
+After downloading, the contents of the folder you named inside the archive are copied into `quizzes/`.
+
+Quizzes can also be downloaded from a private repository with an access token — see the `quizzes` section in [Configuration](040_config.md).
+
+---
+
+#### Switching Between Tests
+
+The administrator can switch the active test at any time through the **Administration** panel.
+When changing tests:
+- All active user sessions are reset
+- Previous test results are saved in corresponding CSV files
+- A new set of questions is loaded
+
+---
+
+### Real Test Examples
+
+#### Math Test
+
+```yaml
+title: "Basic Arithmetic"
+description: "Test on arithmetic operations knowledge"
+
+questions:
+  - question: "What is 7 + 5?"
+    options:
+      - "10"
+      - "11"
+      - "12"
+      - "13"
+    correct_answer: 2
+
+  - question: "What is 9 × 6?"
+    options:
+      - "45"
+      - "54"
+      - "63"
+      - "72"
+    correct_answer: 1
+
+  - question: "What is 20 ÷ 4?"
+    options:
+      - "4"
+      - "5"
+      - "6"
+      - "8"
+    correct_answer: 1
+```
+
+---
+
+#### Geography Test with Images
+
+```yaml
+title: "Countries and Flags"
+description: "Recognizing flags of world countries"
+
+questions:
+  - image: "/imgs/flag_france.png"
+    options:
+      - "Italy"
+      - "France"
+      - "Belgium"
+      - "Netherlands"
+    correct_answer: 1
+
+  - image: "/imgs/flag_japan.png"
+    options:
+      - "China"
+      - "Korea"
+      - "Japan"
+      - "Vietnam"
+    correct_answer: 2
+
+  - question: "What is the capital of Germany?"
+    options:
+      - "Munich"
+      - "Berlin"
+      - "Frankfurt"
+      - "Hamburg"
+    correct_answer: 1
+```
+
+---
+
+#### Programming Test with Multiple Choice
+
+```yaml
+title: "Programming Basics"
+show_right_answer: true
+
+questions:
+  - question: "Which languages are object-oriented?"
+    options:
+      - "Python"
+      - "C"
+      - "Java"
+      - "Assembly"
+      - "C#"
+    correct_answer: [0, 2, 4]
+
+  - question: "Which data structures are linear?"
+    options:
+      - "Array"
+      - "Tree"
+      - "List"
+      - "Graph"
+      - "Stack"
+    correct_answer: [0, 2, 4]
+    min_correct: 2
+```
+
+---
+
+### Summary
+
+The YAML format for tests in **WebQuiz** allows:
+
+✅ Creating questions with single and multiple choice
+✅ Creating text input questions with Python validation
+✅ Adding images to questions and answer options
+✅ Setting minimum number of correct answers
+✅ Showing or hiding correct answers after completion
+✅ Randomizing question order for each student to prevent cheating
+✅ Copy protection — students cannot select or copy question text
+✅ Setting different point values for each question
+✅ Using checker templates for text questions
+✅ Easily editing tests in web interface with automatic validation
+
+**Recommendation:** Use the administrator web interface to create and edit tests — it automatically validates syntax and warns about errors!

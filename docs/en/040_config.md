@@ -1,0 +1,287 @@
+## Server Configuration File
+
+### Language
+
+```
+language: en
+```
+
+- **language** — quiz interface language. Supported values: `"uk"` (Ukrainian, default) and `"en"` (English).
+  This setting controls all user-facing text: registration form labels, quiz buttons, progress indicators, validation error messages, and results display.
+  Hot-reloadable — changes are applied immediately when saved via the admin panel.
+
+### Extra answers-with-users CSV export
+
+```
+extra_answers_with_users_csv: true
+```
+
+- **extra_answers_with_users_csv** — when set to `true`, the server generates
+  a **third** CSV file alongside the standard answers and users CSVs. The
+  `extra_` prefix signals that this is generated in addition to the two
+  default files; `answers_with_users` describes exactly what is combined.
+  The file is named `<quiz>_<NNNN>.answers_with_users.csv` and has one row
+  per submitted answer, with `user_id`, `username`, and any registration
+  fields configured under `registration.fields` prepended to the usual
+  answer columns. This makes downstream analysis easier — you don't have to
+  join the two existing CSVs yourself.
+  Default is `false`. Hot-reloadable — the change takes effect on the next
+  quiz switch or quiz restart.
+
+---
+
+### Section `server`
+
+```
+server:
+  host: "0.0.0.0"
+  port: 8080
+  include_ipv6: false
+  url_format: "http://{IP}:{PORT}/"
+```
+
+- **host** — determines which network interfaces the server accepts connections on.
+  - `"127.0.0.1"` — the server will only be accessible from the same computer (locally).
+  - `"0.0.0.0"` — the server will be accessible to all devices on the local network (via Wi-Fi or Ethernet).
+  Use `"0.0.0.0"` if other devices on your local network will be connecting to the quiz.
+- **port** — the port on which the server runs.
+  By default, `8080` is used. If this port is occupied, you can change it to another, such as `8000`.
+  You can also set it on the command line with `webquiz --port 8000`, which overrides the config file.
+- **include_ipv6** — whether to include IPv6 addresses in the network interfaces list.
+  Default is `false`. If set to `true`, IPv6 addresses will be shown in the list of URLs for accessing from other devices.
+- **url_format** — URL format for displaying in the admin panel.
+  Default is `"http://{IP}:{PORT}/"`. Use placeholders `{IP}` and `{PORT}`.
+  Example for reverse proxy: `"http://{IP}/webquiz/"`
+
+---
+
+### Section `paths`
+
+```
+paths:
+  quizzes_dir: "quizzes"
+  logs_dir: "logs"
+  csv_dir: "data"
+  static_dir: "static"
+```
+
+The `paths` section defines the location of service folders. If the specified directories don't exist, they are created automatically on first launch.
+
+- **quizzes_dir: "quizzes"**
+  Directory for storing quizzes in YAML format.
+  On first launch, an example quiz `default.yaml` is created here.
+  It can also contain an **`imgs`** subfolder where images used in questions are stored.
+
+- **logs_dir: "logs"**
+  Contains server operation logs.
+  These files record messages about launches, errors, or other events.
+  Each new launch creates a new log, for example `0001.log`, `0002.log`.
+
+- **csv_dir: "data"**
+  Directory where quiz results are stored in CSV format.
+  For each quiz, two files are created (three when `extra_answers_with_users_csv: true`):
+  - `default_0001.csv` — user answers without personal data;
+  - `default_0001.users.csv` — user data with registration fields, including total quiz completion time in `MM:SS` format (minutes:seconds);
+  - `default_0001.answers_with_users.csv` — only when `extra_answers_with_users_csv: true`: per-answer rows with `user_id`, `username`, and registration fields prepended to each answer.
+  All files can be opened in any spreadsheet editor (Excel, Google Sheets).
+
+- **static_dir: "static"**
+  Directory with static web files.
+  The main file **index.html** is a service file that is generated or updated automatically.
+  You don't need to edit it manually.
+
+---
+
+### Section `admin`
+
+```
+admin:
+  master_key: a1
+```
+
+- **master_key** — access key to the administrative interface.
+  If a key **is specified**, the administrator can open the control panel from any device on the network by entering this key.
+  If a key **is not specified**, the admin panel will be accessible **only from local addresses** (for example, `127.0.0.1` or `localhost`), and in this case, entering a key **is not required**.
+
+---
+
+### Section `registration` (optional)
+
+```
+registration:
+  approve: false
+  username_label: "Ім'я користувача"
+  fields:
+    - Grade
+    - School
+  disabled_fields:
+    - Teacher
+    - City
+```
+
+This section defines how users register before taking quizzes.
+
+- **approve**
+  If set to `true`, the user will not be able to start the quiz immediately after filling out the form — their request will be added to a waiting list, and the administrator must approve it manually.
+  If the value is `false`, the user can start the quiz immediately after registration.
+
+- **username_label**
+  Customizes the label text for the username input field in the registration form.
+  Default: follows the `language` setting — `"Ім'я користувача"` for `uk`, `"Username"` for `en`.
+  Usage examples:
+  ```
+  username_label: "Full Name"
+  username_label: "Student ID"
+  username_label: "Прізвище та ім'я"
+  ```
+  This label appears in both the registration form and the waiting for approval form.
+  Supports special characters, emojis, and multilingual text.
+
+- **fields**
+  Additional registration fields that appear in the form before starting the quiz.
+  For example:
+  ```
+  fields:
+    - Grade
+    - School
+    - City
+  ```
+  All collected data is automatically saved to the CSV results file.
+
+- **disabled_fields**
+  Additional registration fields that are kept in the config but are not shown on the registration form. Use this to "park" fields you toggle on and off often without losing their names.
+
+  In the admin file manager (Config → Form view), every additional field shows a checkbox: uncheck it to move the field from `fields` to `disabled_fields`, check it to move the field back. Saving the form simply shuffles each field between the two lists — nothing is deleted, so you can re-enable a field in one click later.
+
+---
+
+### Section `quizzes` (optional)
+
+```
+quizzes:
+  - name: "Basic Math Quiz"
+    download_path: "https://example.com/quizzes/math.zip"
+    folder: "math_questions/"
+```
+
+This section allows the administrator to download quizzes from external sources through the administrative interface.
+
+- **name** — the name of the quiz that appears in the admin panel.
+- **download_path** — link to an archive with the quiz (for example, `.zip`).
+- **folder** — the folder **inside the archive** whose contents are copied into your quizzes directory. Leave it empty to copy the whole archive.
+
+#### Private archives
+
+One more optional field lets you download from a place that needs an access token, such as a private GitHub repository:
+
+- **auth_header_token** — the access token. The server sends it in the `Authorization` header of the download request. Without this field the archive is downloaded without any token, which is what public archives need.
+
+```
+quizzes:
+  - name: "My Private Quizzes"
+    download_path: "https://api.github.com/repos/myname/my-quizzes/zipball/master"
+    folder: "data"
+    auth_header_token: "github_pat_..."
+```
+
+For a private GitHub repository:
+
+1. Create a **fine-grained personal access token**: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
+2. Under *Repository access* choose only the repository with your quizzes, and under *Permissions* give it **Contents: Read-only**. Nothing else is needed.
+3. Use the API address of the archive, as in the example above: `https://api.github.com/repos/OWNER/REPO/zipball/BRANCH`.
+
+The usual browser address `https://github.com/OWNER/REPO/archive/refs/heads/master.zip` does **not** work with a token. GitHub redirects it to another host, and the token is dropped on the way for safety, so the download fails with "HTTP 404". The `api.github.com` address above works because it signs the redirect itself.
+
+A GitHub archive keeps everything inside one directory named after the repository and the commit, and that name changes with every push. You do not have to write it: give `folder` as the path inside the repository (`data` in the example), and the server finds it inside the archive.
+
+Two things to keep in mind:
+
+- A token is only ever sent over `https`. If `download_path` starts with `http://`, the download is refused.
+- A token written in the config file is visible to anyone who can open the Config tab of the file manager, which means anyone on your local network who has the master key. The token is never sent to the browser as part of the admin page, but the config file itself shows it.
+
+---
+
+### Section `tunnel` (optional)
+
+**Option 1: Fetch config from server**
+```
+tunnel:
+  server: "tunnel.example.com"
+  public_key: "keys/id_ed25519.pub"
+  private_key: "keys/id_ed25519"
+  socket_name: "my-quiz-socket"  # Optional: Fixed socket name (default: random 6-8 chars)
+  # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml
+```
+
+**Option 2: Local config (bypasses server fetch)**
+```
+tunnel:
+  server: "tunnel.example.com"
+  public_key: "keys/id_ed25519.pub"
+  private_key: "keys/id_ed25519"
+  config:  # Optional: Provide locally to skip fetching from server
+    username: "tunneluser"
+    socket_directory: "/var/run/tunnels"
+    base_url: "https://tunnel.example.com/tests"
+```
+
+The `tunnel` section allows you to configure an SSH tunnel for public access to your local server through an external tunnel server. This is useful for:
+- Running quizzes from a local computer without port forwarding configuration
+- Temporary public access without dedicated hosting
+- Classroom environments where students connect from outside the local network
+
+**Parameters:**
+
+- **server** — domain name or IP address of the tunnel server (e.g., `"tunnel.example.com"`).
+  This is the server that provides public access to your local WebQuiz instance.
+
+- **public_key** — path to the SSH public key file.
+  If the file doesn't exist, WebQuiz will automatically generate an ED25519 key pair.
+  Example: `"keys/id_ed25519.pub"`
+
+- **private_key** — path to the SSH private key file.
+  Used for authentication on the tunnel server.
+  Example: `"keys/id_ed25519"`
+
+- **socket_name** (optional) — fixed socket name instead of random generation.
+  Allows having a predictable URL for public access through the tunnel.
+  If not specified, a random identifier of 6-8 characters is generated.
+  Required for sending files between servers: it is the name other servers use to reach this one.
+  Use letters, digits, `-`, `_` and `.`.
+  After a disconnect, the same name may be busy for up to 5 minutes, until the tunnel server removes the old socket file.
+  Example: `"my-quiz-socket"`
+
+- **config** (optional subsection) — local tunnel configuration.
+  If provided, WebQuiz will use this configuration instead of fetching from the server.
+  - **username** — SSH user for tunnel server connection
+  - **socket_directory** — directory on server for Unix domain sockets
+  - **base_url** — base URL for tunnel access (e.g., `"https://tunnel.example.com/tests"`)
+
+**How it works:**
+
+1. **Automatic key generation**: If keys are missing, WebQuiz automatically creates an ED25519 key pair without a passphrase.
+
+2. **Admin panel control**: Open the administrative panel to view the tunnel status.
+
+3. **Copy public key**: Copy the generated public key and add it to the `~/.ssh/authorized_keys` file on your tunnel server.
+
+4. **Connect**: Click the "Connect" button in the admin panel to establish the tunnel.
+
+5. **Public URL**: Once connected, a public URL will be displayed (e.g., `https://tunnel.example.com/tests/a3f7b2/`).
+
+6. **Auto-reconnect**: If the connection drops, WebQuiz automatically attempts to restore it.
+
+**Server requirements:**
+- The tunnel server must support Unix domain socket forwarding
+- The server must provide a `tunnel_config.yaml` endpoint at `https://[server]/tunnel_config.yaml` with the following parameters:
+  ```yaml
+  username: tunneluser
+  socket_directory: /var/run/tunnels
+  base_url: https://tunnel.example.com/tests
+  ```
+
+**Security notes:**
+- SSH keys are generated without a passphrase for automated connection
+- The private key is stored with 600 permissions (owner only)
+- Connection is admin-initiated (no auto-connect on startup)
+- Connection status is displayed in real-time via WebSocket
