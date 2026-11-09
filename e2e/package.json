@@ -1,0 +1,16 @@
+{
+  "name": "webquiz-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test --trace off",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22",
+    "typescript": "^5",
+    "yaml": "^2"
+  }
+}
