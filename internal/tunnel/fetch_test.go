@@ -115,7 +115,7 @@ func TestFetchTunnelConfigMissingFields(t *testing.T) {
 	if got != nil {
 		t.Errorf("fetchTunnelConfig() = %+v, want nil", got)
 	}
-	if st := m.Status(); !strings.Contains(st.Error, "socket_directory") {
+	if st := m.Status(); !strings.Contains(string(st.Error), "socket_directory") {
 		t.Errorf("status error = %q, want it to name socket_directory", st.Error)
 	}
 }
@@ -147,10 +147,10 @@ func TestFetchTunnelConfigBadStatus(t *testing.T) {
 				t.Fatalf("fetchTunnelConfig() = %+v, %v, want an error", got, err)
 			}
 			st := m.Status()
-			if !strings.HasPrefix(st.Error, "Failed to fetch config from server: "+tc.wantText) {
+			if !strings.HasPrefix(string(st.Error), "Failed to fetch config from server: "+tc.wantText) {
 				t.Errorf("status error = %q, want it to start with %q", st.Error, "Failed to fetch config from server: "+tc.wantText)
 			}
-			if err.Error() != st.Error {
+			if err.Error() != string(st.Error) {
 				t.Errorf("error = %q, want the status error %q", err, st.Error)
 			}
 			if requests := web.requestURLs(); len(requests) != 1 {

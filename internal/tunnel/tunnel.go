@@ -13,6 +13,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -53,13 +54,29 @@ type ServerConfig struct {
 }
 
 // Status is what the admin panel shows about the tunnel. The JSON names are
-// the keys of Python's status dict. An empty string stands for Python's None.
+// the keys of Python's status dict. URL, Error and PublicKeyContent are empty
+// where Python had None, and their JSON is null then, as in Python.
+//
+// Status has no MarshalJSON of its own, so a struct that embeds it (the
+// server adds configured, server and socket_name) keeps its other fields.
 type Status struct {
-	Connected        bool   `json:"connected"`
-	URL              string `json:"url"`
-	Error            string `json:"error"`
-	KeysStatus       string `json:"keys_status"`
-	PublicKeyContent string `json:"public_key_content"`
+	Connected        bool           `json:"connected"`
+	URL              OptionalString `json:"url"`
+	Error            OptionalString `json:"error"`
+	KeysStatus       string         `json:"keys_status"`
+	PublicKeyContent OptionalString `json:"public_key_content"`
+}
+
+// OptionalString is a string that Python could leave as None: the empty
+// string stands for None and is written to JSON as null.
+type OptionalString string
+
+// MarshalJSON writes null for the empty string, and a JSON string otherwise.
+func (s OptionalString) MarshalJSON() ([]byte, error) {
+	if s == "" {
+		return []byte("null"), nil
+	}
+	return json.Marshal(string(s))
 }
 
 // The values of Status.KeysStatus.
@@ -354,7 +371,7 @@ func (m *Manager) attempt(ctx context.Context, r *run) (*session, error) {
 	m.mu.Unlock()
 	if cfg.Server == "" {
 		m.mu.Lock()
-		m.status.Error = errNoServer.Error()
+		m.status.Error = OptionalString(errNoServer.Error())
 		m.mu.Unlock()
 		return nil, errNoServer
 	}
@@ -387,7 +404,7 @@ func (m *Manager) attempt(ctx context.Context, r *run) (*session, error) {
 	m.sess = s
 	m.socketID, m.baseURL = socketID, baseURL
 	m.status.Connected = true
-	m.status.URL = s.url
+	m.status.URL = OptionalString(s.url)
 	m.status.Error = ""
 	m.want = true
 	localAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(m.localPort))
@@ -413,7 +430,7 @@ func (m *Manager) failed(r *run, err error) error {
 	if current {
 		m.status.Connected = false
 		m.status.URL = ""
-		m.status.Error = err.Error()
+		m.status.Error = OptionalString(err.Error())
 	}
 	m.mu.Unlock()
 	if current {
