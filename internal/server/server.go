@@ -336,14 +336,13 @@ func (s *Server) runSafely(name string, work func() error) {
 // written to the CSV files first (Python lost them on exit). Then the log
 // file is closed. Close does not stop the HTTP server that serves Handler;
 // stop that first. Calling Close again does nothing.
-func (s *Server) Close() error {
+func (s *Server) Close() {
 	s.closeOnce.Do(func() {
 		s.cancel()
 		s.loops.Wait()
 		s.flushCSV()
 		s.shutdown()
 	})
-	return nil
 }
 
 // shutdown closes the clients, the tunnel and the log file.
