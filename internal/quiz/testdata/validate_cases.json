@@ -1,0 +1,1915 @@
+[
+ {
+  "data": null,
+  "valid": false,
+  "errors": [
+   "Дані квізу повинні бути словником"
+  ]
+ },
+ {
+  "data": [],
+  "valid": false,
+  "errors": [
+   "Дані квізу повинні бути словником"
+  ]
+ },
+ {
+  "data": "text",
+  "valid": false,
+  "errors": [
+   "Дані квізу повинні бути словником"
+  ]
+ },
+ {
+  "data": 5,
+  "valid": false,
+  "errors": [
+   "Дані квізу повинні бути словником"
+  ]
+ },
+ {
+  "data": {},
+  "valid": false,
+  "errors": [
+   "Квіз повинен містити поле 'questions'"
+  ]
+ },
+ {
+  "data": {
+   "questions": null
+  },
+  "valid": false,
+  "errors": [
+   "'questions' повинно бути списком"
+  ]
+ },
+ {
+  "data": {
+   "questions": {}
+  },
+  "valid": false,
+  "errors": [
+   "'questions' повинно бути списком"
+  ]
+ },
+ {
+  "data": {
+   "questions": "x"
+  },
+  "valid": false,
+  "errors": [
+   "'questions' повинно бути списком"
+  ]
+ },
+ {
+  "data": {
+   "questions": []
+  },
+  "valid": false,
+  "errors": [
+   "Квіз повинен містити принаймні одне питання"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    5
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must be a dictionary"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must have either question text or image"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "image": "/imgs/a.png"
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "image": ""
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must have either question text or image"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": 0,
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must have either question text or image"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": null,
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "image": null
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must have either question text or image"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q"
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 missing required field: options",
+   "Question 1 missing required field: correct_answer"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 missing required field: options"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 missing required field: correct_answer"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": "AB",
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 options must be a list"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": {
+      "a": 1,
+      "b": 2
+     },
+     "correct_answer": 1
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 options must be a list"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A"
+     ],
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must have at least 2 options"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      1
+     ],
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 all options must be strings"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      null
+     ],
+     "correct_answer": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 all options must be strings"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 3
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer index out of range"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": -1
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer index out of range"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": true
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 1.0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer must be an integer or array of integers"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": "0"
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer must be an integer or array of integers"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": null
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer must be an integer or array of integers"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": {
+      "a": 1
+     }
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer must be an integer or array of integers"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": []
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer array cannot be empty"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      "1"
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer array must contain only integers"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      1.0
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer array must contain only integers"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      3
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer array contains index out of range"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      -1,
+      0
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer array contains index out of range"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer array contains duplicate indices"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      1,
+      true
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 correct_answer array contains duplicate indices"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ]
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": 1
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": 2
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 min_correct must be at least 1"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": 3
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 min_correct cannot exceed number of correct answers"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": 1.5
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 min_correct must be an integer"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": "1"
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 min_correct must be an integer"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": true
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": false
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 min_correct must be at least 1"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      2
+     ],
+     "min_correct": null
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 min_correct must be an integer"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 1,
+     "min_correct": 1
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 min_correct is only valid for multiple answer questions"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "min_correct": 1
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 missing required field: correct_answer",
+   "Question 1 has min_correct but no correct_answer"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 1
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points must be greater than 0"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": -1
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points must be greater than 0"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 1.5
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 1.25
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 1.255
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points can have at most 2 decimal places"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 0.1
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 0.125
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points can have at most 2 decimal places"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 2.675
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points can have at most 2 decimal places"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 0.001
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points can have at most 2 decimal places"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 100
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": 100.0
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": true
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points must be a positive number"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": "2"
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points must be a positive number"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": null
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points must be a positive number"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "points": [
+      1
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points must be a positive number"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "stick_to_the_previous": true
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 cannot have 'stick_to_the_previous: true' (no previous question to stick to)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "stick_to_the_previous": false
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    },
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "stick_to_the_previous": true
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    },
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "stick_to_the_previous": "yes"
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 2 'stick_to_the_previous' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    },
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "stick_to_the_previous": 1
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 2 'stick_to_the_previous' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    },
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "stick_to_the_previous": null
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 2 'stick_to_the_previous' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "show_right_answer": "no"
+  },
+  "valid": false,
+  "errors": [
+   "'show_right_answer' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "randomize_questions": 1
+  },
+  "valid": false,
+  "errors": [
+   "'randomize_questions' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "show_answers_on_completion": null
+  },
+  "valid": false,
+  "errors": [
+   "'show_answers_on_completion' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "show_final_list": "x"
+  },
+  "valid": false,
+  "errors": [
+   "'show_final_list' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "show_explanation": "yes"
+  },
+  "valid": false,
+  "errors": [
+   "'show_explanation' must be a boolean (true or false)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "show_right_answer": false,
+   "randomize_questions": true,
+   "show_answers_on_completion": true,
+   "show_final_list": false,
+   "show_explanation": true
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "title": 5
+  },
+  "valid": false,
+  "errors": [
+   "'title' must be a string"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "title": null
+  },
+  "valid": false,
+  "errors": [
+   "'title' must be a string"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "title": "Тест"
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "explanation": 5
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 'explanation' must be text"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "explanation": null
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "explanation": [
+      "x"
+     ]
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 'explanation' must be text"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "explanation": "**Why**"
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "time_limit": {
+    "per_question": 30
+   }
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "time_limit": {
+    "whole_quiz": 1.5
+   }
+  },
+  "valid": false,
+  "errors": [
+   "'time_limit.whole_quiz' must be a whole number of seconds (0 or more)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "time_limit": {
+    "minutes": 1
+   }
+  },
+  "valid": false,
+  "errors": [
+   "'time_limit' has an unknown key: 'minutes'"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0
+    }
+   ],
+   "time_limit": 30
+  },
+  "valid": false,
+  "errors": [
+   "'time_limit' must have exactly one of 'per_question' or 'whole_quiz'"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "time_limit": -5
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 'time_limit' must be a whole number of seconds (0 or more)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": 0,
+     "time_limit": 10
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": ""
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": 5
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 checker must be a string"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": null
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 checker must be a string"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": "",
+     "default_value": 5,
+     "correct_value": 6
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 default_value must be a string",
+   "Question 1 correct_value must be a string"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": "",
+     "default_value": "a",
+     "correct_value": "b"
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": "assert user_answer.strip() == '5', 'no'"
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": "if True print(1)"
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 checker has invalid Python syntax: invalid syntax (line 1)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": "x = (1,\ny = 2"
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 checker has invalid Python syntax: '(' was never closed (line 1)"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "checker": ""
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must have either question text or image"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": "",
+     "options": [
+      "A"
+     ],
+     "correct_answer": 5,
+     "min_correct": 0
+    }
+   ]
+  },
+  "valid": true,
+  "errors": []
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "question": "Q",
+     "checker": "",
+     "points": 0
+    }
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 points must be greater than 0"
+  ]
+ },
+ {
+  "data": {
+   "questions": [
+    {
+     "options": [
+      "A"
+     ],
+     "correct_answer": [],
+     "points": 0,
+     "stick_to_the_previous": true
+    },
+    "x",
+    {
+     "question": "Q",
+     "options": [
+      "A",
+      "B",
+      "C"
+     ],
+     "correct_answer": [
+      0,
+      0
+     ],
+     "min_correct": 5
+    }
+   ],
+   "show_right_answer": "no",
+   "title": 1,
+   "time_limit": {}
+  },
+  "valid": false,
+  "errors": [
+   "Question 1 must have either question text or image",
+   "Question 1 must have at least 2 options",
+   "Question 1 correct_answer array cannot be empty",
+   "Question 1 points must be greater than 0",
+   "Question 1 cannot have 'stick_to_the_previous: true' (no previous question to stick to)",
+   "Question 2 must be a dictionary",
+   "Question 3 correct_answer array contains duplicate indices",
+   "Question 3 min_correct cannot exceed number of correct answers",
+   "'show_right_answer' must be a boolean (true or false)",
+   "'title' must be a string",
+   "'time_limit' must have exactly one of 'per_question' or 'whole_quiz'"
+  ]
+ }
+]
