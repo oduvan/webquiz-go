@@ -122,6 +122,19 @@ CASES = [
     {"name": "is_integer", "checker": "assert float(user_answer).is_integer(), 'Whole number please'", "answers": ["4.0", "4.5"]},
     {"name": "format method without spec", "checker": "x = float(user_answer)\nassert x == 1, 'got {}'.format(x)", "answers": ["1", "2"]},
     {"name": "percent format without precision", "checker": "x = int(user_answer)\nassert x == 1, 'got %d' % x", "answers": ["1", "2"]},
+    # Text read as numbers: like Python's int() and float(), the helpers take
+    # any Unicode decimal digit, Unicode spaces and "_" between digits.
+    {"name": "to_int with Unicode digits", "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+     "answers": ["４２", "٤٢", " 42　", "\x1c42", "+4_2", "1_000", "4__2", "42²"]},
+    {"name": "int() text forms", "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+     "answers": ["७", " +7 ", "0_7", "\x1c7", "7_", "Ⅶ", "1٣"]},
+    {"name": "int() digit limit", "checker": "n = int(user_answer)\nassert n > 0", "answers": ["9" * 4300, "9" * 4301]},
+    {"name": "distance with Unicode digits", "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+     "answers": ["１.５km", "1_500m", "1.5E3", "+1500м", "１５００", "2\x1ckm", "1.5e3km", "inf"]},
+    {"name": "direction_angle with Unicode digits", "checker": "assert direction_angle(user_answer) == 2030, 'wrong angle'",
+     "answers": ["２０-３０", "20-3_0", " 20 -　30 ", "20-٣٠", "+20-+30"]},
+    {"name": "float() text forms", "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+     "answers": ["１.５", "Infinity", "-inf", "+nan", "+1E-3", "1_0e1_0", " 1.5 ", "\x1c1.5", "١٫٥", "in_f", ".5_0", "1e5_"]},
     # Python features the Go checker cannot run
     {"name": "try and except", "checker": "try:\n    v = float(user_answer)\nexcept ValueError:\n    v = None\nassert v == 1.5, 'Expected 1.5'",
      "answers": ["1.5", "abc"], "go_unsupported": "try/except is not supported"},

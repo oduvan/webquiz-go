@@ -6,17 +6,21 @@ package checker
 //
 //   - assert X, Y            ->  _assert_(X, lambda: (Y))
 //   - f"..{x!r:>8}.."        ->  (".." + _fmt_((x), "r", ">8") + "..")
-//   - a ** b                 ->  pow(a, b)
+//   - a ** b                 ->  _pow_(a, b)
 //   - a * b                  ->  _mul_(a, b)          (refuses a text or list too large)
-//   - a < b < c              ->  (a < b and b < c)
-//   - a is b, a is not b     ->  a == b, a != b
+//   - a < b                  ->  _cmp_("<", a, b)      (NaN compares like in Python)
+//   - a < b < c              ->  (_cmp_("<", a, b) and _cmp_("<", b, c))
+//   - a is b, a is not b     ->  _cmp_("==", a, b), _cmp_("!=", a, b)
 //   - for x in s             ->  for x in _iter_(s)   (Python can loop over text)
 //   - (x for x in s)         ->  [x for x in s]       (Starlark has no generators)
-//   - {a, b}                 ->  set([a, b])
+//   - {a, b}                 ->  _set_([a, b])
 //   - "a" "b"                ->  "ab"
 //   - a = b = 0              ->  _chained_value_ = 0; a = _chained_value_; b = _chained_value_
 //   - x.sort()               ->  _attr_(x, "sort")()  (methods Starlark lacks)
 //   - type hints are dropped, strings get Starlark quotes and escapes.
+//
+// The names that start and end with "_" are builtins that the checker
+// cannot change, so a checker may still assign to pow or set.
 //
 // The code is put inside a function, so that it can assign to user_answer
 // and use if, for and while at the top level:
@@ -665,7 +669,7 @@ func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
 		case "@=":
 			return nil, &SyntaxError{Msg: "'@=' is not supported in checker code", Line: op.line}
 		case "**=":
-			out := append(first, added("="), added("pow"), added("("))
+			out := append(first, added("="), added("_pow_"), added("("))
 			out = append(out, copyAdded(first)...)
 			out = append(out, added(","))
 			out = append(out, value...)
@@ -872,30 +876,48 @@ func (p *parser) notTest() ([]piece, *SyntaxError) {
 	return p.comparison()
 }
 
-// compOp reads a comparison operator. "is" and "is not" become "==" and
-// "!=": Starlark has no "is", and checkers use it for None, True and False.
-func (p *parser) compOp() ([]piece, bool) {
+// compOp reads a comparison operator and returns its Python text, and the
+// pieces of "in" and "not in", which stay in the code. "is" and "is not"
+// become "==" and "!=": Starlark has no "is", and checkers use it for None,
+// True and False.
+func (p *parser) compOp() (string, []piece, bool) {
 	tok := p.peek()
 	switch {
 	case tok.kind == tokOp:
 		switch tok.text {
 		case "<", ">", "==", ">=", "<=", "!=":
-			return []piece{p.take()}, true
+			p.take()
+			return tok.text, nil, true
 		}
 	case tok.kind == tokName && tok.text == "in":
-		return []piece{p.take()}, true
+		return "in", []piece{p.take()}, true
 	case tok.kind == tokName && tok.text == "not" && p.pos+1 < len(p.toks) && p.toks[p.pos+1].kind == tokName && p.toks[p.pos+1].text == "in":
 		not := p.take()
-		return []piece{not, p.take()}, true
+		return "not in", []piece{not, p.take()}, true
 	case tok.kind == tokName && tok.text == "is":
-		is := p.take()
+		p.take()
 		if p.atKeyword("not") {
 			p.take()
-			return []piece{{text: "!=", line: is.line}}, true
+			return "!=", nil, true
 		}
-		return []piece{{text: "==", line: is.line}}, true
+		return "==", nil, true
 	}
-	return nil, false
+	return "", nil, false
+}
+
+// compare writes one comparison. "in" and "not in" stay as they are; the
+// others go through _cmp_, because Starlark puts NaN above every number,
+// while in Python every comparison with NaN is false, except "!=".
+func compare(op string, opPieces, left, right []piece) []piece {
+	if op == "in" || op == "not in" {
+		out := append(append([]piece{}, left...), opPieces...)
+		return append(out, right...)
+	}
+	out := []piece{added("_cmp_"), added("("), added(strconv.Quote(op)), added(",")}
+	out = append(out, left...)
+	out = append(out, added(","))
+	out = append(out, right...)
+	return append(out, added(")"))
 }
 
 func (p *parser) comparison() ([]piece, *SyntaxError) {
@@ -903,10 +925,14 @@ func (p *parser) comparison() ([]piece, *SyntaxError) {
 	if err != nil {
 		return nil, err
 	}
-	type link struct{ op, right []piece }
+	type link struct {
+		op       string
+		opPieces []piece
+		right    []piece
+	}
 	var links []link
 	for {
-		op, ok := p.compOp()
+		op, opPieces, ok := p.compOp()
 		if !ok {
 			break
 		}
@@ -914,14 +940,13 @@ func (p *parser) comparison() ([]piece, *SyntaxError) {
 		if err != nil {
 			return nil, err
 		}
-		links = append(links, link{op, right})
+		links = append(links, link{op, opPieces, right})
 	}
 	switch len(links) {
 	case 0:
 		return first, nil
 	case 1:
-		out := append(first, links[0].op...)
-		return append(out, links[0].right...), nil
+		return compare(links[0].op, links[0].opPieces, first, links[0].right), nil
 	}
 	// a < b < c: Starlark does not chain comparisons.
 	out := []piece{added("(")}
@@ -931,9 +956,7 @@ func (p *parser) comparison() ([]piece, *SyntaxError) {
 			out = append(out, added("and"))
 			left = copyAdded(links[i-1].right)
 		}
-		out = append(out, left...)
-		out = append(out, l.op...)
-		out = append(out, l.right...)
+		out = append(out, compare(l.op, l.opPieces, left, l.right)...)
 	}
 	return append(out, added(")")), nil
 }
@@ -1016,7 +1039,7 @@ func (p *parser) power() ([]piece, *SyntaxError) {
 	if err != nil {
 		return nil, err
 	}
-	out := []piece{added("pow"), added("(")}
+	out := []piece{added("_pow_"), added("(")}
 	out = append(out, base...)
 	out = append(out, added(","))
 	out = append(out, exponent...)
@@ -1303,8 +1326,8 @@ func (p *parser) braceAtom() ([]piece, *SyntaxError) {
 	if p.at(":") {
 		return p.dictRest(open, first)
 	}
-	// A set: Starlark has no set literal, so {a, b} becomes set([a, b]).
-	out := []piece{{text: "set", line: open.line}, added("("), added("[")}
+	// A set: Starlark has no set literal, so {a, b} becomes _set_([a, b]).
+	out := []piece{{text: "_set_", line: open.line}, added("("), added("[")}
 	out = append(out, first...)
 	if p.atKeyword("for") {
 		comp, err := p.compFor()

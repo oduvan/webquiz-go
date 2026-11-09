@@ -106,6 +106,12 @@ func TestCheckComparisons(t *testing.T) {
 		{"in lambda", "ok = lambda v: 0 <= v <= 1\nassert ok(0.5) and not ok(2)", "", true, ""},
 		{"middle evaluated twice is fine", "assert 1 < len(user_answer) < 4", "abc", true, ""},
 		{"is None", "v = None\nassert v is None and v is not 0", "", true, ""},
+		// Starlark puts NaN above every number; Python says every comparison
+		// with NaN is false, except "!=". A student must not pass x > 0 with "nan".
+		{"nan is not greater", "x = float(user_answer)\nassert x > 0", "nan", false, ""},
+		{"nan is not equal to itself", "x = float(user_answer)\nassert not (x == x) and x != x and not (x <= 1e308)", "nan", true, ""},
+		{"nan with an int", "x = float(user_answer)\nassert not (x > 1) and not (1 < x) and not (0 <= x <= 2)", "nan", true, ""},
+		{"comparison errors stay", "assert 1 < 'a'", "", false, "int < string not implemented"},
 	})
 }
 
@@ -134,6 +140,13 @@ func TestCheckBuiltins(t *testing.T) {
 		{"int error like Python", "x = int(user_answer)", "3.14", false, "invalid literal for int() with base 10: '3.14'"},
 		{"float error like Python", "x = float(user_answer)", "abc", false, "could not convert string to float: 'abc'"},
 		{"float with spaces", "assert float(user_answer) == 2.5", " 2.5 ", true, ""},
+		// int(text, base): the expected results and errors are Python's.
+		{"int with a base", "assert int('ff', 16) == 255 and int('0xff', 0) == 255 and int('  ff  ', 16) == 255 and int('z', 36) == 35 and int('1_2', 7) == 9 and int('\u0661\u0662', 7) == 9 and int('0', 0) == 0", "", true, ""},
+		{"int with a base and a bad digit", "x = int('13', 3)", "", false, "invalid literal for int() with base 3: '13'"},
+		{"int with base 0 and a leading zero", "x = int('010', 0)", "", false, "invalid literal for int() with base 0: '010'"},
+		{"int with a bad base", "x = int('12', 37)", "", false, "int() base must be >= 2 and <= 36, or 0"},
+		{"int with a base of two has no digit limit", "assert int('7' * 4301, 8) > 0", "", true, ""},
+		{"int with another base has the digit limit", "x = int('6' * 4301, 7)", "", false, "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"},
 		{"round half to even", "assert round(2.5) == 2 and round(3.5) == 4 and round(2.675, 2) == 2.67", "", true, ""},
 		{"round to tens", "assert round(1250, -2) == 1200 and round(1351.0, -2) == 1400.0", "", true, ""},
 		{"pow with modulus", "assert pow(3, 2, 7) == 2 and pow(2, 10) == 1024", "", true, ""},
@@ -143,6 +156,7 @@ func TestCheckBuiltins(t *testing.T) {
 		{"map and filter", "n = list(map(int, user_answer.split(',')))\nassert list(filter(lambda v: v % 2 == 0, n)) == [2, 4]", "1,2,3,4", true, ""},
 		{"isinstance", "assert isinstance(1, int) and isinstance(True, int) and isinstance(1.0, (int, float)) and not isinstance('1', int)", "", true, ""},
 		{"type", "assert type(1) == int and type('a') is str", "", true, ""},
+		{"frozenset", "assert frozenset('ab') == {'a', 'b'} and isinstance(frozenset([1]), frozenset)", "", true, ""},
 		{"format", "assert format(3.14159, '.2f') == '3.14' and format(42, '>5') == '   42'", "", true, ""},
 		{"str and repr like Python", "assert str(1e15) == '1000000000000000.0' and repr('a') == \"'a'\" and str([1, 'a']) == \"[1, 'a']\"", "", true, ""},
 		{"min and max of text", "assert max(user_answer) == 'c' and min(user_answer) == 'a'", "bca", true, ""},
@@ -287,6 +301,14 @@ func TestHugeStringFails(t *testing.T) {
 		{"s = 'x' * 10 ** 9", []string{tooMuchMemory}},
 		{"x = [0] * 10 ** 8", []string{tooMuchMemory}},
 		{"s = 'x'\ns *= 10 ** 9", []string{tooMuchMemory}},
+		{"s = f'{1:0100000000,}'", []string{tooMuchMemory}},
+		{"s = format('a', '>999999999')", []string{tooMuchMemory}},
+		{"s = 'a'.zfill(2 ** 31 - 1)", []string{tooMuchMemory}},
+		{"s = 'a'.ljust(10 ** 9)", []string{tooMuchMemory}},
+		{"s = 'a'.center(10 ** 9, '*')", []string{tooMuchMemory}},
+		{"x = list('x' * 60000000)", []string{tooMuchMemory, tooManySteps, timeoutTextFor(Timeout)}},
+		{"for c in 'x' * 60000000:\n    pass", []string{tooManySteps, tooMuchMemory, timeoutTextFor(Timeout)}},
+		{"a = [1]\nfor i in range(40):\n    a = [a, a]\nx = str(a)", []string{tooMuchMemory}},
 		{"s = 'ab'\nwhile True:\n    s = s + s", []string{tooMuchMemory, timeoutTextFor(Timeout), tooManySteps}},
 		{"x = list(range(10 ** 12))", []string{tooManySteps, tooMuchMemory, timeoutTextFor(Timeout)}},
 	}
@@ -315,6 +337,7 @@ func TestHugeNumberFails(t *testing.T) {
 	for _, code := range []string{
 		"x = 10 ** 10 ** 10",
 		"n = 2\nwhile True:\n    n = n * n",
+		"x = pow(3, 2 ** 9000, 2 ** 9000 + 7)",
 	} {
 		start := time.Now()
 		got := Check(code, "")
@@ -325,9 +348,40 @@ func TestHugeNumberFails(t *testing.T) {
 			t.Errorf("Check(%q) took %v", code, elapsed)
 		}
 	}
-	// Big numbers that a checker may really use still work.
-	if got := Check("assert 2 ** 1000 * 3 ** 500 > 10 ** 500", ""); !got.Correct {
-		t.Errorf("big numbers failed: %+v", got)
+	// Big numbers that a checker may really use still work, and rounding
+	// to a huge number of tens is quick.
+	for _, code := range []string{
+		"assert 2 ** 1000 * 3 ** 500 > 10 ** 500",
+		"assert pow(3, 2 ** 2048 + 1, 2 ** 2048 + 7) > 0",
+		"assert round(5, -10 ** 9) == 0 and round(-15, -1) == -20",
+	} {
+		start := time.Now()
+		if got := Check(code, ""); !got.Correct {
+			t.Errorf("Check(%q) = %+v", code, got)
+		}
+		if elapsed := time.Since(start); elapsed > time.Second {
+			t.Errorf("Check(%q) took %v", code, elapsed)
+		}
+	}
+}
+
+// TestLargeButAllowedWidths checks that big widths below the limit work and
+// are quick: zero padding with grouping used to take seconds.
+func TestLargeButAllowedWidths(t *testing.T) {
+	for _, code := range []string{
+		// The lengths are Python's: a width that ends on a separator gets one
+		// more digit.
+		"assert len(f'{1:01000000,}') == 1000001",
+		"assert len(format(1, '040000,')) == 40001 and format(1234, '08,') == '0,001,234'",
+		"assert len('a'.zfill(1000000)) == 1000000 and len('a'.center(1000000)) == 1000000",
+	} {
+		start := time.Now()
+		if got := Check(code, ""); !got.Correct {
+			t.Errorf("Check(%q) = %+v", code, got)
+		}
+		if elapsed := time.Since(start); elapsed > time.Second {
+			t.Errorf("Check(%q) took %v", code, elapsed)
+		}
 	}
 }
 
@@ -367,6 +421,17 @@ func TestErrorTextHasNoStarlarkDetails(t *testing.T) {
 	if got.Correct || strings.Contains(got.Error, "checker") || strings.Contains(got.Error, "Traceback") || strings.Contains(got.Error, ":2:") {
 		t.Errorf("error text = %q, want only the message", got.Error)
 	}
+}
+
+// TestRewriteKeepsTeacherNames checks that the code the rewrite adds does
+// not use names that the checker itself may assign, like pow and set.
+func TestRewriteKeepsTeacherNames(t *testing.T) {
+	runCheckCases(t, []checkCase{
+		{"pow", "x = 2 ** 3\npow = 5\nassert x == 8", "", true, ""},
+		{"set", "set = 1\nassert 'a' in {'a', 'b'}", "", true, ""},
+		{"set comprehension", "set = 1\nassert {c for c in 'aab'} == {'a', 'b'}", "", true, ""},
+		{"power assignment", "pow = None\nx = 3\nx **= 2\nassert x == 9", "", true, ""},
+	})
 }
 
 // TestCheckPythonSyntax runs code with many ordinary Python forms, to make
@@ -426,5 +491,17 @@ func TestLettersOfNonASCIIText(t *testing.T) {
 	runCheckCases(t, []checkCase{
 		{"len counts bytes", "assert len(user_answer) == 8", "Київ", true, ""},
 		{"len of a list counts letters", "assert len(list(user_answer)) == 4 and list(user_answer)[0] == 'К'", "Київ", true, ""},
+	})
+}
+
+// TestDocAdviceWorks runs the ways around the known differences that the
+// package docs suggest.
+func TestDocAdviceWorks(t *testing.T) {
+	runCheckCases(t, []checkCase{
+		{"count with a condition", "n = 0\nfor c in user_answer:\n    n += 1 if c.isdigit() else 0\nassert n == 2 and sum(c.isdigit() for c in user_answer) == 2", "a1b2", true, ""},
+		{"unpack a list of letters", "a, b = list(user_answer)\nassert (a, b) == ('o', 'k')", "ok", true, ""},
+		{"tuple in brackets", "x = (1,)\nassert len(x) == 1", "", true, ""},
+		{"slice syntax", "assert 'abcdefg'[1:5:2] == 'bd'", "", true, ""},
+		{"format with precision", "x = float(user_answer)\nassert False, f'{x:.2f} ' + format(x, '.1f')", "2.345", false, "2.35 2.3"},
 	})
 }

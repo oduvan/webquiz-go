@@ -7,6 +7,7 @@ import (
 	"runtime/metrics"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.starlark.net/resolve"
@@ -137,14 +138,16 @@ func starlarkSyntaxError(err error, lines int) *SyntaxError {
 // runState lets a running check be stopped from outside: by the timer, the
 // memory watch or the step limit.
 type runState struct {
-	once    sync.Once
-	stopped chan struct{}
-	reason  string
+	once      sync.Once
+	stopped   chan struct{}
+	isStopped atomic.Bool // the same as a closed stopped, but quick to read
+	reason    string
 }
 
 func (s *runState) stop(thread *starlark.Thread, reason string) {
 	s.once.Do(func() {
 		s.reason = reason
+		s.isStopped.Store(true)
 		close(s.stopped)
 		thread.Cancel(reason)
 	})

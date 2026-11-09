@@ -29,6 +29,10 @@ const maxPowerBits = 1 << 20
 
 const tooLargeNumber = "the number is too large"
 
+// maxModPowWork limits pow(a, b, m): the work grows with the bits of b
+// times the bits of m. 8000-bit numbers still take only milliseconds.
+const maxModPowWork = 1 << 26
+
 // maxRepeatBytes limits the size of text * n and list * n, which Starlark
 // makes in one step, before the memory watch could stop the checker.
 const maxRepeatBytes = MaxMemory / 2
@@ -44,6 +48,7 @@ func newPredeclared() starlark.StringDict {
 		"_iter_":          builtin("_iter_", iterBuiltin),
 		"_attr_":          builtin("_attr_", attrBuiltin),
 		"_mul_":           builtin("_mul_", mulBuiltin),
+		"_cmp_":           builtin("_cmp_", cmpBuiltin),
 		"math":            mathModule(),
 		"to_int":          helperBuiltin("to_int", toInt),
 		"distance":        helperBuiltin("distance", distance),
@@ -76,8 +81,14 @@ func newPredeclared() starlark.StringDict {
 		"min":       nil,
 		"max":       nil,
 	} {
-		d[name] = textBuiltin(name, textArgs)
+		d[name] = textBuiltin(name, name, textArgs)
 	}
+	// Starlark has no frozen set: frozenset makes a normal set.
+	d["frozenset"] = textBuiltin("frozenset", "set", firstArg)
+	// The rewrite step calls these names. A checker cannot change them,
+	// although it may assign to pow or set.
+	d["_pow_"] = d["pow"]
+	d["_set_"] = d["set"]
 	return d
 }
 
@@ -105,38 +116,39 @@ func stateOf(thread *starlark.Thread) *runState {
 	return s
 }
 
-// step counts work done inside a builtin, like the interpreter counts its
-// own steps, and stops the builtin when the check must stop.
-func step(thread *starlark.Thread) error {
-	thread.Steps++
-	if thread.Steps >= MaxSteps {
+// meter counts work done inside a builtin, like the interpreter counts its
+// own steps, so that a long builtin stops with the check.
+type meter struct {
+	thread *starlark.Thread
+	state  *runState
+}
+
+func newMeter(thread *starlark.Thread) meter {
+	return meter{thread: thread, state: stateOf(thread)}
+}
+
+// step counts one item and tells when the check must stop.
+func (m meter) step() error {
+	m.thread.Steps++
+	if m.thread.Steps >= MaxSteps {
 		return errors.New(tooManySteps)
 	}
-	if s := stateOf(thread); s != nil && thread.Steps%256 == 0 {
-		select {
-		case <-s.stopped:
-			return errors.New(s.reason)
-		default:
-		}
+	if m.state != nil && m.state.isStopped.Load() {
+		return errors.New(m.state.reason)
 	}
 	return nil
 }
 
-// textChars returns the characters of a text, as Python iterates it.
-func textChars(s string) starlark.Tuple {
-	chars := make(starlark.Tuple, 0, len(s))
-	for _, r := range s {
-		chars = append(chars, starlark.String(string(r)))
-	}
-	return chars
-}
-
 // iterate calls fn for every item of v. Text gives its characters.
 func iterate(thread *starlark.Thread, v starlark.Value, fn func(starlark.Value) error) error {
+	m := newMeter(thread)
 	switch v := v.(type) {
 	case starlark.String:
-		for _, c := range textChars(string(v)) {
-			if err := fn(c); err != nil {
+		for _, r := range string(v) {
+			if err := m.step(); err != nil {
+				return err
+			}
+			if err := fn(starlark.String(string(r))); err != nil {
 				return err
 			}
 		}
@@ -146,7 +158,7 @@ func iterate(thread *starlark.Thread, v starlark.Value, fn func(starlark.Value) 
 		defer iter.Done()
 		var x starlark.Value
 		for iter.Next(&x) {
-			if err := step(thread); err != nil {
+			if err := m.step(); err != nil {
 				return err
 			}
 			if err := fn(x); err != nil {
@@ -178,11 +190,12 @@ func items(thread *starlark.Thread, v starlark.Value) (starlark.Tuple, error) {
 	return out, err
 }
 
-// textBuiltin wraps a Starlark builtin so that its iterable arguments may be
-// text. textArg tells which positional arguments are iterables; nil means
-// "the only argument, when there is just one" (min and max).
-func textBuiltin(name string, textArg func(int) bool) *starlark.Builtin {
-	original := starlark.Universe[name].(*starlark.Builtin)
+// textBuiltin wraps the Starlark builtin original so that its iterable
+// arguments may be text. textArg tells which positional arguments are
+// iterables; nil means "the only argument, when there is just one" (min and
+// max).
+func textBuiltin(name, original string, textArg func(int) bool) *starlark.Builtin {
+	starlarkBuiltin := starlark.Universe[original].(*starlark.Builtin)
 	return builtin(name, func(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		converted := make(starlark.Tuple, len(args))
 		for i, arg := range args {
@@ -204,7 +217,7 @@ func textBuiltin(name string, textArg func(int) bool) *starlark.Builtin {
 			// Python allows enumerate(x, start=1); Starlark only enumerate(x, 1).
 			converted, kwargs = append(converted, kwargs[0][1]), nil
 		}
-		return original.CallInternal(thread, converted, kwargs)
+		return starlarkBuiltin.CallInternal(thread, converted, kwargs)
 	})
 }
 
@@ -221,11 +234,15 @@ func assertBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.T
 	if message == nil {
 		return nil, errors.New("")
 	}
-	text, err := starlark.Call(thread, message, nil, nil)
+	value, err := starlark.Call(thread, message, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return nil, errors.New(pyStr(text))
+	text, err := pyStr(value)
+	if err != nil {
+		return nil, err
+	}
+	return nil, errors.New(text)
 }
 
 // fmtBuiltin formats one f-string field: _fmt_(value, conversion, spec).
@@ -235,19 +252,59 @@ func fmtBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tupl
 	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 3, &value, &conversion, &spec); err != nil {
 		return nil, err
 	}
+	var converted string
+	var err error
 	switch conversion {
 	case "r":
-		value = starlark.String(pyRepr(value))
+		converted, err = pyRepr(value)
 	case "s":
-		value = starlark.String(pyStr(value))
+		converted, err = pyStr(value)
 	case "a":
-		value = starlark.String(pyASCII(value))
+		converted, err = pyASCII(value)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if conversion != "" {
+		value = starlark.String(converted)
 	}
 	text, err := formatValue(value, spec)
 	if err != nil {
 		return nil, err
 	}
 	return starlark.String(text), nil
+}
+
+// compareOps are the operators that _cmp_ takes.
+var compareOps = map[string]syntax.Token{
+	"<": syntax.LT, ">": syntax.GT, "<=": syntax.LE, ">=": syntax.GE, "==": syntax.EQL, "!=": syntax.NEQ,
+}
+
+// cmpBuiltin is _cmp_(op, a, b): a comparison like Python's. Starlark puts
+// NaN above every number and calls it equal to itself; in Python every
+// comparison with NaN is false, except "!=".
+func cmpBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if len(args) != 3 || len(kwargs) != 0 {
+		return nil, fmt.Errorf("%s: want 3 arguments", b.Name())
+	}
+	opText, _ := args[0].(starlark.String)
+	op, ok := compareOps[string(opText)]
+	if !ok {
+		return nil, fmt.Errorf("%s: unknown operator %s", b.Name(), args[0])
+	}
+	if isNaN(args[1]) || isNaN(args[2]) {
+		return starlark.Bool(op == syntax.NEQ), nil
+	}
+	result, err := starlark.Compare(op, args[1], args[2])
+	if err != nil {
+		return nil, err
+	}
+	return starlark.Bool(result), nil
+}
+
+func isNaN(v starlark.Value) bool {
+	f, ok := v.(starlark.Float)
+	return ok && math.IsNaN(float64(f))
 }
 
 // mulBuiltin is a * b, but refuses a text or list that would be too large.
@@ -299,7 +356,13 @@ func iterBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tup
 		return nil, err
 	}
 	if s, ok := v.(starlark.String); ok {
-		return textChars(string(s)), nil
+		// codepoints() gives the characters one by one, so a loop over a
+		// long text does not build a list first.
+		codepoints, err := s.Attr("codepoints")
+		if err != nil {
+			return nil, err
+		}
+		return starlark.Call(thread, codepoints, nil, nil)
 	}
 	return v, nil
 }
@@ -433,6 +496,9 @@ func zfill(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs 
 	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 1, &width); err != nil {
 		return nil, err
 	}
+	if width > maxRepeatBytes {
+		return nil, errors.New(tooMuchMemory)
+	}
 	s := string(b.Receiver().(starlark.String))
 	n := width - utf8.RuneCountInString(s)
 	if n <= 0 {
@@ -454,6 +520,9 @@ func justify(align byte) builtinFunc {
 		}
 		if utf8.RuneCountInString(fill) != 1 {
 			return nil, errors.New("The fill character must be exactly one character long")
+		}
+		if width > 0 && uint64(width)*uint64(len(fill)) > maxRepeatBytes {
+			return nil, errors.New(tooMuchMemory)
 		}
 		s := string(b.Receiver().(starlark.String))
 		n := width - utf8.RuneCountInString(s)
@@ -561,7 +630,11 @@ func strBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kw
 	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 0, &v); err != nil {
 		return nil, err
 	}
-	return starlark.String(pyStr(v)), nil
+	text, err := pyStr(v)
+	if err != nil {
+		return nil, err
+	}
+	return starlark.String(text), nil
 }
 
 func reprBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -569,7 +642,11 @@ func reprBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, k
 	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 1, &v); err != nil {
 		return nil, err
 	}
-	return starlark.String(pyRepr(v)), nil
+	text, err := pyRepr(v)
+	if err != nil {
+		return nil, err
+	}
+	return starlark.String(text), nil
 }
 
 func formatBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -591,18 +668,26 @@ func intBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tupl
 	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "x?", &x, "base?", &base); err != nil {
 		return nil, err
 	}
-	s, isText := x.(starlark.String)
 	if base != nil {
+		s, isText := x.(starlark.String)
 		if !isText {
 			return nil, errors.New("int() can't convert non-string with explicit base")
 		}
-		return starlark.Call(thread, starlark.Universe["int"], starlark.Tuple{starlark.String(pyStrip(string(s))), base}, nil)
+		var b int
+		if err := starlark.AsInt(base, &b); err != nil {
+			return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", pyTypeName(base))
+		}
+		n, err := pyIntBase(string(s), b)
+		if err != nil {
+			return nil, err
+		}
+		return starlark.MakeBigInt(n), nil
 	}
 	switch x := x.(type) {
 	case starlark.String:
-		n, ok := parsePyInt(string(s))
-		if !ok {
-			return nil, fmt.Errorf("invalid literal for int() with base 10: %s", pyReprString(string(s)))
+		n, err := pyInt(string(x))
+		if err != nil {
+			return nil, err
 		}
 		return starlark.MakeBigInt(n), nil
 	case starlark.Float:
@@ -692,6 +777,10 @@ func isinstanceBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tu
 			if x.Type() == name {
 				return starlark.True, nil
 			}
+		case "frozenset":
+			if x.Type() == "set" {
+				return starlark.True, nil
+			}
 		default:
 			return nil, errors.New("isinstance() arg 2 must be a type, a tuple of types, or a union")
 		}
@@ -716,7 +805,11 @@ func mapBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tupl
 		}
 	}
 	out := make([]starlark.Value, 0, shortest)
+	m := newMeter(thread)
 	for i := 0; i < shortest; i++ {
+		if err := m.step(); err != nil {
+			return nil, err
+		}
 		call := make(starlark.Tuple, len(lists))
 		for j, list := range lists {
 			call[j] = list[i]
@@ -860,6 +953,11 @@ func roundBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, 
 		if digits >= 0 {
 			return x, nil
 		}
+		// 10**k is more than twice |x| when k > bits/3 + 2: then x rounds to 0,
+		// and 10**k itself is never computed.
+		if -digits > x.BigInt().BitLen()/3+2 {
+			return starlark.MakeInt(0), nil
+		}
 		return starlark.MakeBigInt(roundRat(new(big.Rat).SetInt(x.BigInt()), digits).Num()), nil
 	case starlark.Float:
 		f := float64(x)
@@ -971,8 +1069,11 @@ func modPow(base, exp, mod starlark.Value) (starlark.Value, error) {
 		return nil, errors.New("pow() 3rd argument cannot be 0")
 	}
 	absM := new(big.Int).Abs(m)
-	x := new(big.Int).Mod(bi.BigInt(), absM)
 	e := ei.BigInt()
+	if e.BitLen()*absM.BitLen() > maxModPowWork {
+		return nil, errors.New(tooLargeNumber)
+	}
+	x := new(big.Int).Mod(bi.BigInt(), absM)
 	if e.Sign() < 0 {
 		if x.ModInverse(x, absM) == nil {
 			return nil, errors.New("base is not invertible for the given modulus")

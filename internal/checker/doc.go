@@ -23,19 +23,23 @@
 // f-strings with conversions (!r, !s, !a), format specs (fill, align, sign,
 // width, "," and "_", precision, types d f e g % s x o b c n) and nested
 // fields, a ** b, chained comparisons like 0 < x < 10 (also with in, not in,
-// is and is not), conditional expressions, lambda, list, dict and set
+// is and is not; any comparison with NaN is false except "!=", as in
+// Python), conditional expressions, lambda, list, dict and set
 // comprehensions, generator expressions, set literals, and text joined by
-// writing two literals side by side.
+// writing two literals side by side. A checker may assign to pow or set: the
+// code that the rewrite adds uses its own names.
 //
 // Names: user_answer; math (Starlark's math module plus isclose, log10,
 // log2, trunc, factorial, gcd, fmod, isfinite, isinf, isnan, inf, nan and
 // tau; domain and range errors fail like in Python); the helpers to_int,
 // distance and direction_angle (the same results and error texts as 1.19);
 // and the builtins abs, all, any, bool, chr, dict, enumerate, filter, float,
-// format, int, isinstance, len, list, map, max, min, ord, pow, print, range,
-// repr, reversed, round, set, sorted, str, sum, tuple, type and zip. int(),
-// float(), str(), repr(), round(), pow() and sum() follow Python's rules: int
-// and float accept spaces around a number, str of a float gives
+// format, frozenset (it makes a normal set), int, isinstance, len, list, map,
+// max, min, ord, pow, print, range, repr, reversed, round, set, sorted, str,
+// sum, tuple, type and zip. int(), float(), str(), repr(), round(), pow() and
+// sum() follow Python's rules: int and float read any Unicode decimal digit
+// ("４２"), spaces around the number and "_" between digits, int reads at
+// most 4300 digits like Python 3.11 and later, str of a float gives
 // "1000000000000000.0" like Python, round goes to the even neighbour, and
 // sum adds floats like Python 3.12. Text can be looped over and passed to
 // list, sorted, set, min, max and the others, which see its characters.
@@ -60,6 +64,15 @@
 //   - Generator expressions are computed in full, also inside any() and
 //     all(). map() and filter() return lists.
 //   - "is" compares values like "==".
+//   - Starlark does not count True and False as numbers outside sum():
+//     n += c.isdigit() fails. Write n += 1 if c.isdigit() else 0, or use
+//     sum().
+//   - Text cannot be unpacked: a, b = user_answer fails. Write
+//     a, b = list(user_answer).
+//   - A tuple with a trailing comma and no brackets, like x = 1, is
+//     refused when the quiz is saved. Write x = (1,).
+//   - \N{...} escapes in text are refused when the quiz is saved.
+//   - slice() does not exist; use a[1:5:2].
 //   - In a chained comparison like a < f() < b the middle value is computed
 //     twice.
 //   - Some other Python methods are missing, for example text translate and
@@ -67,10 +80,14 @@
 //     errors of int(), float(), the helpers and math have Starlark's texts.
 //   - A checker stops after Timeout (2 seconds), after MaxSteps steps, when
 //     memory grows by more than MaxMemory, or when calls nest deeper than
-//     1000. Text or lists made with "*" may not be larger than half of
-//     MaxMemory, and numbers made with "*" or "**" not longer than about
-//     a million bits. The answer then counts as wrong. Python 1.19 had no
-//     such limits.
+//     1000. Text and lists made in one step (with "*", a format width,
+//     zfill, ljust, rjust or center) may not be larger than half of
+//     MaxMemory, the text of repr() and str() not larger than 4 MB, and
+//     numbers made with "*" or "**" not longer than about a million bits.
+//     The answer then counts as wrong. Python 1.19 had no such limits.
+//   - The memory watch measures the memory of the whole program. A checker
+//     that uses much memory can make another check that runs at the same
+//     time fail too.
 //
 // Some code that failed in 1.19 works now. 1.19 ran exec() with separate
 // globals and locals, so a function defined in a checker could not call

@@ -21,81 +21,125 @@ import (
 // maxReprDepth stops repr() of very deeply nested lists.
 const maxReprDepth = 200
 
+// maxReprBytes limits the text of repr() and str(). Text made of many small
+// values is slow to build: 4 MB takes about a fifth of a second, and much
+// more than any checker message needs.
+const maxReprBytes = 4 << 20
+
 // pyStr returns Python's str(v).
-func pyStr(v starlark.Value) string {
+func pyStr(v starlark.Value) (string, error) {
 	if s, ok := v.(starlark.String); ok {
-		return string(s)
+		return string(s), nil
 	}
 	return pyRepr(v)
 }
 
-// pyRepr returns Python's repr(v).
-func pyRepr(v starlark.Value) string {
-	var b strings.Builder
-	writeRepr(&b, v, map[starlark.Value]bool{}, 0)
-	return b.String()
+// pyRepr returns Python's repr(v). It fails when the text would be larger
+// than maxReprBytes: a list that holds another list twice at each level has
+// a huge text although it is small.
+func pyRepr(v starlark.Value) (string, error) {
+	w := &reprWriter{}
+	if err := w.write(v); err != nil {
+		return "", err
+	}
+	return w.b.String(), nil
 }
 
-func writeRepr(b *strings.Builder, v starlark.Value, open map[starlark.Value]bool, depth int) {
-	if depth > maxReprDepth {
-		b.WriteString("...")
-		return
+// reprWriter builds the text of repr().
+type reprWriter struct {
+	b     strings.Builder
+	depth int // how deep the value being written is nested
+	// open holds the lists and dicts being written, outermost first. A
+	// value that holds itself is written as [...], like Python does.
+	open []starlark.Value
+}
+
+func (w *reprWriter) isOpen(v starlark.Value) bool {
+	for _, x := range w.open {
+		if x == v {
+			return true
+		}
 	}
+	return false
+}
+
+func (w *reprWriter) write(v starlark.Value) error {
+	b := &w.b
+	if b.Len() > maxReprBytes {
+		return errors.New(tooMuchMemory)
+	}
+	if w.depth > maxReprDepth {
+		b.WriteString("...")
+		return nil
+	}
+	w.depth++
+	defer func() { w.depth-- }()
 	switch v := v.(type) {
 	case starlark.String:
+		if b.Len()+len(v) > maxReprBytes {
+			return errors.New(tooMuchMemory)
+		}
 		b.WriteString(pyReprString(string(v)))
 	case starlark.Bytes:
 		b.WriteString(pyReprBytes(string(v)))
 	case starlark.Float:
 		b.WriteString(pyFloatRepr(float64(v)))
 	case *starlark.List:
-		if open[v] {
+		if w.isOpen(v) {
 			b.WriteString("[...]")
-			return
+			return nil
 		}
-		open[v] = true
+		w.open = append(w.open, v)
 		b.WriteByte('[')
 		for i := 0; i < v.Len(); i++ {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, v.Index(i), open, depth+1)
+			if err := w.write(v.Index(i)); err != nil {
+				return err
+			}
 		}
 		b.WriteByte(']')
-		delete(open, v)
+		w.open = w.open[:len(w.open)-1]
 	case starlark.Tuple:
 		b.WriteByte('(')
 		for i, x := range v {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, x, open, depth+1)
+			if err := w.write(x); err != nil {
+				return err
+			}
 		}
 		if len(v) == 1 {
 			b.WriteByte(',')
 		}
 		b.WriteByte(')')
 	case *starlark.Dict:
-		if open[v] {
+		if w.isOpen(v) {
 			b.WriteString("{...}")
-			return
+			return nil
 		}
-		open[v] = true
+		w.open = append(w.open, v)
 		b.WriteByte('{')
 		for i, item := range v.Items() {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, item[0], open, depth+1)
+			if err := w.write(item[0]); err != nil {
+				return err
+			}
 			b.WriteString(": ")
-			writeRepr(b, item[1], open, depth+1)
+			if err := w.write(item[1]); err != nil {
+				return err
+			}
 		}
 		b.WriteByte('}')
-		delete(open, v)
+		w.open = w.open[:len(w.open)-1]
 	case *starlark.Set:
 		if v.Len() == 0 {
 			b.WriteString("set()")
-			return
+			return nil
 		}
 		b.WriteByte('{')
 		iter := v.Iterate()
@@ -105,12 +149,15 @@ func writeRepr(b *strings.Builder, v starlark.Value, open map[starlark.Value]boo
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, x, open, depth+1)
+			if err := w.write(x); err != nil {
+				return err
+			}
 		}
 		b.WriteByte('}')
 	default:
 		b.WriteString(v.String())
 	}
+	return nil
 }
 
 // pyReprString returns Python's repr() of a string: single quotes, or double
@@ -181,9 +228,13 @@ func pyReprBytes(s string) string {
 }
 
 // pyASCII returns Python's ascii(v): repr() with non-ASCII letters escaped.
-func pyASCII(v starlark.Value) string {
+func pyASCII(v starlark.Value) (string, error) {
+	text, err := pyRepr(v)
+	if err != nil {
+		return "", err
+	}
 	var b strings.Builder
-	for _, r := range pyRepr(v) {
+	for _, r := range text {
 		switch {
 		case r < 0x80:
 			b.WriteRune(r)
@@ -195,7 +246,7 @@ func pyASCII(v starlark.Value) string {
 			fmt.Fprintf(&b, `\U%08x`, r)
 		}
 	}
-	return b.String()
+	return b.String(), nil
 }
 
 // pyTypeName returns the name Python uses for the type of v.
@@ -272,11 +323,15 @@ func parseFormatSpec(spec string, defaultAlign rune, typeName string) (formatSpe
 	readNumber := func() (int, bool, error) {
 		start := pos
 		n := 0
-		for pos < len(r) && r[pos] >= '0' && r[pos] <= '9' {
-			n = n*10 + int(r[pos]-'0')
-			if n > 1_000_000 {
+		for pos < len(r) {
+			d, ok := decimalValue(r[pos])
+			if !ok {
+				break
+			}
+			if n > (math.MaxInt-d)/10 {
 				return 0, false, errors.New("Too many decimal digits in format string")
 			}
+			n = n*10 + d
 			pos++
 		}
 		return n, pos > start, nil
@@ -330,6 +385,11 @@ func parseFormatSpec(spec string, defaultAlign rune, typeName string) (formatSpe
 			return fs, groupingError(fs)
 		}
 	}
+	// A huge width would make a huge text in one step, before the memory
+	// watch could stop the checker.
+	if fillSize := utf8.RuneLen(fs.fill); fs.width > 0 && uint64(fs.width)*uint64(max(fillSize, 1)) > maxRepeatBytes {
+		return fs, errors.New(tooMuchMemory)
+	}
 	return fs, nil
 }
 
@@ -374,7 +434,7 @@ func formatValue(v starlark.Value, spec string) (string, error) {
 		return formatFloat(float64(v), spec, "float")
 	}
 	if spec == "" {
-		return pyStr(v), nil
+		return pyStr(v)
 	}
 	return "", fmt.Errorf("unsupported format string passed to %s.__format__", pyTypeName(v))
 }
@@ -403,10 +463,21 @@ func formatString(s, spec string) (string, error) {
 	case fs.align == '=':
 		return "", errors.New("'=' alignment not allowed in string format specifier")
 	}
-	if fs.precision >= 0 && utf8.RuneCountInString(s) > fs.precision {
-		s = string([]rune(s)[:fs.precision])
+	if fs.precision >= 0 {
+		s = firstRunes(s, fs.precision)
 	}
 	return pad(s, fs), nil
+}
+
+// firstRunes returns the first n characters of s.
+func firstRunes(s string, n int) string {
+	for i := range s {
+		if n == 0 {
+			return s[:i]
+		}
+		n--
+	}
+	return s
 }
 
 // pad adds fill characters to reach the width, for text and for numbers
@@ -504,6 +575,9 @@ func formatFloat(x float64, spec, typeName string) (string, error) {
 
 // formatFloatSpec follows format_float_internal in CPython.
 func formatFloatSpec(x float64, fs formatSpec) (string, error) {
+	if fs.precision > maxRepeatBytes {
+		return "", errors.New(tooMuchMemory)
+	}
 	code, precision, addDot0, percent := fs.typ, fs.precision, false, false
 	defaultPrecision := 6
 	if code == 0 {
@@ -574,21 +648,37 @@ func assembleNumber(sign, prefix, digits, rest string, fs formatSpec, groupSize 
 }
 
 // groupDigits puts sep between groups of size digits, counted from the right.
-// With minWidth it adds leading zeros (also grouped) until the text is that wide.
+// With minWidth it first adds leading zeros (grouped too) until the text is
+// at least that wide, the way Python pads format(1234, "010,").
 func groupDigits(digits string, sep byte, size, minWidth int) string {
-	for {
-		var b strings.Builder
-		for i := 0; i < len(digits); i++ {
-			if i > 0 && (len(digits)-i)%size == 0 {
-				b.WriteByte(sep)
-			}
-			b.WriteByte(digits[i])
-		}
-		if b.Len() >= minWidth {
-			return b.String()
-		}
-		digits = "0" + digits
+	if need := digitsForWidth(minWidth, size); need > len(digits) {
+		digits = strings.Repeat("0", need-len(digits)) + digits
 	}
+	n := len(digits)
+	var b strings.Builder
+	b.Grow(n + n/size)
+	for i := 0; i < n; i++ {
+		if i > 0 && (n-i)%size == 0 {
+			b.WriteByte(sep)
+		}
+		b.WriteByte(digits[i])
+	}
+	return b.String()
+}
+
+// digitsForWidth returns the fewest digits that, grouped by size, make a
+// text at least width long. n digits make n + (n-1)/size characters. A text
+// never starts with a separator, so when width would end on one, one more
+// digit is needed.
+func digitsForWidth(width, size int) int {
+	if width <= 1 {
+		return 1
+	}
+	groups, rest := (width-1)/(size+1), (width-1)%(size+1)
+	if rest < size {
+		return groups*size + rest + 1
+	}
+	return (groups+1)*size + 1
 }
 
 // floatDigits returns the decimal digits of |x| without leading and trailing
