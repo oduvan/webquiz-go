@@ -1,0 +1,1074 @@
+{
+ "validate": [
+  {
+   "data": null,
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {},
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": [],
+   "valid": false,
+   "errors": [
+    "Config must be a dictionary"
+   ]
+  },
+  {
+   "data": "text",
+   "valid": false,
+   "errors": [
+    "Config must be a dictionary"
+   ]
+  },
+  {
+   "data": 5,
+   "valid": false,
+   "errors": [
+    "Config must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "language": "uk"
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "language": "en"
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "language": "ru"
+   },
+   "valid": false,
+   "errors": [
+    "російська мова не підтримується, але ти москалику попався"
+   ]
+  },
+  {
+   "data": {
+    "language": "fr"
+   },
+   "valid": false,
+   "errors": [
+    "'language' must be 'uk' or 'en'"
+   ]
+  },
+  {
+   "data": {
+    "language": null
+   },
+   "valid": false,
+   "errors": [
+    "'language' must be 'uk' or 'en'"
+   ]
+  },
+  {
+   "data": {
+    "language": 1
+   },
+   "valid": false,
+   "errors": [
+    "'language' must be 'uk' or 'en'"
+   ]
+  },
+  {
+   "data": {
+    "extra_answers_with_users_csv": true
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "extra_answers_with_users_csv": "yes"
+   },
+   "valid": false,
+   "errors": [
+    "'extra_answers_with_users_csv' must be a boolean"
+   ]
+  },
+  {
+   "data": {
+    "server": null
+   },
+   "valid": false,
+   "errors": [
+    "'server' section must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "server": []
+   },
+   "valid": false,
+   "errors": [
+    "'server' section must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "server": {}
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "server": {
+     "host": "0.0.0.0",
+     "port": 8080
+    }
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "server": {
+     "host": 5
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'server.host' must be a string"
+   ]
+  },
+  {
+   "data": {
+    "server": {
+     "port": "8080"
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'server.port' must be an integer"
+   ]
+  },
+  {
+   "data": {
+    "server": {
+     "port": 0
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'server.port' must be between 1 and 65535"
+   ]
+  },
+  {
+   "data": {
+    "server": {
+     "port": 65536
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'server.port' must be between 1 and 65535"
+   ]
+  },
+  {
+   "data": {
+    "server": {
+     "port": 65535
+    }
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "server": {
+     "port": true
+    }
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "server": {
+     "port": 8080.0
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'server.port' must be an integer"
+   ]
+  },
+  {
+   "data": {
+    "server": {
+     "include_ipv6": "x",
+     "url_format": 5
+    }
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "paths": "x"
+   },
+   "valid": false,
+   "errors": [
+    "'paths' section must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "paths": {
+     "quizzes_dir": 1,
+     "logs_dir": null,
+     "csv_dir": "d",
+     "static_dir": []
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'paths.quizzes_dir' must be a string",
+    "'paths.logs_dir' must be a string",
+    "'paths.static_dir' must be a string"
+   ]
+  },
+  {
+   "data": {
+    "admin": 5
+   },
+   "valid": false,
+   "errors": [
+    "'admin' section must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "admin": {
+     "master_key": null
+    }
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "admin": {
+     "master_key": 123
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'admin.master_key' must be a string or null"
+   ]
+  },
+  {
+   "data": {
+    "admin": {
+     "trusted_ips": "127.0.0.1"
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'admin.trusted_ips' must be a list"
+   ]
+  },
+  {
+   "data": {
+    "admin": {
+     "trusted_ips": [
+      "127.0.0.1",
+      5
+     ]
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'admin.trusted_ips' must contain only strings"
+   ]
+  },
+  {
+   "data": {
+    "admin": {
+     "trusted_ips": []
+    }
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "registration": null
+   },
+   "valid": false,
+   "errors": [
+    "'registration' section must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "registration": {
+     "fields": "Grade"
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'registration.fields' must be a list"
+   ]
+  },
+  {
+   "data": {
+    "registration": {
+     "fields": [
+      "Grade",
+      1
+     ]
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'registration.fields' must contain only strings"
+   ]
+  },
+  {
+   "data": {
+    "registration": {
+     "disabled_fields": {}
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'registration.disabled_fields' must be a list"
+   ]
+  },
+  {
+   "data": {
+    "registration": {
+     "disabled_fields": [
+      null
+     ]
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'registration.disabled_fields' must contain only strings"
+   ]
+  },
+  {
+   "data": {
+    "registration": {
+     "approve": "yes"
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'registration.approve' must be a boolean"
+   ]
+  },
+  {
+   "data": {
+    "registration": {
+     "approve": false,
+     "username_label": 5
+    }
+   },
+   "valid": false,
+   "errors": [
+    "'registration.username_label' must be a string"
+   ]
+  },
+  {
+   "data": {
+    "registration": {
+     "fields": [
+      "Клас"
+     ],
+     "disabled_fields": [
+      "Школа"
+     ],
+     "approve": true,
+     "username_label": "Ім'я"
+    }
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "quizzes": {}
+   },
+   "valid": false,
+   "errors": [
+    "'quizzes' section must be a list"
+   ]
+  },
+  {
+   "data": {
+    "quizzes": null
+   },
+   "valid": false,
+   "errors": [
+    "'quizzes' section must be a list"
+   ]
+  },
+  {
+   "data": {
+    "quizzes": [
+     5
+    ]
+   },
+   "valid": false,
+   "errors": [
+    "Quiz 1 must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "quizzes": [
+     {}
+    ]
+   },
+   "valid": false,
+   "errors": [
+    "Quiz 1 missing required field: 'name'",
+    "Quiz 1 missing required field: 'download_path'",
+    "Quiz 1 missing required field: 'folder'"
+   ]
+  },
+  {
+   "data": {
+    "quizzes": [
+     {
+      "name": "a",
+      "download_path": "b",
+      "folder": "c"
+     }
+    ]
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "quizzes": [
+     {
+      "name": 1,
+      "download_path": null,
+      "folder": []
+     }
+    ]
+   },
+   "valid": false,
+   "errors": [
+    "Quiz 1 field 'name' must be a string",
+    "Quiz 1 field 'download_path' must be a string",
+    "Quiz 1 field 'folder' must be a string"
+   ]
+  },
+  {
+   "data": {
+    "quizzes": [
+     {
+      "name": "a",
+      "download_path": "b",
+      "folder": "c",
+      "auth_header_token": 5
+     }
+    ]
+   },
+   "valid": false,
+   "errors": [
+    "Quiz 1 field 'auth_header_token' must be a string"
+   ]
+  },
+  {
+   "data": {
+    "quizzes": [
+     {
+      "name": "a",
+      "download_path": "b",
+      "folder": "c",
+      "auth_header_token": "t"
+     },
+     "x"
+    ]
+   },
+   "valid": false,
+   "errors": [
+    "Quiz 2 must be a dictionary"
+   ]
+  },
+  {
+   "data": {
+    "tunnel": 5,
+    "checker_templates": 5
+   },
+   "valid": true,
+   "errors": []
+  },
+  {
+   "data": {
+    "language": "ru",
+    "server": {
+     "port": 0
+    },
+    "paths": [],
+    "admin": {
+     "trusted_ips": [
+      1
+     ]
+    },
+    "registration": {
+     "approve": 1
+    },
+    "quizzes": [
+     {
+      "name": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "errors": [
+    "російська мова не підтримується, але ти москалику попався",
+    "'server.port' must be between 1 and 65535",
+    "'paths' section must be a dictionary",
+    "'admin.trusted_ips' must contain only strings",
+    "'registration.approve' must be a boolean",
+    "Quiz 1 missing required field: 'download_path'",
+    "Quiz 1 missing required field: 'folder'"
+   ]
+  }
+ ],
+ "merge": [
+  {
+   "original": "# WebQuiz Server Configuration\n# Copy this file to server_config.yaml and customize as needed\n\nserver:\n  host: \"0.0.0.0\"  # Listen on all interfaces (use \"127.0.0.1\" for localhost only)\n  port: 8080       # Server port\n\npaths:\n  quizzes_dir: \"quizzes\"  # Directory containing quiz YAML files\n  logs_dir: \"logs\"        # Directory for server log files (auto-created)\n  csv_dir: \"data\"         # Directory for CSV response files (auto-created)\n  static_dir: \"static\"    # Directory for static web files (auto-created)\n\nadmin:\n  master_key: a1        # Set to enable admin interface (e.g., \"your-secret-key\")\n                          # Can also use WEBQUIZ_MASTER_KEY environment variable\n  # trusted_ips:        # List of IP addresses allowed to access admin interface\n  #   - \"127.0.0.1\"     # Default: only localhost (127.0.0.1)\n  #   - \"192.168.1.10\"  # Add additional trusted IPs as needed\n\n# Optional: Registration configuration\n# Uncomment and configure to collect additional user information\n# registration:\n#   approve: false                     # Set to true to require admin approval before users can start\n#   username_label: \"Ім'я користувача\" # Label for username field (default: follows `language` — \"Ім'я користувача\" for uk, \"Username\" for en)\n#   fields:                            # Additional registration fields (supports Cyrillic)\n#     - Grade\n#     - School\n\n# Optional: Downloadable quizzes configuration\n# Uncomment and configure to enable quiz downloads in admin panel\n# quizzes:\n#   - name: \"Basic Math Quiz\"\n#     download_path: \"https://example.com/quizzes/math.zip\"\n#     folder: \"math_questions/\"\n#   - name: \"Geography Quiz\"\n#     download_path: \"https://example.com/quizzes/geography.zip\"\n#     folder: \"geography/\"\n\n# Optional: SSH Tunnel configuration for public access\n# Uncomment and configure to enable SSH tunnel for remote access\n# tunnel:\n#   server: \"tunnel.example.com\"           # SSH tunnel server hostname or IP address\n#                                          # Note: Uses HTTPS for domains, HTTP for IP addresses\n#   public_key: \"keys/id_ed25519.pub\"      # SSH public key path (auto-generated if missing)\n#   private_key: \"keys/id_ed25519\"         # SSH private key path (auto-generated if missing)\n#   socket_name: \"my-quiz-socket\"          # Optional: Fixed socket name (default: random 6-8 hex chars)\n#                                          # Use for predictable URLs or server-side management\n#\n#   # Option 1: Fetch config from server (default)\n#   # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml\n#\n#   # Option 2: Provide local config (bypasses server fetch)\n#   # Uncomment to use local configuration instead of fetching from server\n#   # config:\n#   #   username: \"tunneluser\"\n#   #   socket_directory: \"/var/run/tunnels\"\n#   #   base_url: \"https://tunnel.example.com/tests\"\n\n# Usage examples:\n# webquiz --config server_config.yaml\n# webquiz --config server_config.yaml --master-key override-key\n# WEBQUIZ_MASTER_KEY=secret webquiz --config server_config.yaml\n",
+   "data": {
+    "language": "en",
+    "extra_answers_with_users_csv": true,
+    "registration": {
+     "approve": true,
+     "username_label": "Ім'я",
+     "fields": [
+      "Клас",
+      "Школа"
+     ],
+     "disabled_fields": []
+    }
+   },
+   "ruamel_output": "# WebQuiz Server Configuration\n# Copy this file to server_config.yaml and customize as needed\n\nserver:\n  host: \"0.0.0.0\"  # Listen on all interfaces (use \"127.0.0.1\" for localhost only)\n  port: 8080       # Server port\n\npaths:\n  quizzes_dir: \"quizzes\"  # Directory containing quiz YAML files\n  logs_dir: \"logs\"        # Directory for server log files (auto-created)\n  csv_dir: \"data\"         # Directory for CSV response files (auto-created)\n  static_dir: \"static\"    # Directory for static web files (auto-created)\n\nadmin:\n  master_key: a1        # Set to enable admin interface (e.g., \"your-secret-key\")\n                          # Can also use WEBQUIZ_MASTER_KEY environment variable\n  # trusted_ips:        # List of IP addresses allowed to access admin interface\n  #   - \"127.0.0.1\"     # Default: only localhost (127.0.0.1)\n  #   - \"192.168.1.10\"  # Add additional trusted IPs as needed\n\n# Optional: Registration configuration\n# Uncomment and configure to collect additional user information\n# registration:\n#   approve: false                     # Set to true to require admin approval before users can start\n#   username_label: \"Ім'я користувача\" # Label for username field (default: follows `language` — \"Ім'я користувача\" for uk, \"Username\" for en)\n#   fields:                            # Additional registration fields (supports Cyrillic)\n#     - Grade\n#     - School\n\n# Optional: Downloadable quizzes configuration\n# Uncomment and configure to enable quiz downloads in admin panel\n# quizzes:\n#   - name: \"Basic Math Quiz\"\n#     download_path: \"https://example.com/quizzes/math.zip\"\n#     folder: \"math_questions/\"\n#   - name: \"Geography Quiz\"\n#     download_path: \"https://example.com/quizzes/geography.zip\"\n#     folder: \"geography/\"\n\n# Optional: SSH Tunnel configuration for public access\n# Uncomment and configure to enable SSH tunnel for remote access\n# tunnel:\n#   server: \"tunnel.example.com\"           # SSH tunnel server hostname or IP address\n#                                          # Note: Uses HTTPS for domains, HTTP for IP addresses\n#   public_key: \"keys/id_ed25519.pub\"      # SSH public key path (auto-generated if missing)\n#   private_key: \"keys/id_ed25519\"         # SSH private key path (auto-generated if missing)\n#   socket_name: \"my-quiz-socket\"          # Optional: Fixed socket name (default: random 6-8 hex chars)\n#                                          # Use for predictable URLs or server-side management\n#\n#   # Option 1: Fetch config from server (default)\n#   # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml\n#\n#   # Option 2: Provide local config (bypasses server fetch)\n#   # Uncomment to use local configuration instead of fetching from server\n#   # config:\n#   #   username: \"tunneluser\"\n#   #   socket_directory: \"/var/run/tunnels\"\n#   #   base_url: \"https://tunnel.example.com/tests\"\n\n# Usage examples:\n# webquiz --config server_config.yaml\n# webquiz --config server_config.yaml --master-key override-key\n# WEBQUIZ_MASTER_KEY=secret webquiz --config server_config.yaml\nlanguage: en\nextra_answers_with_users_csv: true\nregistration:\n  approve: true\n  username_label: Ім'я\n  fields:\n    - Клас\n    - Школа\n  disabled_fields: []\n",
+   "parsed": {
+    "server": {
+     "host": "0.0.0.0",
+     "port": 8080
+    },
+    "paths": {
+     "quizzes_dir": "quizzes",
+     "logs_dir": "logs",
+     "csv_dir": "data",
+     "static_dir": "static"
+    },
+    "admin": {
+     "master_key": "a1"
+    },
+    "language": "en",
+    "extra_answers_with_users_csv": true,
+    "registration": {
+     "approve": true,
+     "username_label": "Ім'я",
+     "fields": [
+      "Клас",
+      "Школа"
+     ],
+     "disabled_fields": []
+    }
+   }
+  },
+  {
+   "original": "# WebQuiz Server Configuration\n# Copy this file to server_config.yaml and customize as needed\n\nserver:\n  host: \"0.0.0.0\"  # Listen on all interfaces (use \"127.0.0.1\" for localhost only)\n  port: 8080       # Server port\n\npaths:\n  quizzes_dir: \"quizzes\"  # Directory containing quiz YAML files\n  logs_dir: \"logs\"        # Directory for server log files (auto-created)\n  csv_dir: \"data\"         # Directory for CSV response files (auto-created)\n  static_dir: \"static\"    # Directory for static web files (auto-created)\n\nadmin:\n  master_key: a1        # Set to enable admin interface (e.g., \"your-secret-key\")\n                          # Can also use WEBQUIZ_MASTER_KEY environment variable\n  # trusted_ips:        # List of IP addresses allowed to access admin interface\n  #   - \"127.0.0.1\"     # Default: only localhost (127.0.0.1)\n  #   - \"192.168.1.10\"  # Add additional trusted IPs as needed\n\n# Optional: Registration configuration\n# Uncomment and configure to collect additional user information\n# registration:\n#   approve: false                     # Set to true to require admin approval before users can start\n#   username_label: \"Ім'я користувача\" # Label for username field (default: follows `language` — \"Ім'я користувача\" for uk, \"Username\" for en)\n#   fields:                            # Additional registration fields (supports Cyrillic)\n#     - Grade\n#     - School\n\n# Optional: Downloadable quizzes configuration\n# Uncomment and configure to enable quiz downloads in admin panel\n# quizzes:\n#   - name: \"Basic Math Quiz\"\n#     download_path: \"https://example.com/quizzes/math.zip\"\n#     folder: \"math_questions/\"\n#   - name: \"Geography Quiz\"\n#     download_path: \"https://example.com/quizzes/geography.zip\"\n#     folder: \"geography/\"\n\n# Optional: SSH Tunnel configuration for public access\n# Uncomment and configure to enable SSH tunnel for remote access\n# tunnel:\n#   server: \"tunnel.example.com\"           # SSH tunnel server hostname or IP address\n#                                          # Note: Uses HTTPS for domains, HTTP for IP addresses\n#   public_key: \"keys/id_ed25519.pub\"      # SSH public key path (auto-generated if missing)\n#   private_key: \"keys/id_ed25519\"         # SSH private key path (auto-generated if missing)\n#   socket_name: \"my-quiz-socket\"          # Optional: Fixed socket name (default: random 6-8 hex chars)\n#                                          # Use for predictable URLs or server-side management\n#\n#   # Option 1: Fetch config from server (default)\n#   # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml\n#\n#   # Option 2: Provide local config (bypasses server fetch)\n#   # Uncomment to use local configuration instead of fetching from server\n#   # config:\n#   #   username: \"tunneluser\"\n#   #   socket_directory: \"/var/run/tunnels\"\n#   #   base_url: \"https://tunnel.example.com/tests\"\n\n# Usage examples:\n# webquiz --config server_config.yaml\n# webquiz --config server_config.yaml --master-key override-key\n# WEBQUIZ_MASTER_KEY=secret webquiz --config server_config.yaml\n",
+   "data": {
+    "server": {
+     "port": 9000
+    },
+    "admin": {
+     "trusted_ips": [
+      "127.0.0.1",
+      "10.0.0.5"
+     ]
+    }
+   },
+   "ruamel_output": "# WebQuiz Server Configuration\n# Copy this file to server_config.yaml and customize as needed\n\nserver:\n  host: \"0.0.0.0\"  # Listen on all interfaces (use \"127.0.0.1\" for localhost only)\n  port: 9000       # Server port\n\npaths:\n  quizzes_dir: \"quizzes\"  # Directory containing quiz YAML files\n  logs_dir: \"logs\"        # Directory for server log files (auto-created)\n  csv_dir: \"data\"         # Directory for CSV response files (auto-created)\n  static_dir: \"static\"    # Directory for static web files (auto-created)\n\nadmin:\n  master_key: a1        # Set to enable admin interface (e.g., \"your-secret-key\")\n                          # Can also use WEBQUIZ_MASTER_KEY environment variable\n  # trusted_ips:        # List of IP addresses allowed to access admin interface\n  #   - \"127.0.0.1\"     # Default: only localhost (127.0.0.1)\n  #   - \"192.168.1.10\"  # Add additional trusted IPs as needed\n\n# Optional: Registration configuration\n# Uncomment and configure to collect additional user information\n# registration:\n#   approve: false                     # Set to true to require admin approval before users can start\n#   username_label: \"Ім'я користувача\" # Label for username field (default: follows `language` — \"Ім'я користувача\" for uk, \"Username\" for en)\n#   fields:                            # Additional registration fields (supports Cyrillic)\n#     - Grade\n#     - School\n\n# Optional: Downloadable quizzes configuration\n# Uncomment and configure to enable quiz downloads in admin panel\n# quizzes:\n#   - name: \"Basic Math Quiz\"\n#     download_path: \"https://example.com/quizzes/math.zip\"\n#     folder: \"math_questions/\"\n#   - name: \"Geography Quiz\"\n#     download_path: \"https://example.com/quizzes/geography.zip\"\n#     folder: \"geography/\"\n\n# Optional: SSH Tunnel configuration for public access\n# Uncomment and configure to enable SSH tunnel for remote access\n# tunnel:\n#   server: \"tunnel.example.com\"           # SSH tunnel server hostname or IP address\n#                                          # Note: Uses HTTPS for domains, HTTP for IP addresses\n#   public_key: \"keys/id_ed25519.pub\"      # SSH public key path (auto-generated if missing)\n#   private_key: \"keys/id_ed25519\"         # SSH private key path (auto-generated if missing)\n#   socket_name: \"my-quiz-socket\"          # Optional: Fixed socket name (default: random 6-8 hex chars)\n#                                          # Use for predictable URLs or server-side management\n#\n#   # Option 1: Fetch config from server (default)\n#   # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml\n#\n#   # Option 2: Provide local config (bypasses server fetch)\n#   # Uncomment to use local configuration instead of fetching from server\n#   # config:\n#   #   username: \"tunneluser\"\n#   #   socket_directory: \"/var/run/tunnels\"\n#   #   base_url: \"https://tunnel.example.com/tests\"\n\n# Usage examples:\n# webquiz --config server_config.yaml\n# webquiz --config server_config.yaml --master-key override-key\n# WEBQUIZ_MASTER_KEY=secret webquiz --config server_config.yaml\n  trusted_ips:\n    - 127.0.0.1\n    - 10.0.0.5\n",
+   "parsed": {
+    "server": {
+     "host": "0.0.0.0",
+     "port": 9000
+    },
+    "paths": {
+     "quizzes_dir": "quizzes",
+     "logs_dir": "logs",
+     "csv_dir": "data",
+     "static_dir": "static"
+    },
+    "admin": {
+     "master_key": "a1",
+     "trusted_ips": [
+      "127.0.0.1",
+      "10.0.0.5"
+     ]
+    }
+   }
+  },
+  {
+   "original": "",
+   "data": {
+    "language": "en",
+    "extra_answers_with_users_csv": true,
+    "registration": {
+     "approve": true,
+     "username_label": "Ім'я",
+     "fields": [
+      "Клас",
+      "Школа"
+     ],
+     "disabled_fields": []
+    }
+   },
+   "ruamel_output": "language: en\nextra_answers_with_users_csv: true\nregistration:\n  approve: true\n  username_label: Ім'я\n  fields:\n    - Клас\n    - Школа\n  disabled_fields: []\n",
+   "parsed": {
+    "language": "en",
+    "extra_answers_with_users_csv": true,
+    "registration": {
+     "approve": true,
+     "username_label": "Ім'я",
+     "fields": [
+      "Клас",
+      "Школа"
+     ],
+     "disabled_fields": []
+    }
+   }
+  },
+  {
+   "original": "   \n",
+   "data": {
+    "language": "uk"
+   },
+   "ruamel_output": "language: uk\n",
+   "parsed": {
+    "language": "uk"
+   }
+  },
+  {
+   "original": "# only a comment\n",
+   "data": {
+    "language": "uk"
+   },
+   "ruamel_output": "language: uk\n",
+   "parsed": {
+    "language": "uk"
+   }
+  },
+  {
+   "original": "- a\n- b\n",
+   "data": {
+    "language": "en"
+   },
+   "ruamel_output": "language: en\n",
+   "parsed": {
+    "language": "en"
+   }
+  },
+  {
+   "original": "just text\n",
+   "data": {
+    "language": "en"
+   },
+   "ruamel_output": "language: en\n",
+   "parsed": {
+    "language": "en"
+   }
+  },
+  {
+   "original": "a: [1, 2\n",
+   "data": {
+    "language": "en"
+   },
+   "ruamel_output": "language: en\n",
+   "parsed": {
+    "language": "en"
+   }
+  },
+  {
+   "original": "language: uk   # the language\n\nregistration:\n  approve: false   # need approval?\n  # a comment before fields\n  fields:\n    - Class    # first\n    # between\n    - School\n  username_label: \"Name\"\n\n# trailing comment\n",
+   "data": {
+    "language": "en",
+    "registration": {
+     "approve": true,
+     "fields": [
+      "A",
+      "B"
+     ],
+     "disabled_fields": [
+      "C"
+     ],
+     "username_label": ""
+    }
+   },
+   "ruamel_output": "language: en   # the language\n\nregistration:\n  approve: true    # need approval?\n  # a comment before fields\n  fields:\n    - A\n    - B\n  username_label: \"\"\n\n# trailing comment\n  disabled_fields:\n    - C\n",
+   "parsed": {
+    "language": "en",
+    "registration": {
+     "approve": true,
+     "fields": [
+      "A",
+      "B"
+     ],
+     "username_label": "",
+     "disabled_fields": [
+      "C"
+     ]
+    }
+   }
+  },
+  {
+   "original": "registration:\n  approve: false\nserver:\n  port: 8080\n",
+   "data": {
+    "registration": {
+     "approve": true
+    },
+    "server": {
+     "port": 9000
+    }
+   },
+   "ruamel_output": "registration:\n  approve: true\nserver:\n  port: 9000\n",
+   "parsed": {
+    "registration": {
+     "approve": true
+    },
+    "server": {
+     "port": 9000
+    }
+   }
+  },
+  {
+   "original": "language: uk\nregistration: null\n",
+   "data": {
+    "registration": {
+     "approve": true,
+     "fields": []
+    }
+   },
+   "ruamel_output": "language: uk\nregistration:\n  approve: true\n  fields: []\n",
+   "parsed": {
+    "language": "uk",
+    "registration": {
+     "approve": true,
+     "fields": []
+    }
+   }
+  },
+  {
+   "original": "language: uk\nregistration:\n# approve: true\nserver:\n  port: 1\n",
+   "data": {
+    "registration": {
+     "approve": true
+    }
+   },
+   "ruamel_output": "language: uk\nregistration:\n  approve: true\n# approve: true\nserver:\n  port: 1\n",
+   "parsed": {
+    "language": "uk",
+    "registration": {
+     "approve": true
+    },
+    "server": {
+     "port": 1
+    }
+   }
+  },
+  {
+   "original": "server: {port: 8080}\n",
+   "data": {
+    "server": {
+     "host": "1.2.3.4"
+    }
+   },
+   "ruamel_output": "server: {port: 8080, host: 1.2.3.4}\n",
+   "parsed": {
+    "server": {
+     "port": 8080,
+     "host": "1.2.3.4"
+    }
+   }
+  },
+  {
+   "original": "registration:\n  fields: [A, B]\n",
+   "data": {
+    "registration": {
+     "fields": [
+      "X"
+     ]
+    }
+   },
+   "ruamel_output": "registration:\n  fields:\n    - X\n",
+   "parsed": {
+    "registration": {
+     "fields": [
+      "X"
+     ]
+    }
+   }
+  },
+  {
+   "original": "admin:\n  trusted_ips:\n  - 127.0.0.1\n  - 10.0.0.1\nregistration:\n  fields:\n  - A\n",
+   "data": {
+    "registration": {
+     "fields": [
+      "X",
+      "Y"
+     ]
+    }
+   },
+   "ruamel_output": "admin:\n  trusted_ips:\n    - 127.0.0.1\n    - 10.0.0.1\nregistration:\n  fields:\n    - X\n    - Y\n",
+   "parsed": {
+    "admin": {
+     "trusted_ips": [
+      "127.0.0.1",
+      "10.0.0.1"
+     ]
+    },
+    "registration": {
+     "fields": [
+      "X",
+      "Y"
+     ]
+    }
+   }
+  },
+  {
+   "original": "language: uk",
+   "data": {
+    "language": "en"
+   },
+   "ruamel_output": "language: en\n",
+   "parsed": {
+    "language": "en"
+   }
+  },
+  {
+   "original": "registration:\n  approve: false",
+   "data": {
+    "registration": {
+     "username_label": "Ім'я",
+     "fields": [
+      "1",
+      "a: b",
+      "#x",
+      "",
+      "true",
+      "null",
+      "@x",
+      "- y",
+      "multi\nline"
+     ]
+    }
+   },
+   "ruamel_output": "registration:\n  approve: false\n  username_label: Ім'я\n  fields:\n    - '1'\n    - 'a: b'\n    - '#x'\n    - ''\n    - 'true'\n    - 'null'\n    - '@x'\n    - '- y'\n    - \"multi\\nline\"\n",
+   "parsed": {
+    "registration": {
+     "approve": false,
+     "username_label": "Ім'я",
+     "fields": [
+      "1",
+      "a: b",
+      "#x",
+      "",
+      "true",
+      "null",
+      "@x",
+      "- y",
+      "multi\nline"
+     ]
+    }
+   }
+  },
+  {
+   "original": "language: uk\n",
+   "data": {
+    "registration": {
+     "approve": true
+    },
+    "server": null,
+    "quizzes": [
+     {
+      "name": "Q",
+      "download_path": "https://e.com/q.zip",
+      "folder": "q/"
+     }
+    ]
+   },
+   "ruamel_output": "language: uk\nregistration:\n  approve: true\nserver:\nquizzes:\n  - name: Q\n    download_path: https://e.com/q.zip\n    folder: q/\n",
+   "parsed": {
+    "language": "uk",
+    "registration": {
+     "approve": true
+    },
+    "server": null,
+    "quizzes": [
+     {
+      "name": "Q",
+      "download_path": "https://e.com/q.zip",
+      "folder": "q/"
+     }
+    ]
+   }
+  },
+  {
+   "original": "language: 'uk'\nextra_answers_with_users_csv: false\n",
+   "data": {
+    "language": "en",
+    "extra_answers_with_users_csv": true
+   },
+   "ruamel_output": "language: 'en'\nextra_answers_with_users_csv: true\n",
+   "parsed": {
+    "language": "en",
+    "extra_answers_with_users_csv": true
+   }
+  },
+  {
+   "original": "registration:\n  approve: false\n  fields:\n    - A\n  username_label: x\nlanguage: uk\n",
+   "data": {
+    "registration": "replaced"
+   },
+   "ruamel_output": "registration: replaced\nlanguage: uk\n",
+   "parsed": {
+    "registration": "replaced",
+    "language": "uk"
+   }
+  },
+  {
+   "original": "registration:\n  approve: false\n",
+   "data": {
+    "registration": {
+     "nested": {
+      "a": 1
+     },
+     "list": [
+      {
+       "x": 1
+      },
+      {
+       "y": [
+        1,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   "ruamel_output": "registration:\n  approve: false\n  nested:\n    a: 1\n  list:\n    - x: 1\n    - y:\n        - 1\n        - 2\n",
+   "parsed": {
+    "registration": {
+     "approve": false,
+     "nested": {
+      "a": 1
+     },
+     "list": [
+      {
+       "x": 1
+      },
+      {
+       "y": [
+        1,
+        2
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "original": "server:\n  host: \"0.0.0.0\"  # all\n  port: 8080       # port\n",
+   "data": {
+    "server": {
+     "host": "127.0.0.1",
+     "port": 8081
+    }
+   },
+   "ruamel_output": "server:\n  host: \"127.0.0.1\" # all\n  port: 8081       # port\n",
+   "parsed": {
+    "server": {
+     "host": "127.0.0.1",
+     "port": 8081
+    }
+   }
+  },
+  {
+   "original": "checker_templates:\n  - name: Int\n    code: |\n      assert int(user_answer) == 5\n      # inside the code\n\nlanguage: uk\n",
+   "data": {
+    "checker_templates": [
+     {
+      "name": "New",
+      "code": "assert True"
+     }
+    ]
+   },
+   "ruamel_output": "checker_templates:\n  - name: New\n    code: assert True\nlanguage: uk\n",
+   "parsed": {
+    "checker_templates": [
+     {
+      "name": "New",
+      "code": "assert True"
+     }
+    ],
+    "language": "uk"
+   }
+  },
+  {
+   "original": "registration:\n  username_label: |\n    long\n    label\n  approve: true\n",
+   "data": {
+    "registration": {
+     "username_label": "short"
+    }
+   },
+   "ruamel_output": "registration:\n  username_label: |-\n    short\n  approve: true\n",
+   "parsed": {
+    "registration": {
+     "username_label": "short",
+     "approve": true
+    }
+   }
+  },
+  {
+   "original": "language: uk\r\nregistration:\r\n  approve: false\r\n",
+   "data": {
+    "registration": {
+     "approve": true
+    },
+    "language": "en"
+   },
+   "ruamel_output": "language: en\nregistration:\n  approve: true\n",
+   "parsed": {
+    "language": "en",
+    "registration": {
+     "approve": true
+    }
+   }
+  },
+  {
+   "original": "registration:\n  approve: false\nregistration:\n  approve: true\n",
+   "data": {
+    "language": "en"
+   },
+   "ruamel_output": "language: en\n",
+   "parsed": {
+    "language": "en"
+   }
+  }
+ ]
+}
