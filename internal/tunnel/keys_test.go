@@ -69,7 +69,7 @@ func TestEnsureKeysGenerateNew(t *testing.T) {
 	if st.KeysStatus != "ok" {
 		t.Errorf("keys_status = %q, want %q", st.KeysStatus, "ok")
 	}
-	if st.PublicKeyContent != publicKey {
+	if string(st.PublicKeyContent) != publicKey {
 		t.Errorf("public_key_content = %q, want %q", st.PublicKeyContent, publicKey)
 	}
 
@@ -197,7 +197,7 @@ func TestEnsureKeysInvalid(t *testing.T) {
 	if st.KeysStatus != "invalid" {
 		t.Errorf("keys_status = %q, want %q", st.KeysStatus, "invalid")
 	}
-	if st.Error != err.Error() {
+	if string(st.Error) != err.Error() {
 		t.Errorf("status error = %q, want %q", st.Error, err.Error())
 	}
 	content, err := os.ReadFile(privatePath)

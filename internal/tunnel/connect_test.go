@@ -204,7 +204,7 @@ func TestConnectSuccess(t *testing.T) {
 	if !st.Connected {
 		t.Error("status is not connected")
 	}
-	if !strings.HasPrefix(st.URL, "https://example.com/tests/") {
+	if !strings.HasPrefix(string(st.URL), "https://example.com/tests/") {
 		t.Errorf("url = %q, want it to start with https://example.com/tests/", st.URL)
 	}
 	m.mu.Lock()
@@ -217,7 +217,7 @@ func TestConnectSuccess(t *testing.T) {
 	if (len(socketID) != 6 && len(socketID) != 8) || strings.Trim(socketID, "0123456789abcdef") != "" {
 		t.Errorf("socket id = %q, want 6 or 8 lowercase hex characters", socketID)
 	}
-	if st.URL != "https://example.com/tests/"+socketID+"/" {
+	if string(st.URL) != "https://example.com/tests/"+socketID+"/" {
 		t.Errorf("url = %q, want https://example.com/tests/%s/", st.URL, socketID)
 	}
 	// One SSH connection, to the server of the config, as the user named in
@@ -398,7 +398,7 @@ func TestConnectGivesUpAfterLoginTimeout(t *testing.T) {
 	case <-time.After(waitTimeout):
 		t.Fatal("Connect still waits for the silent server")
 	}
-	if st := m.Status(); st.Connected || !strings.HasPrefix(st.Error, "Failed to establish SSH tunnel: ") {
+	if st := m.Status(); st.Connected || !strings.HasPrefix(string(st.Error), "Failed to establish SSH tunnel: ") {
 		t.Errorf("status = %+v, want not connected with the error", st)
 	}
 }
@@ -451,7 +451,7 @@ func TestConnectFailureReportsError(t *testing.T) {
 		t.Fatalf("Connect() error = %v, want \"Failed to establish SSH tunnel: ...connection refused\"", err)
 	}
 	st := m.Status()
-	if st.Connected || st.URL != "" || st.Error != err.Error() {
+	if st.Connected || st.URL != "" || string(st.Error) != err.Error() {
 		t.Errorf("status = %+v, want not connected with error %q", st, err)
 	}
 	if got := m.statuses.all(); len(got) != 1 || got[0] != st {
@@ -613,11 +613,11 @@ func TestReconnectAfterConnectionLost(t *testing.T) {
 		t.Errorf("report after the drop = %+v, want not connected with error \"Connection lost\"", lost)
 	}
 	for _, failed := range got[2:9] {
-		if failed.Connected || !strings.HasPrefix(failed.Error, "Failed to establish SSH tunnel: ") {
+		if failed.Connected || !strings.HasPrefix(string(failed.Error), "Failed to establish SSH tunnel: ") {
 			t.Errorf("report of a failed attempt = %+v, want not connected with error \"Failed to establish SSH tunnel: ...\"", failed)
 		}
 	}
-	if again := got[9]; !again.Connected || again.Error != "" || !strings.HasPrefix(again.URL, "https://example.com/tests/") {
+	if again := got[9]; !again.Connected || again.Error != "" || !strings.HasPrefix(string(again.URL), "https://example.com/tests/") {
 		t.Errorf("report after reconnecting = %+v, want connected", again)
 	}
 	want := []time.Duration{5 * time.Second, 10 * time.Second, 20 * time.Second, 40 * time.Second,

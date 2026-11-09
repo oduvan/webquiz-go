@@ -79,7 +79,7 @@ func (m *Manager) setKeysStatus(keysStatus, message string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status.KeysStatus = keysStatus
-	m.status.Error = message
+	m.status.Error = OptionalString(message)
 }
 
 // keysReady records usable keys. Like Python, it leaves the status error as it is.
@@ -87,7 +87,7 @@ func (m *Manager) keysReady(publicKey string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status.KeysStatus = KeysOK
-	m.status.PublicKeyContent = publicKey
+	m.status.PublicKeyContent = OptionalString(publicKey)
 }
 
 // readKeys reads the key files, checks that they parse, and returns the

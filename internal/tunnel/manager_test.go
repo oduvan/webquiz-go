@@ -36,6 +36,35 @@ func TestManagerInitialization(t *testing.T) {
 	if st.KeysStatus != "unchecked" {
 		t.Errorf("keys_status = %q, want %q", st.KeysStatus, "unchecked")
 	}
+	// Python checked status["url"] is None. The admin page gets the status as
+	// JSON, where None is null.
+	expectNull(t, st, "url", "error", "public_key_content")
+}
+
+// statusJSON returns the status as the admin page gets it: the JSON text and
+// its fields.
+func statusJSON(t *testing.T, st Status) ([]byte, map[string]any) {
+	t.Helper()
+	data, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatal(err)
+	}
+	return data, fields
+}
+
+// expectNull checks that the status JSON has each key, with the value null.
+func expectNull(t *testing.T, st Status, keys ...string) {
+	t.Helper()
+	data, fields := statusJSON(t, st)
+	for _, key := range keys {
+		if value, ok := fields[key]; !ok || value != nil {
+			t.Errorf("%s in the status JSON %s is %#v, want null (Python's None)", key, data, value)
+		}
+	}
 }
 
 // py: tests/test_tunnel.py::test_get_status
@@ -46,14 +75,7 @@ func TestGetStatus(t *testing.T) {
 
 	// Python returned a dict. The Go status reaches the admin page as JSON,
 	// so the check is on the JSON keys.
-	data, err := json.Marshal(st)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var fields map[string]any
-	if err := json.Unmarshal(data, &fields); err != nil {
-		t.Fatal(err)
-	}
+	data, fields := statusJSON(t, st)
 	for _, key := range []string{"connected", "url", "error", "keys_status"} {
 		if _, ok := fields[key]; !ok {
 			t.Errorf("status JSON %s has no %q", data, key)
@@ -61,6 +83,36 @@ func TestGetStatus(t *testing.T) {
 	}
 	if fields["connected"] != false {
 		t.Errorf("connected = %v, want false", fields["connected"])
+	}
+	expectNull(t, st, "url", "error", "public_key_content")
+}
+
+// Not a port. A status with values writes them as JSON strings, and only the
+// empty ones are null, as Python's None. The server adds its own fields
+// (configured, server, socket_name) by embedding Status, and they stay.
+func TestStatusJSON(t *testing.T) {
+	st := Status{
+		Connected:        true,
+		URL:              "https://example.com/tests/abc123/",
+		KeysStatus:       "ok",
+		PublicKeyContent: "ssh-ed25519 AAAA webquiz@tunnel",
+	}
+	data, err := json.Marshal(st)
+	want := `{"connected":true,"url":"https://example.com/tests/abc123/","error":null,` +
+		`"keys_status":"ok","public_key_content":"ssh-ed25519 AAAA webquiz@tunnel"}`
+	if err != nil || string(data) != want {
+		t.Errorf("status JSON = %s, %v, want %s", data, err, want)
+	}
+
+	type adminTunnel struct {
+		Configured bool `json:"configured"`
+		Status
+	}
+	data, err = json.Marshal(adminTunnel{Configured: true, Status: Status{KeysStatus: "unchecked"}})
+	want = `{"configured":true,"connected":false,"url":null,"error":null,` +
+		`"keys_status":"unchecked","public_key_content":null}`
+	if err != nil || string(data) != want {
+		t.Errorf("JSON of a struct that embeds Status = %s, %v, want %s", data, err, want)
 	}
 }
 

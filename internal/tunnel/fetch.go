@@ -38,7 +38,7 @@ func (m *Manager) fetchTunnelConfig(ctx context.Context) (*ServerConfig, error) 
 		m.log().Error(fmt.Sprintf("Failed to fetch tunnel config from %s: %v", address, err))
 		message := "Failed to fetch config from server: " + err.Error()
 		m.mu.Lock()
-		m.status.Error = message
+		m.status.Error = OptionalString(message)
 		m.mu.Unlock()
 		return nil, errors.New(message)
 	}
