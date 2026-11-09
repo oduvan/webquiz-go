@@ -152,13 +152,16 @@ func TestScannerFindsTags(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("internal/a/a_test.go", "// py: tests/test_a.py::test_one\nfunc TestOne(t *testing.T) {}\n"+
+	// The sample tags are built from parts, so the real scan of this
+	// repository does not find them in this file.
+	tag := "py" + ": "
+	write("internal/a/a_test.go", "// "+tag+"tests/test_a.py::test_one\nfunc TestOne(t *testing.T) {}\n"+
 		"var cases = []struct{ py string }{{py: \"tests/test_b.py::test_two[room-a-files1-name of this server]\"}}\n")
-	write("e2e/tests/quiz.spec.ts", "// py: tests/test_c.py::TestClass::test_three\n")
-	write("harness/checks.test.ts", "// py: tests/test_d.py::test_four\n")
-	write("web/src/x.test.tsx", "// py: tests/test_e.py::test_five\n")
-	write("internal/a/a.go", "// py: tests/test_not_a_test_file.py::test_x\n")
-	write("node_modules/pkg/x_test.go", "// py: tests/test_skipped.py::test_y\n")
+	write("e2e/tests/quiz.spec.ts", "// "+tag+"tests/test_c.py::TestClass::test_three\n")
+	write("harness/checks.test.ts", "// "+tag+"tests/test_d.py::test_four\n")
+	write("web/src/x.test.tsx", "// "+tag+"tests/test_e.py::test_five\n")
+	write("internal/a/a.go", "// "+tag+"tests/test_not_a_test_file.py::test_x\n")
+	write("node_modules/pkg/x_test.go", "// "+tag+"tests/test_skipped.py::test_y\n")
 
 	tags, err := findTags(root)
 	if err != nil {
@@ -194,7 +197,7 @@ func TestPythonListIsComplete(t *testing.T) {
 		t.Fatalf("python-tests.txt should list 911 ids, it lists %d", len(ids))
 	}
 	for _, id := range ids {
-		if !tagPattern.MatchString("py: "+id) || tagPattern.FindStringSubmatch("py: "+id)[1] != id {
+		if !tagPattern.MatchString("py: "+id) || tagPattern.FindStringSubmatch("py: " + id)[1] != id {
 			t.Errorf("the tag pattern cannot read this id: %s", id)
 		}
 	}
