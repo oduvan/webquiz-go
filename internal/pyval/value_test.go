@@ -384,7 +384,10 @@ func TestLoadYAMLTaggedValues(t *testing.T) {
 	if m["t"] != Timestamp("2024-01-15") {
 		t.Errorf("!!timestamp = %#v", m["t"])
 	}
-	for _, bad := range []string{"!!binary '***'", "!!timestamp nope", "!!float abc", "!!set {a: 1}", "!!str {a: 1}", "!!map [1]", "a: !!omap [{a: 1}]"} {
+	if b, err := LoadYAML([]byte("!!binary '***'")); err != nil || len(b.([]byte)) != 0 {
+		t.Errorf("!!binary skips characters outside base64, as Python: %#v, %v", b, err)
+	}
+	for _, bad := range []string{"!!binary 'aGVsbG8'", "!!timestamp nope", "!!float abc", "!!set {a: 1}", "!!str {a: 1}", "!!map [1]", "a: !!omap [{a: 1}]"} {
 		if v, err := LoadYAML([]byte(bad)); err == nil {
 			t.Errorf("LoadYAML(%q) = %#v, want an error", bad, v)
 		}

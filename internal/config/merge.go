@@ -336,14 +336,17 @@ func (e *editor) inlineReplacement(ent entry, value any) (string, bool) {
 // where the comment starts, in characters.
 func (e *editor) keyLineComment(ent entry) (column int, comment string, ok bool) {
 	line := e.lines[ent.start]
+	// "key:" with nothing after it has an empty null value on the key line.
+	empty := ent.value.Kind == yaml.ScalarNode && ent.value.Style == 0 && ent.value.Value == ""
 	var after int
-	if ent.value.Line == ent.key.Line && ent.value.Kind == yaml.ScalarNode {
+	switch {
+	case ent.value.Line == ent.key.Line && ent.value.Kind == yaml.ScalarNode && !empty:
 		_, end, found := scalarSpan(line, ent.value)
 		if !found {
 			return 0, "", false
 		}
 		after = end
-	} else if ent.value.Line > ent.key.Line {
+	case ent.value.Line > ent.key.Line || empty:
 		_, keyEnd, found := scalarSpan(line, ent.key)
 		if !found {
 			return 0, "", false
@@ -353,7 +356,7 @@ func (e *editor) keyLineComment(ent entry) (column int, comment string, ok bool)
 			return 0, "", false
 		}
 		after = keyEnd + colon + 1
-	} else {
+	default:
 		return 0, "", false
 	}
 	rest := line[after:]

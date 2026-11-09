@@ -198,6 +198,19 @@ func TestPartialUpdateKeepsQuoteStyleAndLineEnds(t *testing.T) {
 	if out != "language: uk\nserver:\n  port: 9000\n" {
 		t.Errorf("a file without a final line end:\n%q", out)
 	}
+	// The comment of a key that gets a whole new value stays on the key line.
+	out = mustMerge(t, "registration:   # off for now\nlanguage: uk\n", map[string]any{"registration": map[string]any{"approve": true}})
+	if out != "registration:   # off for now\n  approve: true\nlanguage: uk\n" {
+		t.Errorf("comment of an empty key:\n%q", out)
+	}
+	out = mustMerge(t, "registration: null  # off\nlanguage: uk\n", map[string]any{"registration": map[string]any{"approve": true}})
+	if out != "registration:       # off\n  approve: true\nlanguage: uk\n" {
+		t.Errorf("comment after null:\n%q", out)
+	}
+	out = mustMerge(t, "a:\n  fields:   # the list\n    - x\n", map[string]any{"a": map[string]any{"fields": []any{"y"}}})
+	if out != "a:\n  fields:   # the list\n    - \"y\"\n" {
+		t.Errorf("comment of a list key:\n%q", out)
+	}
 	// A file with only comments keeps them (ruamel dropped them; nothing else differs).
 	out = mustMerge(t, "# my notes\n\n", map[string]any{"language": "en"})
 	if out != "# my notes\n\nlanguage: en\n" {

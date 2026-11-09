@@ -297,7 +297,15 @@ func tagged(n *yaml.Node) (any, error) {
 		}
 		return Timestamp(s), nil
 	case "!!binary":
-		decoded, err := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(s), ""))
+		// Like Python's base64.decodebytes: characters outside the base64
+		// alphabet (spaces, line ends, others) are skipped.
+		clean := strings.Map(func(r rune) rune {
+			if r < 128 && (r == '+' || r == '/' || r == '=' || isASCIIAlphaNumeric(byte(r))) {
+				return r
+			}
+			return -1
+		}, s)
+		decoded, err := base64.StdEncoding.DecodeString(clean)
 		if err != nil {
 			return nil, nodeError(n, "failed to decode base64 data: %v", err)
 		}
@@ -392,6 +400,10 @@ func constructFloat(n *yaml.Node, s string) (any, error) {
 		return nil, nodeError(n, "could not convert string to float: %q", s)
 	}
 	return sign * f, nil
+}
+
+func isASCIIAlphaNumeric(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 func nodeError(n *yaml.Node, format string, args ...any) error {
