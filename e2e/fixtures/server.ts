@@ -106,11 +106,17 @@ export async function startServer(options: StartOptions = {}): Promise<RunningSe
   const configPath = path.join(dir, 'webquiz.yaml');
   writeFileSync(configPath, stringify(config));
 
+  // The developer's shell must not change the test server.
+  const baseEnv = { ...process.env };
+  for (const name of ['WEBQUIZ_MASTER_KEY', 'WEBQUIZ_TIME_LIMIT_GRACE_SECONDS', 'WEBQUIZ_TIME_LIMIT_CHECK_INTERVAL']) {
+    delete baseEnv[name];
+  }
+
   let output = '';
   const child: ChildProcess = spawn(binaryPath, ['--config', configPath, '--port', String(port)], {
     cwd: dir,
     env: {
-      ...process.env,
+      ...baseEnv,
       WEBQUIZ_BINARY_DIR: dir,
       WEBQUIZ_IS_BINARY: '0',
       ...options.env,
@@ -120,6 +126,11 @@ export async function startServer(options: StartOptions = {}): Promise<RunningSe
   child.stdout?.on('data', (chunk) => (output += chunk));
   child.stderr?.on('data', (chunk) => (output += chunk));
   let exited = false;
+  let spawnError: Error | undefined;
+  child.on('error', (error) => {
+    spawnError = error;
+    exited = true;
+  });
   const exitPromise = new Promise<void>((resolve) =>
     child.once('exit', () => {
       exited = true;
@@ -128,7 +139,7 @@ export async function startServer(options: StartOptions = {}): Promise<RunningSe
   );
 
   const stop = async () => {
-    if (!exited) {
+    if (!exited && !spawnError) {
       child.kill('SIGKILL');
       await exitPromise;
     }
@@ -137,12 +148,16 @@ export async function startServer(options: StartOptions = {}): Promise<RunningSe
 
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
+    if (spawnError) {
+      rmSync(dir, { recursive: true, force: true });
+      throw new Error(`Could not start ${binaryPath}: ${spawnError.message}`);
+    }
     if (exited) {
       await stop();
       throw new Error(`Server exited before it answered on port ${port}. Output:\n${output}`);
     }
     if (await canConnect(port)) {
-      return { url: `http://localhost:${port}`, port, dir, stop };
+      return { url: `http://127.0.0.1:${port}`, port, dir, stop };
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }

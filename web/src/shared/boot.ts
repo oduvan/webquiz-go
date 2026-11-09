@@ -6,7 +6,7 @@ const BOOT_MARKER = '__WEBQUIZ_BOOT__';
 export function readBoot<T>(devFallback: T): T {
   const el = document.getElementById('webquiz-boot');
   const text = el && el.textContent ? el.textContent.trim() : '';
-  if (text === '' || text.indexOf(BOOT_MARKER) !== -1) {
+  if (text === '' || text === BOOT_MARKER) {
     return devFallback;
   }
   return JSON.parse(text) as T;

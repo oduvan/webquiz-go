@@ -28,6 +28,10 @@ describe('readBoot', () => {
     setBoot('__WEBQUIZ_BOOT__');
     expect(readBoot({ dev: true })).toEqual({ dev: true });
   });
+  it('parses boot JSON that contains the marker text', () => {
+    setBoot('{"note":"__WEBQUIZ_BOOT__"}');
+    expect(readBoot({ note: '' })).toEqual({ note: '__WEBQUIZ_BOOT__' });
+  });
   it('returns the fallback when the script is missing or empty', () => {
     setBoot(null);
     expect(readBoot({ dev: true })).toEqual({ dev: true });
