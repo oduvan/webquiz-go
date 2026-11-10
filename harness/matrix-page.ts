@@ -248,7 +248,18 @@ const READ_JS = String.raw`() => {
   };
   const text = (el) => (el ? (el.innerText || '').trim() : '');
   const content = (el) => (el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '');
-  const button = (el) => ({ visible: visible(el), disabled: !!(el && el.disabled), text: content(el) });
+  const box = (el) => {
+    if (!visible(el)) return null;
+    const rect = el.getBoundingClientRect();
+    return { left: Math.round(rect.left), right: Math.round(rect.right), top: Math.round(rect.top), bottom: Math.round(rect.bottom) };
+  };
+  const button = (el) => ({ visible: visible(el), disabled: !!(el && el.disabled), text: content(el), box: box(el) });
+  // Where an option's radio circle ends, with the gap after it (0 without a circle, as in 1.19)
+  const circleEnd = (option) => {
+    const marker = $('.option-marker', option);
+    if (!visible(marker)) return 0;
+    return Math.round(marker.getBoundingClientRect().right + (parseFloat(getComputedStyle(marker).marginRight) || 0));
+  };
   const image = (img) =>
     img
       ? {
@@ -320,6 +331,7 @@ const READ_JS = String.raw`() => {
           classes: Array.from(el.classList),
           label: label ? content(label) : afterLabel(el),
           image: image($('img.option-image', el)),
+          circleEnd: circleEnd(el),
         };
       }),
       textInput: textInput
@@ -416,6 +428,8 @@ const READ_JS = String.raw`() => {
     question,
     submit: button($('#submit-answer-btn')),
     cont: button($('#continue-btn')),
+    // The verdict next to "Continue" is new in 2.0: a 1.19 page has none
+    verdict: visible($('#answer-verdict')) ? { text: content($('#answer-verdict')), box: box($('#answer-verdict')) } : null,
     explanation,
     results,
   };
@@ -445,6 +459,7 @@ const STATE_JS = String.raw`() => {
     explanationNext: visible($('#explanation-next-btn')) && !$('#explanation-next-btn').disabled,
     contVisible: visible(cont),
     contReady: visible(cont) && !cont.disabled,
+    verdict: visible($('#answer-verdict')),
     marks: document.querySelectorAll('#current-question-container [class*="feedback-"], #current-question-container .checker-error, #current-question-container .correct-value-display').length,
     timeUp: !!(card && card.querySelector('.time-up-message')),
     questionTimer: ($('#question-timer') || {}).textContent || '',
@@ -466,6 +481,8 @@ export interface PageState {
   explanationNext: boolean;
   contVisible: boolean;
   contReady: boolean;
+  /** The verdict next to "Continue" shows (new in 2.0; never on a 1.19 page). */
+  verdict: boolean;
   marks: number;
   timeUp: boolean;
   questionTimer: string;

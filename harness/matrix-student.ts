@@ -54,17 +54,21 @@ import {
   checkFeedback,
   checkNoSideScroll,
   checkNotApprovedYet,
+  checkNoVerdict,
+  checkNoVerdictWhenHidden,
   checkQuestion,
   checkQuestionTimeUp,
   checkRegistration,
   checkResults,
   checkTheme,
+  checkVerdict,
   checkWaiting,
   effectiveLimit,
   expectedResults,
   explanationShown,
   feedbackShown,
   fieldName,
+  newIn2,
   orderProblems,
   same,
   textsFor,
@@ -146,13 +150,14 @@ async function giveAnswer(page: Page, answer: Answer): Promise<ChoiceSeen> {
 
 /** Watch the page after an answer until the next question or the results come, without clicking. */
 async function observeAdvance(page: Page, fromQuestion: string, timeoutMs: number, startedAt: number): Promise<AdvanceSeen> {
-  const seen: AdvanceSeen = { advanced: false, sawContinue: false, sawMarks: false, sawExplanation: false, millis: 0 };
+  const seen: AdvanceSeen = { advanced: false, sawContinue: false, sawMarks: false, sawExplanation: false, sawVerdict: false, millis: 0 };
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const state = await pageState(page);
     seen.sawContinue ||= state.contVisible;
     seen.sawMarks ||= state.marks > 0;
     seen.sawExplanation ||= state.explanation;
+    seen.sawVerdict ||= state.verdict;
     if (state.results || (state.question !== null && state.question !== fromQuestion)) {
       seen.advanced = true;
       break;
@@ -215,6 +220,7 @@ export async function runStudentCase(env: MatrixEnv, matrixCase: MatrixCase, scr
     const running = await admin.call('GET', '/api/admin/version-check');
     const version = typeof running.json?.running_version === 'string' ? running.json.running_version : env.version;
     record.serverVersion = version;
+    if (!newIn2(version)) record.notes.push(`the server reports version ${version}: the checks that are new in 2.0 (the answer verdict) are skipped`);
     const switched = await admin.call('POST', '/api/admin/switch-quiz', {
       quiz_filename: QUIZ_FILE,
       ...(matrixCase.settingsFrom === 'start' ? { settings: startSettings(matrixCase.settings) } : {}),
@@ -395,6 +401,8 @@ async function mainStudent(
   const settings = matrixCase.settings;
   const base = new URL(admin.base);
   const snapChecks = (snap: Snap) => [checkTheme(screen.theme, snap), ...checkNoSideScroll(screen.device, snap)];
+  // The answer verdict is new in 2.0: its checks run only when the server has it
+  const new2 = newIn2(version);
 
   record.where = 'registration';
   await page.goto(base.origin + '/');
@@ -470,6 +478,8 @@ async function mainStudent(
     if (position === 1 && !matrixCase.approve) {
       questionChecks.push(same('no waiting screen without approve', 'index.html:1551-1562; server.py:1961', false, snap.visible.waiting));
     }
+    // The verdict of the last answer is gone on the next question
+    if (new2 && position > 1) questionChecks.push(checkNoVerdict('the next question', snap));
     await shoot(page, record, env.runDir, folder, `${tag}-question`, `Question ${position} of ${QUESTIONS.length}: question ${question.id}, ${question.label}`, record.add(`${tag}-question`, questionChecks));
     if (question.file && snap.question?.file) {
       const response = await fetch(new URL(snap.question.file.href, base.origin + '/'));
@@ -507,12 +517,14 @@ async function mainStudent(
       const seenAt = Date.now();
       snap = await readSnap(page);
       outcomes.push({ id: question.id, position, answer: null });
-      await shoot(page, record, env.runDir, folder, `${tag}-time-up`, `Question ${position}: its own ${limit} s ran out`, record.add(`${tag}-time-up`, checkQuestionTimeUp(matrixCase, question, snap)));
+      const timeUpChecks = checkQuestionTimeUp(matrixCase, question, snap);
+      if (new2 && feedbackShown(settings)) timeUpChecks.push(...checkVerdict(matrixCase, question, null, snap));
+      await shoot(page, record, env.runDir, folder, `${tag}-time-up`, `Question ${position}: its own ${limit} s ran out`, record.add(`${tag}-time-up`, timeUpChecks));
       if (feedbackShown(settings)) {
         await afterFeedback(env, matrixCase, record, folder, page, question, tag, position, 'question-timeout');
       } else {
         const seen = await observeAdvance(page, question.question, 10_000, seenAt);
-        record.add(`${tag}-time-up`, checkAutoAdvance(seen, true));
+        record.add(`${tag}-time-up`, [...checkAutoAdvance(seen, true), ...(new2 ? [checkNoVerdictWhenHidden(seen)] : [])]);
       }
       continue;
     }
@@ -526,11 +538,13 @@ async function mainStudent(
       await until(page, (s) => s.contReady || s.results, 15_000, 'the feedback after the answer');
       await settle(page);
       snap = await readSnap(page);
-      await shoot(page, record, env.runDir, folder, `${tag}-feedback`, `Question ${position}: after the answer`, record.add(`${tag}-feedback`, [...checkFeedback(matrixCase, question, question.main, snap), ...snapChecks(snap)]));
+      const feedbackChecks = [...checkFeedback(matrixCase, question, question.main, snap), ...snapChecks(snap)];
+      if (new2) feedbackChecks.push(...checkVerdict(matrixCase, question, question.main, snap));
+      await shoot(page, record, env.runDir, folder, `${tag}-feedback`, `Question ${position}: after the answer`, record.add(`${tag}-feedback`, feedbackChecks));
       await afterFeedback(env, matrixCase, record, folder, page, question, tag, position, 'answer');
     } else {
       const seen = await observeAdvance(page, question.question, 10_000, submittedAt);
-      record.add(`${tag}-answer`, checkAutoAdvance(seen, false));
+      record.add(`${tag}-answer`, [...checkAutoAdvance(seen, false), ...(new2 ? [checkNoVerdictWhenHidden(seen)] : [])]);
     }
   }
   return outcomes;
@@ -573,6 +587,8 @@ async function afterFeedback(
   await settle(page);
   const snap = await readSnap(page);
   const checks = expected ? [...checkExplanation(matrixCase, question, position, snap), ...checkNoSideScroll(record.device, snap)] : [];
+  // The verdict of the answer is gone on the explanation step (new in 2.0)
+  if (newIn2(record.serverVersion)) checks.push(checkNoVerdict('the explanation step', snap));
   const caption = expected ? 'Question explanation (after "Continue")' : 'An explanation step that 1.19 would not show';
   await shoot(page, record, env.runDir, folder, `${tag}-explanation`, caption, record.add(`${tag}-explanation`, checks));
   await page.click('#explanation-next-btn', { timeout: 5000 });

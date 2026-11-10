@@ -5,6 +5,10 @@
 // The check functions at the end compare a rule's expected value with what the
 // page showed (a Snap, read by matrix-page.ts) and return CheckResults. Nothing
 // here needs a browser or a server, so matrix.test.ts tests it directly.
+//
+// A few rules are for features that are new in 2.0 (1.19 has nothing like them).
+// Their rule text starts with "new in 2.0", and the matrix skips them when the
+// server is a 1.19 one (see newIn2).
 
 import { DISABLED_FIELDS, FIELDS, USERNAME_LABEL, type MatrixCase } from './matrix-cases';
 import {
@@ -16,9 +20,17 @@ import {
   type MatrixQuestion,
   type QuizSettings,
 } from './matrix-quiz';
-import { TEXTS, type StudentTexts } from './matrix-texts';
+import { NEW_TEXTS, TEXTS, type StudentTexts } from './matrix-texts';
 
 // ---- What the page reader returns (plain data) ----
+
+/** A place on the screen in CSS pixels (from the top left corner of the window). */
+export interface Box {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
 
 export interface ImageSnap {
   src: string;
@@ -33,6 +45,11 @@ export interface OptionSnap {
   /** The feedback label the option shows ("✓ Правильна відповідь"), '' when none. */
   label: string;
   image: ImageSnap | null;
+  /**
+   * Where the option's radio circle ends, with the gap after it, in pixels from the left
+   * edge of the screen. 0 when the option has no circle (1.19 has none; it is new in 2.0).
+   */
+  circleEnd?: number;
 }
 
 export interface QuestionSnap {
@@ -54,6 +71,14 @@ export interface ButtonSnap {
   visible: boolean;
   disabled: boolean;
   text: string;
+  /** Where the button is; null when it is hidden. */
+  box?: Box | null;
+}
+
+/** The verdict next to "Continue" after an answer (new in 2.0). */
+export interface VerdictSnap {
+  text: string;
+  box: Box | null;
 }
 
 export interface ResultCellSnap {
@@ -91,6 +116,8 @@ export interface Snap {
   question: QuestionSnap | null;
   submit: ButtonSnap;
   cont: ButtonSnap;
+  /** The verdict next to "Continue" (new in 2.0); null when the page shows none. */
+  verdict: VerdictSnap | null;
   explanation: {
     title: string;
     question: string;
@@ -540,6 +567,17 @@ export function checkTopControls(seen: ScrollSeen): CheckResult[] {
   ];
 }
 
+/**
+ * The theme button of a teacher page scrolls away with the page too: 1.19 placed it with
+ * position: absolute (admin.html:1169-1176, 1224-1226; files.html:528-535, 720-722;
+ * live_stats.html:403-408, 432-434) or in the page header (csv_table.html:291-295).
+ * `rule` names the page's lines. Nothing to check when the page did not scroll.
+ */
+export function checkThemeButtonScroll(seen: ScrollSeen, rule: string): CheckResult[] {
+  if (seen.scrolled <= 0) return [];
+  return [same('theme button scrolls away with the page', rule, 0, seen.toggle)];
+}
+
 export function checkTheme(theme: 'light' | 'dark', snap: Snap): CheckResult {
   return same('theme from localStorage "theme"', 'index.html:1297-1303', theme === 'dark', snap.dark);
 }
@@ -735,6 +773,8 @@ export function checkChoice(question: MatrixQuestion, answer: Answer, seen: { se
  * Image sizes on a question screen. A question image keeps its own size when it fits
  * (index.html:214-223, max-width 100%). Image options are at most 300 px wide on a desktop
  * (index.html:228-235) and fill the screen width on a phone (index.html:501-514, width 100%).
+ * 2.0 keeps a radio circle left of each picture (new in 2.0, and it stays), so there the
+ * picture fills the screen width less the circle.
  */
 export function checkImageSizes(device: string, snap: Snap): CheckResult[] {
   const q = snap.question;
@@ -746,15 +786,19 @@ export function checkImageSizes(device: string, snap: Snap): CheckResult[] {
       truth('question image at its own size', 'index.html:214-223', Math.abs((q.image.width ?? 0) - want) <= 2, `${want}px wide`, `${q.image.width}px wide`),
     );
   }
-  const images = (q?.options ?? []).map((option) => option.image).filter((image): image is ImageSnap => !!image && !!image.natural);
+  const options = (q?.options ?? []).filter((option) => !!option.image && !!option.image.natural);
+  const images = options.map((option) => option.image as ImageSnap);
   if (images.length) {
     if (device === 'phone') {
+      // The width each picture may fill: the screen, less the radio circle when there is one
+      const room = options.map((option) => screen - (option.circleEnd ?? 0));
+      const circle = options.some((option) => (option.circleEnd ?? 0) > 0);
       results.push(
         truth(
           'image options fill the phone screen width',
-          'index.html:501-514 (.option-image width 100%, no side padding)',
-          images.every((image) => (image.width ?? 0) >= screen * 0.95),
-          `${screen}px wide (the screen)`,
+          'index.html:501-514 (.option-image width 100%, no side padding); the radio circle beside the picture is new in 2.0',
+          images.every((image, index) => (image.width ?? 0) >= room[index] * 0.95),
+          circle ? `${[...new Set(room)].join(' / ')}px wide (the screen less the radio circle)` : `${screen}px wide (the screen)`,
           images.map((image) => `${image.width}px`).join(', '),
         ),
       );
@@ -838,6 +882,8 @@ export interface AdvanceSeen {
   sawContinue: boolean;
   sawMarks: boolean;
   sawExplanation: boolean;
+  /** The verdict next to "Continue" showed at some moment (new in 2.0). */
+  sawVerdict?: boolean;
   millis: number;
 }
 
@@ -1047,3 +1093,69 @@ export function checkCsvAgainstScreen(
   return results;
 }
 
+// ---- New in 2.0: rules for features 1.19 does not have ----
+
+/**
+ * Does the server have the features that are new in 2.0? The matrix reads the version the
+ * server reports (/api/admin/version-check): 1.19 reports "1.19", the Go version "2.0".
+ * A version it cannot read counts as 1.19, so the new rules are skipped rather than failed.
+ */
+export function newIn2(version: string | null | undefined): boolean {
+  const major = Number(/^\s*(\d+)(\.|\s*$)/.exec(version ?? '')?.[1]);
+  return Number.isInteger(major) && major >= 2;
+}
+
+/** Where the answer verdict comes from in 2.0 (1.19 has no verdict). */
+export const VERDICT_RULE = 'new in 2.0 (not in 1.19): QuizPage.tsx #answer-verdict, from is_correct of the answer reply (controller.ts)';
+
+/**
+ * The verdict after an answer (new in 2.0). While right answers are shown, the page says in
+ * words whether the answer counts: "✓ Правильно" or "✗ Неправильно" ("✓ Correct" / "✗ Incorrect"
+ * in English). There is none after a timeout (the question already says that the time is up),
+ * and none while right answers are hidden (the reply then has no is_correct). null = no verdict.
+ */
+export function expectedVerdict(matrixCase: MatrixCase, question: MatrixQuestion, answer: Answer | null): string | null {
+  if (!feedbackShown(matrixCase.settings) || answer === null) return null;
+  const T = NEW_TEXTS[matrixCase.language];
+  return judge(question, answer).correct ? T.answer_verdict_correct : T.answer_verdict_incorrect;
+}
+
+/**
+ * The screen right after an answer or a timeout with show_right_answer on (new in 2.0): the
+ * verdict matches whether the answer counts, and it stands left of the "Continue" button.
+ */
+export function checkVerdict(matrixCase: MatrixCase, question: MatrixQuestion, answer: Answer | null, snap: Snap): CheckResult[] {
+  const want = expectedVerdict(matrixCase, question, answer);
+  const verdict = snap.verdict;
+  const results: CheckResult[] = [
+    same(
+      want === null ? 'no verdict after a timeout' : 'verdict says whether the answer counts',
+      VERDICT_RULE,
+      want,
+      verdict ? norm(verdict.text) : null,
+    ),
+  ];
+  if (want !== null && verdict) {
+    const cont = snap.cont.box ?? null;
+    results.push(
+      truth(
+        'verdict stands left of "Continue"',
+        VERDICT_RULE,
+        !!verdict.box && !!cont && verdict.box.right <= cont.left + 1,
+        'its right edge at or before the left edge of "Continue"',
+        verdict.box && cont ? `verdict ${verdict.box.left}..${verdict.box.right} px, "Continue" ${cont.left}..${cont.right} px` : 'one of them has no place on the screen',
+      ),
+    );
+  }
+  return results;
+}
+
+/** A screen after the answer screen shows no verdict: the next question, the explanation step (new in 2.0). */
+export function checkNoVerdict(where: string, snap: Snap): CheckResult {
+  return same(`no verdict on ${where}`, VERDICT_RULE, null, snap.verdict ? norm(snap.verdict.text) : null);
+}
+
+/** With right answers hidden the page goes on by itself and never shows a verdict (new in 2.0). */
+export function checkNoVerdictWhenHidden(seen: AdvanceSeen): CheckResult {
+  return same('no verdict while right answers are hidden', VERDICT_RULE, false, seen.sawVerdict ?? false);
+}
