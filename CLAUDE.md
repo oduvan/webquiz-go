@@ -141,7 +141,7 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 - **Quiz interface language** - `language` (`uk` or `en`, default `uk`) from `internal/i18n`; the pages get the texts in the boot data; hot-reloadable
 - **Dark/Light theme** - toggle on every page, `theme` key in localStorage, CSS variables. The button (and the student's name badge on the quiz page) sit at the top of the page with `position: absolute` and scroll away with it, as in 1.19; never `position: fixed`, which covered the text on a phone
 - **Quiz file attachments** - `file` field, files in `quizzes/attach/`, served at `/attach/` with forced download
-- **Gzip copies of the page files** - `vite build` writes `name.gz` (best compression, only when smaller) next to every .js, .css, .svg, .json and .html in `web/dist`. `serveAssets` sends the copy when Accept-Encoding allows gzip, with `Content-Encoding: gzip`, the type of the file itself and `Vary: Accept-Encoding`. Pictures (`/imgs/`) and the HTML pages (made per request) are sent as they are
+- **Gzip copies of the page files** - `vite build` writes `name.gz` (best compression, only when smaller) next to every .js, .css, .svg and .json in `web/dist`. `serveAssets` sends the copy when Accept-Encoding allows gzip, with `Content-Encoding: gzip`, the type of the file itself and `Vary: Accept-Encoding`. Pictures (`/imgs/`) and the HTML pages (made per request) are sent as they are
 - **Question text copy prevention** - questions have `user-select: none` and a `copy` handler; text inputs stay selectable
 - **File manager** shows the whole `webquiz.yaml` (also `master_key`) to every computer on the local network, as in 1.19
 
