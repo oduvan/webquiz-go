@@ -85,14 +85,19 @@ func TestRequestErrorsLikePython(t *testing.T) {
 			t.Errorf("%s %s %v: %d %s, want %d %q", c.method, c.path, c.body, res.Status, res.Body, c.status, c.error)
 		}
 	}
-	// A question id 1.0 or true is question 1, as in Python.
-	res := ts.PostJSON(t, "/api/submit-answer", map[string]any{"user_id": userID, "question_id": 1.0, "selected_answer": 1})
+	// A question id 1.0 or true is question 1, and the answer 1.0 equals 1, as
+	// in Python. (json.Number sends 1.0 as written; a Go float would go out as 1.)
+	res := ts.PostJSON(t, "/api/submit-answer", map[string]any{"user_id": userID, "question_id": json.Number("1.0"), "selected_answer": 1})
 	if res.Status != 200 || res.JSON(t)["is_correct"] != true {
 		t.Errorf("question_id 1.0: %d %s", res.Status, res.Body)
 	}
-	res = ts.PostJSON(t, "/api/submit-answer", map[string]any{"user_id": userID, "question_id": true, "selected_answer": 1.0})
-	if res.Status != 200 || res.JSON(t)["is_correct"] != true {
+	first := res.Body
+	res = ts.PostJSON(t, "/api/submit-answer", map[string]any{"user_id": userID, "question_id": true, "selected_answer": json.Number("1.0")})
+	if res.Status != 200 || string(res.Body) != string(first) {
 		t.Errorf("a repeated answer 1.0 to question true gets the stored reply: %d %s", res.Status, res.Body)
+	}
+	if res := ts.PostJSON(t, "/api/submit-answer", map[string]any{"user_id": userID, "question_id": 1, "selected_answer": 0}); res.Status != 409 {
+		t.Errorf("another answer to question 1: %d %s, want 409", res.Status, res.Body)
 	}
 }
 
