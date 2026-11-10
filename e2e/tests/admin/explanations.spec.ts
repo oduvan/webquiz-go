@@ -115,6 +115,7 @@ test('the preview takes the place of the field', async ({ page, launch }) => {
   await expect(previewBox(item)).toBeHidden();
 
   await togglePreview(item);
+  await expect(previewBox(item).locator('strong')).toBeVisible();
   await expect(previewBox(item).locator('strong')).toHaveText('Bold');
   await expect(previewBox(item)).toBeVisible();
   await expect(explanationField(item)).toBeHidden();

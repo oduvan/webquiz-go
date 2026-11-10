@@ -91,7 +91,10 @@ test('the collapsed header shows the question text', async ({ page, launch }) =>
   await adminLogin(page, server.url);
   await selectAndEditQuiz(page);
 
-  await expect(questionItems(page).first().locator('.question-preview')).toContainText('What is the capital of Ukraine?');
+  // Selenium's .text is the text on the screen: the preview must be shown
+  const preview = questionItems(page).first().locator('.question-preview');
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText('What is the capital of Ukraine?');
 });
 
 // py: tests/test_selenium_quiz_editor.py::test_file_image_indicators_displayed
@@ -120,12 +123,18 @@ test('the collapsed header shows image and file indicators', async ({ page, laun
   // The picture sign without its variation selector, as the Python test checked it
   const image = '\u{1F5BC}';
   const file = '📎';
+  // Selenium's .text is the text on the screen: the signs must be shown
   const items = questionItems(page);
-  const first = (await items.nth(0).locator('.question-indicators').textContent()) || '';
+  const shownText = async (index: number) => {
+    const indicators = items.nth(index).locator('.question-indicators');
+    await expect(indicators).toBeVisible();
+    return indicators.innerText();
+  };
+  const first = await shownText(0);
   expect(first, 'the first question has the image sign').toContain(image);
-  const second = (await items.nth(1).locator('.question-indicators').textContent()) || '';
+  const second = await shownText(1);
   expect(second, 'the second question has the file sign').toContain(file);
-  const third = (await items.nth(2).locator('.question-indicators').textContent()) || '';
+  const third = await shownText(2);
   expect(third, 'the third question has the image sign').toContain(image);
   expect(third, 'the third question has the file sign').toContain(file);
 });
@@ -171,9 +180,16 @@ test('question numbers have no "Питання" prefix', async ({ page, launch }
   await adminLogin(page, server.url);
   await selectAndEditQuiz(page);
 
+  // Selenium's .text is the text on the screen: the numbers must be shown
   const items = questionItems(page);
-  await expect(items.nth(0).locator('.question-number')).toHaveText('1.');
-  await expect(items.nth(1).locator('.question-number')).toHaveText('2.');
+  for (const [index, text] of [
+    [0, '1.'],
+    [1, '2.'],
+  ] as [number, string][]) {
+    const number = items.nth(index).locator('.question-number');
+    await expect(number).toBeVisible();
+    await expect(number).toHaveText(text);
+  }
 });
 
 // py: tests/test_selenium_quiz_editor.py::test_save_and_continue_keeps_editor_open
@@ -205,6 +221,7 @@ test('"Save and continue" saves a new quiz and keeps the editor open', async ({ 
   await button.click();
 
   // The button shows that it saved, then comes back after 1.5 s
+  await expect(button).toBeVisible();
   await expect(button).toContainText('Збережено');
   await expect(button, 'the button is enabled again after the save').toBeEnabled();
   await expect(button).toContainText('Продовжити');
@@ -212,6 +229,7 @@ test('"Save and continue" saves a new quiz and keeps the editor open', async ({ 
   await expect(page.locator('#quiz-editor-modal'), 'the editor stays open').toBeVisible();
   // Now an edited quiz: the file name can be changed (a rename)
   await expect(page.locator('#quiz-filename')).toBeEnabled();
+  await expect(page.locator('#modal-title')).toBeVisible();
   await expect(page.locator('#modal-title')).toContainText('Редагувати');
 });
 
@@ -232,6 +250,7 @@ test('"Save and continue" works for an edited quiz', async ({ page, launch }) =>
 
   const button = page.locator('#save-continue-btn');
   await button.click();
+  await expect(button).toBeVisible();
   await expect(button).toContainText('Збережено');
   await expect(button, 'the button is enabled again after the save').toBeEnabled();
 

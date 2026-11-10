@@ -48,8 +48,10 @@ test('the running quiz is marked in the list', async ({ page, request, launch })
 
   await adminLogin(page, server.url);
 
-  const texts = await quizOptions(page).allTextContents();
-  expect(texts.some((text) => text.indexOf('(поточний)') !== -1), `options: ${texts.join(' | ')}`).toBe(true);
+  // Selenium's .text is the text on the screen: the marked option must be shown
+  const marked = quizOptions(page).filter({ hasText: '(поточний)' });
+  await expect(marked).toHaveCount(1);
+  await expect(marked).toBeVisible();
 });
 
 // py: tests/test_admin_unite_quizzes.py::test_delete_button_disabled_for_current_quiz
