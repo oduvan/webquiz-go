@@ -67,8 +67,8 @@ func (s *Server) findDownloadableQuiz(name any) (config.DownloadableQuiz, bool) 
 	return found, ok2
 }
 
-// folderError checks the folder of a download and returns the folder in
-// normal form. The text is the 400 error when the folder is not allowed.
+// checkDownloadFolder checks the folder of a download and returns the folder in
+// normal form, or the text of the 400 error when the folder is not allowed.
 func (s *Server) checkDownloadFolder(folder string) (string, string) {
 	// Absolute paths, Unix-style or Windows-style.
 	if filepath.IsAbs(folder) || strings.HasPrefix(folder, "/") || (len(folder) >= 2 && folder[1] == ':') {
