@@ -10,6 +10,7 @@ export function FileList(props: {
   files: FileInfo[] | null; // null while loading
   search: string;
   selected: Set<string>;
+  transferEnabled: boolean; // checkboxes show only while transfer is available
   onToggleTransfer: (type: FileType, name: string, checked: boolean) => void;
   onView: (type: FileType, name: string, mode: 'text' | 'table') => void;
   onEdit: (name: string) => void;
@@ -51,7 +52,7 @@ export function FileList(props: {
           >
             <div className="file-info min-w-0">
               <div className="file-name break-words font-bold">
-                {canTransfer(type, file.name) && (
+                {props.transferEnabled && canTransfer(type, file.name) && (
                   <input
                     type="checkbox"
                     className="transfer-checkbox mr-2"

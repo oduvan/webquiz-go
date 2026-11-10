@@ -34,6 +34,74 @@ test.describe('File manager', () => {
     await expect(rows.nth(1).locator('input[type="checkbox"]')).not.toBeChecked();
   });
 
+  test('transfer checkboxes are absent while transfer is not available', async ({ page, server }) => {
+    await page.goto(`${server.url}/files/`);
+    await expect(page.locator('#csv-files')).toBeVisible();
+    await page.locator('.tab[data-tab="quizzes"]').click();
+    await expect(page.locator('#quizzes-files .file-item[data-name="test_quiz.yaml"]')).toBeVisible();
+    await expect(page.locator('#transfer-panel')).toHaveCount(0);
+    await expect(page.locator('.transfer-checkbox')).toHaveCount(0);
+  });
+
+  test('config tab keeps the saved values and unsaved edits across tab changes', async ({ page, server }) => {
+    await page.goto(`${server.url}/files/`);
+    await page.locator('#config-tab-button').click();
+    await page.locator('#cfg-reg-username-label').fill('First label');
+    await page.getByRole('button', { name: /Save Configuration/ }).click();
+    await expect(page.locator('#config-message-area .message.success')).toBeVisible();
+
+    // Away and back: the form shows the saved value
+    await page.locator('.tab[data-tab="logs"]').click();
+    await page.locator('#config-tab-button').click();
+    await expect(page.locator('#cfg-reg-username-label')).toHaveValue('First label');
+
+    // An unsaved edit also survives a tab change
+    await page.locator('#cfg-reg-approve').check();
+    await page.locator('.tab[data-tab="csv"]').click();
+    await page.locator('#config-tab-button').click();
+    await expect(page.locator('#cfg-reg-approve')).toBeChecked();
+
+    // A second save keeps the first change
+    await page.getByRole('button', { name: /Save Configuration/ }).click();
+    await expect(page.locator('#config-message-area .message.success')).toBeVisible();
+    const saved = readFileSync(path.join(server.dir, 'webquiz.yaml'), 'utf-8');
+    expect(saved).toContain('First label');
+    expect(saved).toMatch(/approve: true/);
+  });
+
+  test('config YAML view saves its text and the form follows', async ({ page, server }) => {
+    await page.goto(`${server.url}/files/`);
+    await page.locator('#config-tab-button').click();
+    await page.locator('.config-view-toggle [data-view="yaml"]').click();
+    const editor = page.locator('#config-editor');
+    const text = await editor.inputValue();
+    await editor.fill(text + '\nlanguage: en\n');
+    await page.getByRole('button', { name: /Save Configuration/ }).click();
+    await expect(page.locator('#config-message-area .message.success')).toBeVisible();
+    expect(readFileSync(path.join(server.dir, 'webquiz.yaml'), 'utf-8')).toMatch(/language: en/);
+    await page.locator('.config-view-toggle [data-view="form"]').click();
+    await expect(page.locator('#cfg-language')).toHaveValue('en');
+  });
+
+  test('switching Form and YAML asks before dropping unsaved changes', async ({ page, server }) => {
+    await page.goto(`${server.url}/files/`);
+    await page.locator('#config-tab-button').click();
+    await page.locator('#cfg-reg-username-label').fill('Changed');
+    const messages: string[] = [];
+    page.on('dialog', async (dialog) => {
+      messages.push(dialog.message());
+      await dialog.dismiss();
+    });
+    await page.locator('.config-view-toggle [data-view="yaml"]').click();
+    await expect.poll(() => messages.length).toBe(1);
+    expect(messages[0]).toContain('unsaved changes');
+    await expect(page.locator('#cfg-reg-username-label')).toBeVisible();
+    page.removeAllListeners('dialog');
+    page.on('dialog', (dialog) => void dialog.accept());
+    await page.locator('.config-view-toggle [data-view="yaml"]').click();
+    await expect(page.locator('#config-editor')).toBeVisible();
+  });
+
   test('YAML validate button reports a valid quiz and a broken one', async ({ page, server }) => {
     await page.goto(`${server.url}/files/`);
     await page.locator('.tab[data-tab="quizzes"]').click();

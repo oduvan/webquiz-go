@@ -6,19 +6,16 @@ import { inputClass, primaryButton, type ShowMessage } from './ui';
 const TARGET_KEY = 'webquiz-transfer-target';
 const POLL_MS = 5000;
 
-export interface TransferHandle {
-  selected: Set<string>; // "type/name"
-  onSent: () => void;
-}
-
 // The panel stays hidden until the server says transfer is available (the tunnel is connected).
 export function TransferPanel({
   selected,
   onSent,
+  onAvailable,
   showMessage,
 }: {
   selected: Set<string>;
   onSent: () => void;
+  onAvailable: (available: boolean) => void;
   showMessage: ShowMessage;
 }) {
   const [state, setState] = useState<TransferState | null>(null);
@@ -33,6 +30,8 @@ export function TransferPanel({
   const statuses = useRef<Record<string, string>>({});
   const messageRef = useRef(showMessage);
   messageRef.current = showMessage;
+  const availableRef = useRef(onAvailable);
+  availableRef.current = onAvailable;
 
   const load = async () => {
     try {
@@ -48,6 +47,7 @@ export function TransferPanel({
         statuses.current[offer.id] = offer.status;
       });
       setState(next);
+      availableRef.current(!!next.available);
     } catch (e) {
       // Ignore: the next poll will try again
     }

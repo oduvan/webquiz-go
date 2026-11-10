@@ -30,12 +30,17 @@ export function FilesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [viewing, setViewing] = useState<ViewTarget | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [transferEnabled, setTransferEnabled] = useState(false);
   const noticeId = useRef(0);
+  const timers = useRef<number[]>([]);
+
+  useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), []);
 
   const showMessage = useCallback((text: string, type: MessageType) => {
     const id = ++noticeId.current;
     setNotices((current) => [...current, { id, text, type }]);
-    window.setTimeout(() => setNotices((current) => current.filter((item) => item.id !== id)), MESSAGE_MS);
+    const timer = window.setTimeout(() => setNotices((current) => current.filter((item) => item.id !== id)), MESSAGE_MS);
+    timers.current.push(timer);
   }, []);
 
   const loadFiles = useCallback(async () => {
@@ -201,7 +206,7 @@ export function FilesPage() {
             </button>
           </div>
 
-          <TransferPanel selected={selected} onSent={() => setSelected(new Set())} showMessage={showMessage} />
+          <TransferPanel selected={selected} onSent={() => setSelected(new Set())} onAvailable={setTransferEnabled} showMessage={showMessage} />
 
           <div className="tabs mb-3 flex flex-wrap gap-1 border-b border-[var(--border)]">
             {tabs.map((item) => (
@@ -224,15 +229,20 @@ export function FilesPage() {
             ))}
           </div>
 
-          {tab === 'config' ? (
-            <ConfigEditor path={boot.config_path ?? ''} content={boot.config_content} data={boot.config_data} />
-          ) : (
+          {showConfig && (
+            // Stays mounted (hidden) so edits and the saved values survive a tab change
+            <div hidden={tab !== 'config'}>
+              <ConfigEditor path={boot.config_path ?? ''} content={boot.config_content} data={boot.config_data} />
+            </div>
+          )}
+          {tab !== 'config' && (
             <div id={`${tab}-tab`} className="tab-content active">
               <FileList
                 type={tab}
                 files={files ? files[tab] : null}
                 search={search}
                 selected={selected}
+                transferEnabled={transferEnabled}
                 onToggleTransfer={toggleTransfer}
                 onView={(type, name, mode) => setViewing({ type, name, mode })}
                 onEdit={setEditing}

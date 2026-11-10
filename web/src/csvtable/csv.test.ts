@@ -39,3 +39,15 @@ describe('filters', () => {
     expect(usersCsvName('q.log')).toBe('');
   });
 });
+
+describe('parseCSV odd input (same results as the old page)', () => {
+  it('keeps CRLF inside a quoted field', () => {
+    expect(parseCSV('a\r\n"x\r\ny"\r\n')).toEqual([['a'], ['x\r\ny']]);
+  });
+  it('takes an unterminated quote to the end of the text', () => {
+    expect(parseCSV('a,"b\nc')).toEqual([['a', 'b\nc']]);
+  });
+  it('treats a quote in the middle of a field as a quote switch', () => {
+    expect(parseCSV('a"b"c,d')).toEqual([['abc', 'd']]);
+  });
+});
