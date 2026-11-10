@@ -45,9 +45,10 @@
 //   - websocket.go: the WebSocket hub (serveWebSocket, broadcastLiveStats,
 //     broadcastAdmin).
 //   - tunnel.go: the SSH tunnel manager and its status messages.
-//   - admin_config.go: config save with hot reload and rollback, the version
-//     check and the tunnel buttons. download.go: quiz downloads from ZIP
-//     archives (with the token rules) and /attach/ files.
+//   - admin_config.go: config save with hot reload and rollback (a form save
+//     is written only when config.CheckMerge accepts the merged text), the
+//     version check and the tunnel buttons. download.go: quiz downloads from
+//     ZIP archives (with the token rules) and /attach/ files.
 //   - admin_auth.go: the admin login (session cookie) and the session check.
 //   - logging.go: the log file logs_dir/NNNN.log in Python's log format.
 //     startup_log.go: the environment lines the log starts with.

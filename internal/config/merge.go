@@ -24,22 +24,33 @@ import (
 // update and the file have a mapping there (a section such as
 // "registration"), the update's keys replace or join the section's keys one
 // by one and the other keys of the section stay. Keys are handled in
-// alphabetical order; new keys go after the last key of their section (new
-// top-level keys at the end of the file).
+// alphabetical order; new keys go after the last key of their section, and
+// new top-level keys at the end of the file (before a "..." line that ends
+// the document), after any new keys of the last section.
 //
 // Only the lines of changed values are rewritten. Comments, blank lines,
 // quotes and spacing elsewhere stay as they were; a changed value keeps the
 // comment on its line and the quote style of the old text. The values of
 // partial are what a JSON body holds (decoded with UseNumber); they are
 // written so that the file reads back with PyYAML's rules as the same values
-// (text like "yes" gets quotes, 1.0 stays a float).
+// (text like "yes" gets quotes, 1.0 stays a float, text with line ends goes
+// in double quotes on one line, as ruamel.yaml wrote it).
 //
 // As in the Python version, a file whose text is not a mapping (a list, plain
 // text, broken YAML) is replaced by the update. Unlike Python (ruamel.yaml
 // refused repeated keys and dropped the whole file), a repeated key is
 // handled like PyYAML reads it: the last one counts and is the one changed.
+//
+// The config save checks the result with CheckMerge before it writes it.
+// One known shape fails that check: a new value for a key whose old value
+// has an anchor ("&name") that an alias elsewhere uses. The anchor goes away
+// with the old value, so the save is refused and the file stays as it was.
 func MergeYAML(original []byte, partial map[string]any) ([]byte, error) {
 	text := string(original)
+	// A byte order mark (Notepad writes one) stays, but the lines are edited
+	// without it: yaml.v3 does not count it in its columns.
+	bom := strings.HasPrefix(text, byteOrderMark)
+	text = strings.TrimPrefix(text, byteOrderMark)
 	crlf := strings.Contains(text, "\r\n")
 	if crlf {
 		text = strings.ReplaceAll(text, "\r\n", "\n")
@@ -58,7 +69,11 @@ func MergeYAML(original []byte, partial map[string]any) ([]byte, error) {
 	case rootFlow:
 		out, err = mergeFlowDocument(root, keys, partial)
 	default:
-		out, err = newEditor(text).merge(root, keys, partial)
+		e := newEditor(text)
+		if !strings.HasSuffix(text, "\n") {
+			e.stripFinalLineEnd(root)
+		}
+		out, err = e.merge(root, keys, partial)
 	}
 	if err != nil {
 		return nil, err
@@ -66,7 +81,195 @@ func MergeYAML(original []byte, partial map[string]any) ([]byte, error) {
 	if crlf {
 		out = strings.ReplaceAll(out, "\n", "\r\n")
 	}
+	if bom {
+		out = byteOrderMark + out
+	}
 	return []byte(out), nil
+}
+
+const byteOrderMark = "\xef\xbb\xbf"
+
+// CheckMerge tells whether merged, the text that MergeYAML made from
+// original and partial, is safe to write. It must read back (with PyYAML's
+// rules) as exactly the values of original with the update in them, merged
+// the way 1.19 merged them, and nothing else may change. The config save
+// runs it before it writes the file, so a mistake of the line editor can
+// never break the config or change a setting that nobody sent. The error
+// tells what is wrong.
+//
+// When the old text cannot be read with PyYAML's rules (an unknown tag, for
+// example), there is nothing to compare with. New text that does not read
+// back either is left to the caller's own YAML check, which reports it as
+// 1.19 did; new text that reads back must hold the update's values.
+func CheckMerge(original []byte, partial map[string]any, merged []byte) error {
+	old, known := mergeBase(original)
+	value, err := pyval.LoadYAML(merged)
+	if err != nil {
+		if !known {
+			return nil
+		}
+		return fmt.Errorf("the new text does not read back: %w", err)
+	}
+	got, ok := value.(map[string]any)
+	if !ok {
+		return errors.New("the new text is not a mapping")
+	}
+	if !known {
+		return checkUpdateIn(got, partial)
+	}
+	return compareConfigs(got, mergeUpdate(old, partial))
+}
+
+// mergeBase gives the values that a partial update goes into: the values of
+// the file, or an empty mapping for a file that is empty, broken or not a
+// mapping (MergeYAML starts again from nothing, as 1.19 did). known is false
+// for a mapping that cannot be read with PyYAML's rules.
+func mergeBase(original []byte) (values map[string]any, known bool) {
+	value, err := pyval.LoadYAML(original)
+	if err == nil {
+		if m, ok := value.(map[string]any); ok {
+			return m, true
+		}
+		return map[string]any{}, true
+	}
+	text := strings.ReplaceAll(strings.TrimPrefix(string(original), byteOrderMark), "\r\n", "\n")
+	if _, status := parseRoot(text); status == rootMissing {
+		return map[string]any{}, true
+	}
+	return nil, false
+}
+
+// mergeUpdate puts the update into values the way 1.19 did: a dict goes into
+// a dict section key by key, any other value replaces the old one. values
+// changes in place, so a section shared through a YAML alias changes for
+// every key that uses it, as in Python.
+func mergeUpdate(values, partial map[string]any) map[string]any {
+	for _, key := range sortedKeys(partial) {
+		updates, isDict := partial[key].(map[string]any)
+		section, isSection := values[key].(map[string]any)
+		if isDict && isSection {
+			for k, v := range updates {
+				section[k] = v
+			}
+			continue
+		}
+		values[key] = partial[key]
+	}
+	return values
+}
+
+// checkUpdateIn checks that each value of the update is in got: a section
+// update key by key, any other value as a whole.
+func checkUpdateIn(got, partial map[string]any) error {
+	for _, key := range sortedKeys(partial) {
+		updates, isDict := partial[key].(map[string]any)
+		section, isSection := got[key].(map[string]any)
+		if !isDict || !isSection {
+			if err := compareValue(key, key, got, partial); err != nil {
+				return err
+			}
+			continue
+		}
+		for _, k := range sortedKeys(updates) {
+			if err := compareValue(key+"."+k, k, section, updates); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// compareConfigs finds the first value that differs between got and want,
+// looking one level into sections, so the error names the setting.
+func compareConfigs(got, want map[string]any) error {
+	for _, key := range unionKeys(got, want) {
+		gotSection, isGotSection := got[key].(map[string]any)
+		wantSection, isWantSection := want[key].(map[string]any)
+		if isGotSection && isWantSection {
+			for _, k := range unionKeys(gotSection, wantSection) {
+				if err := compareValue(key+"."+k, k, gotSection, wantSection); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if err := compareValue(key, key, got, want); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// compareValue compares the values of key in got and want; name is the
+// setting's name for the error ("registration.approve").
+func compareValue(name, key string, got, want map[string]any) error {
+	gotValue, inGot := got[key]
+	wantValue, inWant := want[key]
+	switch {
+	case !inGot && inWant:
+		return fmt.Errorf("%s would be missing", name)
+	case inGot && !inWant:
+		return fmt.Errorf("%s would be added", name)
+	case !sameValue(gotValue, wantValue):
+		return fmt.Errorf("%s would read back as %s, not %s", name, pyval.Repr(gotValue), pyval.Repr(wantValue))
+	}
+	return nil
+}
+
+// unionKeys gives the keys of a and b, sorted.
+func unionKeys(a, b map[string]any) []string {
+	keys := sortedKeys(a)
+	for key := range b {
+		if _, ok := a[key]; !ok {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// sameValue tells whether two values are the same, with the same types all
+// the way down: Python's == except that True is not 1 and 1 is not 1.0, and
+// NaN is the same as NaN.
+func sameValue(a, b any) bool {
+	kind := pyval.KindOf(a)
+	if kind != pyval.KindOf(b) {
+		return false
+	}
+	switch kind {
+	case pyval.KindFloat:
+		x, _ := pyval.ToFloat(a)
+		y, _ := pyval.ToFloat(b)
+		if math.IsNaN(x) && math.IsNaN(y) {
+			return true
+		}
+	case pyval.KindList:
+		listA, _ := pyval.List(a)
+		listB, _ := pyval.List(b)
+		if len(listA) != len(listB) {
+			return false
+		}
+		for i := range listA {
+			if !sameValue(listA[i], listB[i]) {
+				return false
+			}
+		}
+		return true
+	case pyval.KindDict:
+		dictA, _ := pyval.Dict(a)
+		dictB, _ := pyval.Dict(b)
+		if len(dictA) != len(dictB) {
+			return false
+		}
+		for key, value := range dictA {
+			other, ok := dictB[key]
+			if !ok || !sameValue(value, other) {
+				return false
+			}
+		}
+		return true
+	}
+	return pyval.Equal(a, b)
 }
 
 type rootStatus int
@@ -115,6 +318,17 @@ func isContentLine(line string) bool {
 	return trimmed != "" && !strings.HasPrefix(trimmed, "#")
 }
 
+// isDocumentMarker tells whether a line starts ("---") or ends ("...") a
+// YAML document: the marker at the line start, alone or before a space.
+func isDocumentMarker(line string) bool {
+	for _, marker := range []string{"---", "..."} {
+		if rest, ok := strings.CutPrefix(line, marker); ok && (rest == "" || rest[0] == ' ' || rest[0] == '\t') {
+			return true
+		}
+	}
+	return false
+}
+
 func sortedKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for key := range m {
@@ -151,9 +365,10 @@ type editor struct {
 }
 
 // edit replaces lines[start:end] with newLines; start == end inserts them
-// before line start.
+// before line start. indent is the indentation of inserted keys.
 type edit struct {
 	start, end int
+	indent     int
 	newLines   []string
 }
 
@@ -165,11 +380,12 @@ func newEditor(text string) *editor {
 type entry struct {
 	key, value *yaml.Node
 	start      int // the line of the key (0-based)
-	end        int // the line after the entry's last content line
+	end        int // the line after the entry's last line (see entries)
 }
 
 // entries lists the keys of a block mapping; limit is the line where the
-// mapping ends at the latest.
+// mapping ends at the latest. An entry ends after its last content line, or
+// after the text of a block scalar that ends it (blockScalarEnd).
 func (e *editor) entries(m *yaml.Node, limit int) []entry {
 	list := make([]entry, 0, len(m.Content)/2)
 	for i := 0; i+1 < len(m.Content); i += 2 {
@@ -180,15 +396,103 @@ func (e *editor) entries(m *yaml.Node, limit int) []entry {
 		if i+1 < len(list) {
 			next = list[i+1].start
 		}
-		// Comments and blank lines after the entry belong to what follows.
+		// Comments and blank lines after the entry belong to what follows,
+		// and so does a line that ends the document ("...").
 		list[i].end = list[i].start + 1
 		for line := list[i].start + 1; line < next && line < len(e.lines); line++ {
+			if isDocumentMarker(e.lines[line]) {
+				break
+			}
 			if isContentLine(e.lines[line]) {
 				list[i].end = line + 1
 			}
 		}
+		if end := e.blockScalarEnd(list[i].value, next); end > list[i].end {
+			list[i].end = end
+		}
 	}
 	return list
+}
+
+// lastNode is the node that a value ends with: the value itself, or the
+// last item of a list or mapping, all the way down.
+func lastNode(value *yaml.Node) *yaml.Node {
+	for (value.Kind == yaml.MappingNode || value.Kind == yaml.SequenceNode) && len(value.Content) > 0 {
+		value = value.Content[len(value.Content)-1]
+	}
+	return value
+}
+
+// isBlockScalar tells whether a node is a block scalar ("|" or ">").
+func isBlockScalar(n *yaml.Node) bool {
+	return n.Kind == yaml.ScalarNode && n.Style&(yaml.LiteralStyle|yaml.FoldedStyle) != 0
+}
+
+// blockScalarEnd is the line after the end of a value that ends with a block
+// scalar, or 0 for other values. The text of a block scalar is every line
+// indented like its first line, also a line that starts with "#" (checker
+// code often ends with a comment of its own). When the scalar keeps its
+// final line ends ("|+"), the blank lines after its text belong to it too.
+func (e *editor) blockScalarEnd(value *yaml.Node, limit int) int {
+	last := lastNode(value)
+	if !isBlockScalar(last) {
+		return 0
+	}
+	limit = min(limit, len(e.lines))
+	end := last.Line // the line after the "|" or ">"
+	if strings.Trim(last.Value, "\n") != "" {
+		indent := -1
+		for line := last.Line; line < limit; line++ {
+			text := e.lines[line]
+			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			lineIndent := len(text) - len(strings.TrimLeft(text, " "))
+			if indent < 0 {
+				indent = lineIndent
+			}
+			if lineIndent < indent {
+				break
+			}
+			end = line + 1
+		}
+	}
+	// Each kept blank line adds a line end after the one that ends the text.
+	blank := len(last.Value) - len(strings.TrimRight(last.Value, "\n")) - 1
+	for ; blank > 0 && end < limit && strings.TrimSpace(e.lines[end]) == ""; blank-- {
+		end++
+	}
+	return end
+}
+
+// stripFinalLineEnd handles a file that does not end with a line end and
+// whose last value is a block scalar: then the scalar's text has no final
+// line end either. The new text always ends with one, so the scalar gets the
+// "strip" indicator ("|-"), which keeps its text as it was.
+func (e *editor) stripFinalLineEnd(root *yaml.Node) {
+	last := lastNode(root)
+	if !isBlockScalar(last) || last.Value == "" || strings.HasSuffix(last.Value, "\n") {
+		return
+	}
+	line := e.lines[last.Line-1]
+	start, ok := byteOffset(line, last.Column-1)
+	if !ok || start >= len(line) || (line[start] != '|' && line[start] != '>') {
+		return
+	}
+	// After "|" or ">" come the chomping ("+" or "-") and the indentation
+	// (a digit), in any order.
+	end := start + 1
+	indentation := ""
+	for ; end < len(line) && strings.IndexByte("+-123456789", line[end]) >= 0; end++ {
+		switch line[end] {
+		case '-':
+			return // strip already
+		case '+':
+		default:
+			indentation = string(line[end])
+		}
+	}
+	e.lines[last.Line-1] = line[:start+1] + indentation + "-" + line[end:]
 }
 
 // lastEntry finds the last entry with the key (the one PyYAML reads).
@@ -203,6 +507,12 @@ func lastEntry(entries []entry, key string) *entry {
 
 func (e *editor) merge(root *yaml.Node, keys []string, partial map[string]any) (string, error) {
 	topLevel := e.entries(root, len(e.lines))
+	// Top-level keys usually start at the line start, but a file may indent
+	// all of them.
+	indent := 0
+	if len(topLevel) > 0 {
+		indent = topLevel[0].key.Column - 1
+	}
 	for _, key := range keys {
 		value := partial[key]
 		ent := lastEntry(topLevel, key)
@@ -210,7 +520,7 @@ func (e *editor) merge(root *yaml.Node, keys []string, partial map[string]any) (
 		var err error
 		switch {
 		case ent == nil:
-			err = e.insertEntry(e.appendLine(topLevel), key, value, 0)
+			err = e.insertEntry(e.appendLine(topLevel), key, value, indent)
 		case isDict && ent.value.Kind == yaml.MappingNode && ent.value.Style&yaml.FlowStyle == 0:
 			err = e.mergeSection(*ent, updates)
 		case isDict && ent.value.Kind == yaml.MappingNode:
@@ -218,9 +528,9 @@ func (e *editor) merge(root *yaml.Node, keys []string, partial map[string]any) (
 			if mergeErr != nil {
 				return "", mergeErr
 			}
-			err = e.replaceEntry(*ent, 0, merged)
+			err = e.replaceEntry(*ent, indent, merged)
 		default:
-			err = e.replaceValue(*ent, 0, value)
+			err = e.replaceValue(*ent, indent, value)
 		}
 		if err != nil {
 			return "", err
@@ -253,15 +563,14 @@ func (e *editor) mergeSection(section entry, updates map[string]any) error {
 }
 
 // appendLine is where new top-level keys go: the end of the file, or before
-// a document marker ("..." or "---") that follows the mapping.
+// a document marker ("...") that follows the mapping.
 func (e *editor) appendLine(topLevel []entry) int {
 	from := 0
 	if len(topLevel) > 0 {
 		from = topLevel[len(topLevel)-1].end
 	}
 	for line := from; line < len(e.lines); line++ {
-		trimmed := strings.TrimSpace(e.lines[line])
-		if trimmed == "..." || strings.HasPrefix(trimmed, "---") {
+		if isDocumentMarker(e.lines[line]) {
 			return line
 		}
 	}
@@ -273,7 +582,7 @@ func (e *editor) insertEntry(at int, key string, value any, indent int) error {
 	if err != nil {
 		return err
 	}
-	e.edits = append(e.edits, edit{start: at, end: at, newLines: lines})
+	e.edits = append(e.edits, edit{start: at, end: at, indent: indent, newLines: lines})
 	return nil
 }
 
@@ -332,9 +641,18 @@ func (e *editor) inlineReplacement(ent entry, value any) (string, bool) {
 }
 
 // keyLineComment finds the comment on an entry's key line: after a one-line
-// value, or after "key:" when the value starts on the next line. column is
-// where the comment starts, in characters.
+// value, or after "key:" when the value starts on the next line. For a flow
+// list or mapping ("[a, b]", "{a: 1}") it is the comment after the value, on
+// the entry's last line; for a block scalar, the comment after its "|" or
+// ">". column is where the comment starts, in characters.
 func (e *editor) keyLineComment(ent entry) (column int, comment string, ok bool) {
+	// yaml.v3 keeps these two comments in the value's LineComment.
+	switch {
+	case ent.value.Kind != yaml.ScalarNode && ent.value.Style&yaml.FlowStyle != 0:
+		return e.commentAtLineEnd(ent.end-1, ent.value.LineComment)
+	case isBlockScalar(ent.value):
+		return e.commentAtLineEnd(ent.value.Line-1, ent.value.LineComment)
+	}
 	line := e.lines[ent.start]
 	// "key:" with nothing after it has an empty null value on the key line.
 	empty := ent.value.Kind == yaml.ScalarNode && ent.value.Style == 0 && ent.value.Value == ""
@@ -365,6 +683,16 @@ func (e *editor) keyLineComment(ent entry) (column int, comment string, ok bool)
 		return 0, "", false
 	}
 	return utf8.RuneCountInString(line[:len(line)-len(trimmed)]), trimmed, true
+}
+
+// commentAtLineEnd finds a comment that ends a line, and where it starts (in
+// characters).
+func (e *editor) commentAtLineEnd(line int, comment string) (column int, found string, ok bool) {
+	text := strings.TrimRight(e.lines[line], " \t")
+	if comment == "" || !strings.HasSuffix(text, comment) {
+		return 0, "", false
+	}
+	return utf8.RuneCountInString(text[:len(text)-len(comment)]), comment, true
 }
 
 // withComment adds a comment to a line, at the given column when there is room.
@@ -528,7 +856,20 @@ func valueNode(value any) (*yaml.Node, error) {
 	if err := node.Encode(converted); err != nil {
 		return nil, err
 	}
+	quoteMultiline(node)
 	return node, nil
+}
+
+// quoteMultiline writes text with line ends in double quotes on one line
+// ("a\nb"), as ruamel.yaml did. yaml.v3 would write a block scalar ("|"),
+// and the comment lines after it could become part of its text.
+func quoteMultiline(n *yaml.Node) {
+	if n.Kind == yaml.ScalarNode && n.Tag == "!!str" && strings.Contains(n.Value, "\n") {
+		n.Style = yaml.DoubleQuotedStyle
+	}
+	for _, child := range n.Content {
+		quoteMultiline(child)
+	}
 }
 
 // yamlValue prepares a JSON value for the YAML encoder: numbers keep their
@@ -682,11 +1023,19 @@ func mergeFlowDocument(root *yaml.Node, keys []string, partial map[string]any) (
 func (e *editor) result() (string, error) {
 	edits := append([]edit(nil), e.edits...)
 	sort.SliceStable(edits, func(i, j int) bool {
-		if edits[i].start != edits[j].start {
-			return edits[i].start < edits[j].start
+		a, b := edits[i], edits[j]
+		if a.start != b.start {
+			return a.start < b.start
 		}
-		// at the same line, inserted lines come before replaced ones
-		return edits[i].start == edits[i].end && edits[j].start != edits[j].end
+		// At the same line, inserted lines come before replaced ones. When
+		// the last section ends at the end of the file, its new keys and the
+		// new top-level keys go to the same line: the more indented keys come
+		// first, because a less indented key would end the section.
+		aInsert, bInsert := a.start == a.end, b.start == b.end
+		if aInsert != bInsert {
+			return aInsert
+		}
+		return aInsert && a.indent > b.indent
 	})
 	var out []string
 	position := 0

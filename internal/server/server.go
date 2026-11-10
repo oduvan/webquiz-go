@@ -168,6 +168,9 @@ type Server struct {
 	// configHook, when set, runs in a config save before the new settings are
 	// applied; an error makes the save fail and roll back. For tests.
 	configHook func(*config.Config) error
+	// mergeHook, when set, replaces config.MergeYAML in a config form save,
+	// so a test can give the save a merge that went wrong. For tests.
+	mergeHook func(original []byte, partial map[string]any) ([]byte, error)
 
 	mu sync.Mutex
 

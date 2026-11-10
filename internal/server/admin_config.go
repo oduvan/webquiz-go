@@ -72,9 +72,16 @@ func pyContainsKey(data any, key string) (bool, error) {
 	return false, fmt.Errorf("argument of type '%s' is not iterable", pyval.KindOf(data))
 }
 
+// formMergeFailed is the answer of a config form save when the form's values
+// could not be put into the file safely (config.CheckMerge found a problem).
+// 1.19 had no such case: ruamel.yaml always wrote the file.
+const formMergeFailed = "Could not save the form: the form's values could not be put into the config file safely, " +
+	"so the file was not changed. Please make this change in the YAML view."
+
 // adminUpdateConfig is PUT /api/admin/config (admin_update_config). The
 // body is {"content": "<yaml text>"} or {"data": {section: {...}}}, a
-// partial update that keeps the comments of the file.
+// partial update that keeps the comments of the file. The merged text of a
+// partial update is checked (config.CheckMerge) before anything is written.
 func (s *Server) adminUpdateConfig(w http.ResponseWriter, r *http.Request) error {
 	requestData, err := readJSON(r)
 	if err != nil {
@@ -104,9 +111,23 @@ func (s *Server) adminUpdateConfig(w http.ResponseWriter, r *http.Request) error
 			return writeError(w, http.StatusBadRequest, "data must be a dictionary")
 		}
 		current, _ := os.ReadFile(configPath) // a missing or unreadable file counts as empty
-		merged, err := config.MergeYAML(current, mergeData)
+		merge := config.MergeYAML
+		if s.mergeHook != nil {
+			merge = s.mergeHook
+		}
+		merged, err := merge(current, mergeData)
 		if err != nil {
 			return err
+		}
+		// A mistake of the merge must never reach the file: the new text has
+		// to read back as the old values with the form's values in them.
+		if err := config.CheckMerge(current, mergeData, merged); err != nil {
+			s.log.Error("Config form save refused, the file was not changed: " + err.Error())
+			return writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"success": false,
+				"error":   formMergeFailed,
+				"errors":  []string{err.Error()},
+			})
 		}
 		content = string(merged)
 	} else {
