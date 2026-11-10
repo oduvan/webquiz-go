@@ -21,7 +21,56 @@ import (
 // yaml.v3 indents the items of a list under a key and PyYAML did not. Both
 // read back the same, so this does not try to copy that.
 func dumpYAML(value any) ([]byte, error) {
-	node, err := dumpNode(value)
+	out, err := dumpYAMLStyle(value, false)
+	if err != nil {
+		return nil, err
+	}
+	// Last check: the text must load back to the same value. If not, write
+	// every text in double quotes, which always reads back.
+	if back, err := pyval.LoadYAML(out); err != nil || !yamlSame(value, back) {
+		return dumpYAMLStyle(value, true)
+	}
+	return out, nil
+}
+
+// yamlSame tells whether a value written by dumpYAML came back as the same
+// value (numbers are compared by their text form, so 2 and 2.0 differ).
+func yamlSame(a, b any) bool {
+	switch x := a.(type) {
+	case map[string]any:
+		y, ok := b.(map[string]any)
+		if !ok || len(x) != len(y) {
+			return false
+		}
+		for key, item := range x {
+			other, has := y[key]
+			if !has || !yamlSame(item, other) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		y, ok := b.([]any)
+		if !ok || len(x) != len(y) {
+			return false
+		}
+		for i := range x {
+			if !yamlSame(x[i], y[i]) {
+				return false
+			}
+		}
+		return true
+	case string:
+		y, ok := b.(string)
+		return ok && x == y
+	case json.Number:
+		return pyval.IsInt(x) == pyval.IsInt(b) && pyval.Equal(x, b)
+	}
+	return pyval.KindOf(a) == pyval.KindOf(b) && pyval.Equal(a, b)
+}
+
+func dumpYAMLStyle(value any, quoteAll bool) ([]byte, error) {
+	node, err := dumpNode(value, quoteAll)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +86,30 @@ func dumpYAML(value any) ([]byte, error) {
 	return []byte(out.String()), nil
 }
 
-func dumpNode(value any) (*yaml.Node, error) {
+// stringNode writes a text as YAML. It uses yaml.v3's choice only when the
+// scalar reads back as the same text; otherwise (or with quoteAll) the text
+// is double-quoted. Cases that need this: "=", "<<", a text that starts with
+// a line end.
+func stringNode(text string, quoteAll bool) *yaml.Node {
+	quoted := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: text, Style: yaml.DoubleQuotedStyle}
+	if quoteAll {
+		return quoted
+	}
+	node := &yaml.Node{}
+	if err := node.Encode(text); err != nil {
+		return quoted
+	}
+	out, err := yaml.Marshal(node)
+	if err != nil {
+		return quoted
+	}
+	if back, err := pyval.LoadYAML(out); err != nil || back != any(text) {
+		return quoted
+	}
+	return node
+}
+
+func dumpNode(value any, quoteAll bool) (*yaml.Node, error) {
 	switch v := value.(type) {
 	case nil:
 		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null", Value: "null"}, nil
@@ -49,11 +121,8 @@ func dumpNode(value any) (*yaml.Node, error) {
 		slices.Sort(keys)
 		node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		for _, key := range keys {
-			keyNode := &yaml.Node{}
-			if err := keyNode.Encode(key); err != nil {
-				return nil, err
-			}
-			valueNode, err := dumpNode(v[key])
+			keyNode := stringNode(key, quoteAll)
+			valueNode, err := dumpNode(v[key], quoteAll)
 			if err != nil {
 				return nil, err
 			}
@@ -63,7 +132,7 @@ func dumpNode(value any) (*yaml.Node, error) {
 	case []any:
 		node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
 		for _, item := range v {
-			itemNode, err := dumpNode(item)
+			itemNode, err := dumpNode(item, quoteAll)
 			if err != nil {
 				return nil, err
 			}
@@ -84,6 +153,9 @@ func dumpNode(value any) (*yaml.Node, error) {
 		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!timestamp", Value: string(v)}, nil
 	case []byte:
 		return nil, fmt.Errorf("cannot write binary data as YAML")
+	}
+	if text, ok := value.(string); ok {
+		return stringNode(text, quoteAll), nil
 	}
 	node := &yaml.Node{}
 	if err := node.Encode(value); err != nil {

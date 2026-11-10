@@ -21,13 +21,13 @@ type validationCase struct {
 
 var validationCases = []validationCase{
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_invalid_data_type_not_dict", name: "invalid_data_type_not_dict", content: `- invalid
-- structure`, any: [][]string{{"словником"}, {"dictionary"}}},
+- structure`, any: [][]string{{"raw:словником"}, {"dictionary"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_missing_questions_field", name: "missing_questions_field", content: `title: No Questions Quiz
-description: This quiz has no questions field`, any: [][]string{{"questions"}}},
+description: This quiz has no questions field`, any: [][]string{{"raw:questions"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_questions_not_list", name: "questions_not_list", content: `title: Invalid Questions Type
-questions: "not a list"  # Should be array`, any: [][]string{{"списком"}, {"list"}}},
+questions: "not a list"  # Should be array`, any: [][]string{{"raw:списком"}, {"list"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_empty_questions_array", name: "empty_questions_array", content: `title: Empty Questions
-questions: []`, any: [][]string{{"принаймні одне питання"}, {"at least"}}},
+questions: []`, any: [][]string{{"raw:принаймні одне питання"}, {"at least"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_question_not_dict", name: "question_not_dict", content: `title: Invalid Question Type
 questions:
   - "string instead of object"
@@ -37,15 +37,15 @@ questions:
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_missing_required_fields", name: "missing_required_fields_1", content: `title: Missing Options
 questions:
   - question: Where are options?
-    correct_answer: 0`, any: [][]string{{"options"}}},
+    correct_answer: 0`, any: [][]string{{"raw:options"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_missing_required_fields", name: "missing_required_fields_2", content: `title: Missing Correct Answer
 questions:
   - question: What's the answer?
-    options: ['A', 'B', 'C']`, any: [][]string{{"correct_answer"}}},
+    options: ['A', 'B', 'C']`, any: [][]string{{"raw:correct_answer"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_no_question_text_or_image", name: "no_question_text_or_image", content: `title: No Question Content
 questions:
   - options: ['A', 'B']
-    correct_answer: 0`, any: [][]string{{}, {}}},
+    correct_answer: 0`, any: [][]string{{"question text or image"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_options_not_list", name: "options_not_list", content: `title: Options Not List
 questions:
   - question: Test?
@@ -90,7 +90,7 @@ questions:
 questions:
   - question: Test?
     options: ['A', 'B']
-    correct_answer: "zero"  # String instead of int`, any: [][]string{{}, {}}},
+    correct_answer: "zero"  # String instead of int`, any: [][]string{{"integer or array"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_min_correct_without_correct_answer", name: "min_correct_without_correct_answer", content: `title: Min Correct Without Answer
 questions:
   - question: Test?
@@ -125,25 +125,25 @@ show_right_answer: "yes"  # Should be boolean
 questions:
   - question: Test?
     options: ['A', 'B']
-    correct_answer: 0`, any: [][]string{{"show_right_answer", "boolean"}}},
+    correct_answer: 0`, any: [][]string{{"raw:show_right_answer", "boolean"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_randomize_questions_not_boolean", name: "randomize_questions_not_boolean", content: `title: Invalid Randomize Type
 randomize_questions: 1  # Should be boolean
 questions:
   - question: Test?
     options: ['A', 'B']
-    correct_answer: 0`, any: [][]string{{"randomize_questions", "boolean"}}},
+    correct_answer: 0`, any: [][]string{{"raw:randomize_questions", "boolean"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_show_answers_on_completion_not_boolean", name: "show_answers_on_completion_not_boolean", content: `title: Invalid Show Answers On Completion Type
 show_right_answer: false
 show_answers_on_completion: "false"  # Should be boolean
 questions:
   - question: Test?
     options: ['A', 'B']
-    correct_answer: 0`, any: [][]string{{"show_answers_on_completion", "boolean"}}},
+    correct_answer: 0`, any: [][]string{{"raw:show_answers_on_completion", "boolean"}}},
 	{py: "tests/test_quiz_validation_edge_cases.py::test_validate_quiz_title_not_string", name: "title_not_string", content: `title: 123  # Number instead of string
 questions:
   - question: Test?
     options: ['A', 'B']
-    correct_answer: 0`, any: [][]string{{"title", "string"}}},
+    correct_answer: 0`, any: [][]string{{"raw:title", "string"}}},
 }
 
 func TestValidateQuizEdgeCases(t *testing.T) {
@@ -157,11 +157,14 @@ func TestValidateQuizEdgeCases(t *testing.T) {
 			}
 			for _, message := range errorList(data) {
 				lower := strings.ToLower(message)
+				// "raw:" words were matched without lower-casing in Python.
 				for _, words := range c.any {
 					found := true
 					for _, word := range words {
-						if !strings.Contains(lower, word) {
-							found = false
+						if raw, ok := strings.CutPrefix(word, "raw:"); ok {
+							found = found && strings.Contains(message, raw)
+						} else {
+							found = found && strings.Contains(lower, word)
 						}
 					}
 					if found {
