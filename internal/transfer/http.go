@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"unicode/utf8"
 )
 
 // maxBodySize is the largest request body the handlers read: aiohttp's
@@ -157,8 +158,9 @@ func decodeJSON(data []byte) (any, error) {
 	return value, nil
 }
 
-// readJSON is aiohttp's request.json(); any failure (also a body bigger
-// than 1 MiB) is an error.
+// readJSON is aiohttp's request.json(); any failure is an error: a body
+// bigger than 1 MiB, text that is not UTF-8 (Go's JSON decoder would put
+// U+FFFD in its place) or broken JSON.
 func readJSON(r *http.Request) (any, error) {
 	data, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
@@ -166,6 +168,9 @@ func readJSON(r *http.Request) (any, error) {
 	}
 	if len(data) > maxBodySize {
 		return nil, fmt.Errorf("the body is bigger than %d bytes", maxBodySize)
+	}
+	if !utf8.Valid(data) {
+		return nil, errors.New("the body is not UTF-8 text")
 	}
 	return decodeJSON(data)
 }

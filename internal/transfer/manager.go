@@ -543,7 +543,7 @@ func (m *Manager) findWaitingOfferLocked(token any) *offer {
 
 // ----- Receiver side -----
 
-// addIncoming checks and stores an offer from another server
+// addIncomingLocked checks and stores an offer from another server
 // (add_incoming). The caller holds mu.
 func (m *Manager) addIncomingLocked(data any) (*request, error) {
 	_, ownName, err := m.requireEndpoint()
