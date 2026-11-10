@@ -235,6 +235,7 @@ export async function autoStudent(
         return;
       }
       registrations += 1;
+      seen.clear(); // a new registration (the quiz was restarted) starts the questions again
       const username = registrations === 1 ? name : `${name}-${registrations}`;
       await classroom.command(name, 'type', username, { screenshot: false, settle: 0.2, selector: '#username' });
       for (const field of state.fields) {
