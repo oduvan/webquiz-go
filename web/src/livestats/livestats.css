@@ -1,0 +1,358 @@
+/* Live stats page: a table of students and questions that fills the window.
+   The table scrolls inside its box, so the page itself never scrolls sideways.
+   Only CSS that works in Safari 13: no flex gap. */
+
+:root {
+  --live-card: #ffffff;
+  --live-think: #fff3cd;
+  --live-ok: #d4edda;
+  --live-fail: #f8d7da;
+  --live-empty: #e9ecef;
+  --live-header-bg: #007bff;
+  --live-header-color: #ffffff;
+  --live-hover: #f0f0f0;
+}
+
+[data-theme='dark'] {
+  --live-card: #2d2d2d;
+  --live-think: #3d3a1a;
+  --live-ok: #1e3a1e;
+  --live-fail: #3a1a1a;
+  --live-empty: #3a3a3a;
+  --live-header-bg: #0d6efd;
+  --live-header-color: #ffffff;
+  --live-hover: #3a3a3a;
+}
+
+.live-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 56px 20px 20px 20px;
+}
+
+@media (max-width: 767px) {
+  .live-page {
+    padding: 56px 10px 10px 10px;
+  }
+}
+
+.connection-status {
+  flex-shrink: 0;
+  margin-bottom: 20px;
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.connection-status.connected {
+  background: var(--live-ok);
+  color: #155724;
+}
+
+.connection-status.disconnected {
+  background: var(--live-fail);
+  color: #721c24;
+}
+
+.connection-status.connecting {
+  background: var(--live-think);
+  color: #856404;
+}
+
+[data-theme='dark'] .connection-status.connected {
+  color: #a5d6a7;
+}
+
+[data-theme='dark'] .connection-status.disconnected {
+  color: #ef9a9a;
+}
+
+[data-theme='dark'] .connection-status.connecting {
+  color: #ffc107;
+}
+
+.filter-bar {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0 -5px 15px -5px;
+}
+
+.filter-button {
+  display: flex;
+  align-items: center;
+  margin: 0 5px 5px 5px;
+  padding: 10px 20px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--live-card);
+  color: var(--fg);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+@media (max-width: 767px) {
+  .filter-button {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+}
+
+.filter-button:hover {
+  background: var(--live-hover);
+}
+
+.filter-button.active {
+  border-color: var(--live-header-bg);
+  background: var(--live-header-bg);
+  color: var(--live-header-color);
+}
+
+.filter-badge {
+  min-width: 20px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+  text-align: center;
+}
+
+.filter-button.active .filter-badge {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.stats-container {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--live-card);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.group-section {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.table-wrapper {
+  flex: 1;
+  height: 100%;
+  overflow: auto;
+}
+
+.no-data {
+  padding: 40px;
+  text-align: center;
+  font-style: italic;
+  color: #6c757d;
+}
+
+.stats-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 12px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.stats-table th {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--live-header-bg);
+  color: var(--live-header-color);
+  font-weight: bold;
+}
+
+.stats-table .username-header {
+  left: 0;
+  z-index: 11;
+  width: 150px;
+  text-align: left;
+}
+
+.stats-table .username-cell {
+  position: -webkit-sticky;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  border-right: 2px solid var(--border);
+  background: var(--live-card);
+  font-weight: bold;
+  text-align: left;
+}
+
+@media (max-width: 767px) {
+  .stats-table th,
+  .stats-table td {
+    padding: 8px 4px;
+  }
+
+  .stats-table .username-header,
+  .stats-table .username-cell {
+    width: 100px;
+  }
+}
+
+.username-text {
+  font-weight: bold;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.user-stats {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--fg);
+  font-size: 11px;
+  font-weight: normal;
+  opacity: 0.8;
+}
+
+.question-header,
+.image-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px;
+}
+
+.question-header .question-text {
+  margin-bottom: 4px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.question-stats {
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.1);
+  color: #dddddd;
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.header-image {
+  max-width: 40px;
+  max-height: 40px;
+  margin-bottom: 4px;
+  border-radius: 3px;
+  object-fit: cover;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.image-filename {
+  max-width: 80px;
+  overflow: hidden;
+  line-height: 1.1;
+  text-align: center;
+  word-break: break-all;
+}
+
+.file-indicator {
+  margin-left: 4px;
+  cursor: help;
+}
+
+.points-indicator {
+  margin-left: 4px;
+  color: #ffc107;
+  font-size: 0.85em;
+}
+
+.state-cell {
+  position: relative;
+  width: 80px;
+  height: 50px;
+  padding: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+@media (max-width: 767px) {
+  .state-cell {
+    width: 60px;
+    height: 40px;
+    font-size: 12px;
+  }
+}
+
+.cell-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.state-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.time-display {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: normal;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.state-think {
+  background: var(--live-think);
+  color: #856404;
+}
+
+.state-ok {
+  background: var(--live-ok);
+  color: #155724;
+}
+
+.state-fail,
+.state-timeout {
+  background: var(--live-fail);
+  color: #721c24;
+}
+
+.state-empty {
+  background: var(--live-empty);
+  color: #6c757d;
+}
+
+[data-theme='dark'] .state-think {
+  color: #ffc107;
+}
+
+[data-theme='dark'] .state-ok {
+  color: #a5d6a7;
+}
+
+[data-theme='dark'] .state-fail,
+[data-theme='dark'] .state-timeout {
+  color: #ef9a9a;
+}
+
+[data-theme='dark'] .state-empty {
+  color: #888888;
+}
