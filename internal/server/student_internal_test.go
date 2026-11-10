@@ -1,9 +1,12 @@
 package server
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -37,7 +40,7 @@ func TestMinutesAndSecondsLikePython(t *testing.T) {
 // is free for all three; ".yaml" and ".yml" are removed from the quiz name.
 func TestCSVFileNumbers(t *testing.T) {
 	dir := t.TempDir()
-	if got := freeCSVNumber(dir, "quiz"); got != 1 {
+	if got := freeCSVNumber(dir, "quiz", os.Lstat); got != 1 {
 		t.Errorf("empty folder: %d", got)
 	}
 	for _, name := range []string{"quiz_0001.answers_with_users.csv", "quiz_0002.users.csv", "other_0003.csv"} {
@@ -45,7 +48,7 @@ func TestCSVFileNumbers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := freeCSVNumber(dir, "quiz"); got != 3 {
+	if got := freeCSVNumber(dir, "quiz", os.Lstat); got != 3 {
 		t.Errorf("number %d, want 3 (one file of a run is enough to take the number)", got)
 	}
 	if got := csvPrefix("week.yaml.final.yml"); got != "week.final" {
@@ -212,6 +215,82 @@ func TestCheckedAnswerSeesChangesMadeMeanwhile(t *testing.T) {
 	s.withLock(func() {
 		if len(s.answersBeingChecked) != 0 {
 			t.Errorf("being checked after the switch: %v", s.answersBeingChecked)
+		}
+	})
+}
+
+// Only a file that lstat finds takes a CSV number. Any other error counts as
+// free, like Python's os.path.exists: a name that is too long or a folder
+// the server may not read must not make the search go on forever (it runs
+// while csvMu is held). The problem shows when the file is written.
+func TestFreeCSVNumberCountsOnlyFoundFiles(t *testing.T) {
+	found := map[string]bool{"quiz_0001.csv": true, "quiz_0002.users.csv": true}
+	cases := map[string]struct {
+		lstat func(string) (os.FileInfo, error)
+		want  int
+	}{
+		"name too long": {func(string) (os.FileInfo, error) { return nil, syscall.ENAMETOOLONG }, 1},
+		"no permission": {func(string) (os.FileInfo, error) { return nil, fs.ErrPermission }, 1},
+		"found files": {func(path string) (os.FileInfo, error) {
+			if found[filepath.Base(path)] {
+				return nil, nil
+			}
+			return nil, fs.ErrNotExist
+		}, 3},
+	}
+	for name, c := range cases {
+		result := make(chan int, 1)
+		go func() { result <- freeCSVNumber("data", "quiz", c.lstat) }()
+		select {
+		case got := <-result:
+			if got != c.want {
+				t.Errorf("%s: number %d, want %d", name, got, c.want)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s: the search does not end", name)
+		}
+	}
+}
+
+// A quiz whose name is so long that <name>_0001.answers_with_users.csv is
+// longer than a file name may be still starts, and its answers are written.
+func TestVeryLongQuizNameStarts(t *testing.T) {
+	name := strings.Repeat("ж", 115) + ".yaml" // 235 bytes; the answers_with_users name would be 258
+	started := make(chan *Server, 1)
+	go func() {
+		started <- newTestServer(t, map[string]string{name: quizText("Long")}, nil)
+	}()
+	var s *Server
+	select {
+	case s = <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the server did not start: the CSV number search does not end")
+	}
+	s.withLock(func() {
+		if got := filepath.Base(s.csvFile); got != strings.Repeat("ж", 115)+"_0001.csv" {
+			t.Errorf("answers CSV %s", got)
+		}
+	})
+}
+
+// The time limit check of the next question counts from the moment the
+// answer arrived (Python set question_ready_times at the start of
+// _record_answer), not from the end of a slow checker.
+func TestReadyTimeIsTheArrivalOfTheAnswer(t *testing.T) {
+	s, clock := timedServer(t, "{per_question: 0}")
+	arrived := *clock
+	sub := &submission{rawUserID: "u1", rawQuestionID: 1, answer: "x"}
+	if _, _, job, err := s.submitStep(sub); err != nil || job == nil {
+		t.Fatalf("the first step must ask for the checker: %v %v", job, err)
+	}
+	*clock = clock.Add(3 * time.Second) // the checker takes its time
+	sub.grade = gradeAnswer(s.quiz, s.quiz.Questions[0], "x")
+	if status, _, _, err := s.submitStep(sub); err != nil || status != 200 {
+		t.Fatalf("second step: %d %v", status, err)
+	}
+	s.withLock(func() {
+		if got := s.questionReadyTimes["u1"]; !got.Equal(arrived) {
+			t.Errorf("question_ready_times = %v, want the arrival %v", got, arrived)
 		}
 	})
 }

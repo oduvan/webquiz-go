@@ -655,14 +655,14 @@ func (s *Server) submitLocked(sub *submission) (int, map[string]any, *checkJob, 
 			return http.StatusBadRequest, errorReply(s.translations["server_empty_answer"]), nil, nil
 		}
 		elapsed := s.questionElapsedLocked(userID, questionID, now)
-		return http.StatusOK, s.recordAnswerLocked(userID, question, sub.answer, elapsed, recordTimeout, nil), nil, nil
+		return http.StatusOK, s.recordAnswerLocked(userID, question, sub.answer, elapsed, now, recordTimeout, nil), nil, nil
 	}
 
 	// Per-question limit: an answer after the limit and the grace is a timeout.
 	if limit := s.quiz.QuestionTimeLimits[questionID]; limit > 0 {
 		if elapsed := s.answerElapsedLocked(userID, questionID, now); elapsed.later(limit, s.grace) {
 			s.log.Info(fmt.Sprintf("Answer from user %s for question %d arrived after the time limit", userID, questionID))
-			return http.StatusOK, s.recordAnswerLocked(userID, question, sub.answer, elapsed, recordTimeout, nil), nil, nil
+			return http.StatusOK, s.recordAnswerLocked(userID, question, sub.answer, elapsed, now, recordTimeout, nil), nil, nil
 		}
 	}
 
@@ -674,7 +674,7 @@ func (s *Server) submitLocked(sub *submission) (int, map[string]any, *checkJob, 
 		}
 		g = gradeAnswer(s.quiz, question, sub.answer)
 	}
-	return http.StatusOK, s.recordAnswerLocked(userID, question, sub.answer, timeTaken, recordAnswer, g), nil, nil
+	return http.StatusOK, s.recordAnswerLocked(userID, question, sub.answer, timeTaken, now, recordAnswer, g), nil, nil
 }
 
 // recordKind says what recordAnswerLocked stores.
@@ -689,8 +689,10 @@ const (
 // recordAnswerLocked is _record_answer: it stores an answer or a timeout,
 // moves the student on, updates the live stats and the final results, and
 // returns the reply for the page. A timeout is an empty, wrong answer: no
-// checker runs and no points are earned. The caller holds mu.
-func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selected any, timeTaken seconds, kind recordKind, g *grade) map[string]any {
+// checker runs and no points are earned. now is when the answer arrived (or
+// the time ran out): the next question becomes available then, as Python
+// set question_ready_times before the checker ran. The caller holds mu.
+func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selected any, timeTaken seconds, now time.Time, kind recordKind, g *grade) map[string]any {
 	user := s.users[userID]
 	questionID := question.ID()
 	timedOut := kind != recordAnswer
@@ -701,7 +703,6 @@ func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selec
 		delete(s.questionStartTimes, userID)
 		delete(s.currentQuestionIDs, userID)
 	}
-	now := s.now()
 	s.questionReadyTimes[userID] = now
 
 	isText := question.IsText()
@@ -875,7 +876,7 @@ func (s *Server) endWholeQuizLocked(userID string, now time.Time, questionID int
 		if !ok {
 			continue
 		}
-		s.recordAnswerLocked(userID, question, nil, elapsed[id], recordQuizEnd, nil)
+		s.recordAnswerLocked(userID, question, nil, elapsed[id], now, recordQuizEnd, nil)
 		if firstStored == 0 {
 			firstStored = id
 		}

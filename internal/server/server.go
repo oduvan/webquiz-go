@@ -292,6 +292,7 @@ func copyConfig(cfg *config.Config) *config.Config {
 func emptyQuiz() *quiz.Quiz {
 	return &quiz.Quiz{
 		Data:               map[string]any{},
+		Questions:          []quiz.Question{}, // JSON [] like Python's self.questions = []
 		Title:              quiz.DefaultTitle,
 		ShowRightAnswer:    true,
 		ShowFinalList:      true,

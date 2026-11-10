@@ -300,3 +300,57 @@ func TestTimeoutEverywhere(t *testing.T) {
 		t.Errorf("users CSV:\n%s", strings.Join(users, "\n"))
 	}
 }
+
+// A quiz switch writes the answers that still wait for the 5-second flush
+// to the files of the old run first (Python lost them). An old run without
+// students leaves no files, so a new run of the same quiz takes its number
+// again, as in Python.
+func TestSwitchWritesWaitingAnswers(t *testing.T) {
+	t.Parallel()
+	quiz := map[string]any{"title": "Q", "questions": []any{map[string]any{"question": "Q1", "options": []any{"A", "B"}, "correct_answer": 0}}}
+	ts := testutil.StartServer(t, testutil.Options{Quizzes: map[string]any{"a.yaml": quiz, "b.yaml": quiz}})
+	admin := ts.AdminClient(t, "test123")
+	switchTo := func(name string) string {
+		t.Helper()
+		res := admin.PostJSON(t, "/api/admin/switch-quiz", map[string]any{"quiz_filename": name})
+		if res.Status != 200 {
+			t.Fatalf("switch to %s: %d %s", name, res.Status, res.Body)
+		}
+		return res.JSON(t)["csv_file"].(string)
+	}
+
+	if got := switchTo("a.yaml"); got != "a_0001.csv" {
+		t.Errorf("first run: %s", got)
+	}
+	if got := switchTo("a.yaml"); got != "a_0001.csv" {
+		t.Errorf("a run without students leaves no files, so the number is free again: %s", got)
+	}
+	userID := ts.RegisterStudent(t, "Ann")
+	if res := ts.PostJSON(t, "/api/submit-answer", map[string]any{"user_id": userID, "question_id": 1, "selected_answer": 0}); res.Status != 200 {
+		t.Fatalf("answer: %d %s", res.Status, res.Body)
+	}
+	switchTo("b.yaml") // well before the 5-second flush
+	answers := csvLines(t, ts.CSVDir+"/a_0001.csv")
+	if len(answers) != 2 || !strings.HasPrefix(answers[1], userID+",Q1,A,A,True,") {
+		t.Errorf("answers of the old run:\n%s", strings.Join(answers, "\n"))
+	}
+	users := csvLines(t, ts.CSVDir+"/a_0001.users.csv")
+	if len(users) != 2 || !strings.HasPrefix(users[1], userID+",Ann,") || !strings.HasSuffix(users[1], ",1,1,1,1,0:00") {
+		t.Errorf("users of the old run:\n%s", strings.Join(users, "\n"))
+	}
+	if got := switchTo("a.yaml"); got != "a_0002.csv" {
+		t.Errorf("the next run of a.yaml: %s", got)
+	}
+}
+
+// Before the admin chooses a quiz the live stats page gets an empty question
+// list, as in Python (questions: [], not null).
+func TestLiveStatsBeforeAQuizIsChosen(t *testing.T) {
+	t.Parallel()
+	quiz := map[string]any{"title": "Q", "questions": []any{map[string]any{"question": "Q1", "options": []any{"A"}, "correct_answer": 0}}}
+	ts := testutil.StartServer(t, testutil.Options{Quizzes: map[string]any{"a.yaml": quiz, "b.yaml": quiz}})
+	state := liveStatsState(t, ts)
+	if questions, ok := state["questions"].([]any); !ok || len(questions) != 0 || state["total_questions"] != 0.0 || state["current_quiz"] != nil {
+		t.Errorf("initial state before a quiz is chosen: questions %#v, total %v, current %v", state["questions"], state["total_questions"], state["current_quiz"])
+	}
+}

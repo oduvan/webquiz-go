@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/oduvan/webquiz-go/internal/config"
 	"github.com/oduvan/webquiz-go/internal/pyval"
 )
 
@@ -38,24 +37,6 @@ type csvFiles struct {
 	answers, users, answersWithUsers string
 }
 
-// newCSVFilesLocked chooses the CSV files of a new run of quizFilename
-// (generate_csv_path for each kind) and makes csv_dir. The caller holds
-// csvMu, so no flush writes a file while the names are chosen, and mu.
-func (s *Server) newCSVFilesLocked(quizFilename string) (csvFiles, error) {
-	if _, err := config.EnsureDir(s.csvDir); err != nil {
-		return csvFiles{}, err
-	}
-	number := freeCSVNumber(s.csvDir, csvPrefix(quizFilename))
-	files := csvFiles{
-		answers: csvPath(s.csvDir, quizFilename, number, ""),
-		users:   csvPath(s.csvDir, quizFilename, number, ".users"),
-	}
-	if s.cfg.ExtraAnswersWithUsersCSV {
-		files.answersWithUsers = csvPath(s.csvDir, quizFilename, number, ".answers_with_users")
-	}
-	return files, nil
-}
-
 // csvPrefix is the quiz name in the CSV file names: the file name without
 // ".yaml" and ".yml" (Python removed them wherever they were in the name).
 func csvPrefix(quizFilename string) string {
@@ -67,13 +48,30 @@ func csvPath(dir, quizFilename string, number int, kind string) string {
 	return filepath.Join(dir, fmt.Sprintf("%s_%04d%s.csv", csvPrefix(quizFilename), number, kind))
 }
 
+// csvRunFiles are the CSV files of run number of quizFilename. The
+// answers_with_users file is "" unless extra is set.
+func csvRunFiles(dir, quizFilename string, number int, extra bool) csvFiles {
+	files := csvFiles{
+		answers: csvPath(dir, quizFilename, number, ""),
+		users:   csvPath(dir, quizFilename, number, ".users"),
+	}
+	if extra {
+		files.answersWithUsers = csvPath(dir, quizFilename, number, ".answers_with_users")
+	}
+	return files
+}
+
 // freeCSVNumber is the first number from 1 up for which none of the three
-// CSV files of a run exists yet.
-func freeCSVNumber(dir, prefix string) int {
+// CSV files of a run exists yet (generate_csv_path). Only a file that lstat
+// finds takes a number: any error counts as free, like Python's
+// os.path.exists, so a name that is too long or a folder the server may not
+// read shows as an error when the file is written, instead of a search that
+// never ends.
+func freeCSVNumber(dir, prefix string, lstat func(string) (os.FileInfo, error)) int {
 	for number := 1; ; number++ {
 		free := true
 		for _, kind := range []string{"", ".users", ".answers_with_users"} {
-			if _, err := os.Lstat(filepath.Join(dir, fmt.Sprintf("%s_%04d%s.csv", prefix, number, kind))); !errors.Is(err, fs.ErrNotExist) {
+			if _, err := lstat(filepath.Join(dir, fmt.Sprintf("%s_%04d%s.csv", prefix, number, kind))); err == nil {
 				free = false
 				break
 			}
@@ -211,6 +209,12 @@ func (s *Server) flushResponsesToCSV() error {
 	if !ok {
 		return nil
 	}
+	return s.writeResponses(snapshot)
+}
+
+// writeResponses appends taken answers to their CSV files. The caller holds
+// csvMu (not mu).
+func (s *Server) writeResponses(snapshot responsesSnapshot) error {
 	header := append([]string{"user_id"}, answerColumns...)
 	created, err := appendCSV(snapshot.answersFile, header, snapshot.answerRows)
 	if err != nil {
@@ -320,5 +324,42 @@ func (s *Server) flushUsersToCSV() error {
 	if !ok {
 		return nil
 	}
+	return writeUsersCSV(path, text)
+}
+
+// writeUsersCSV writes the users CSV of a run again.
+func writeUsersCSV(path, text string) error {
 	return writeSynced(path, text, os.O_CREATE|os.O_TRUNC)
+}
+
+// runCSVRows are the rows of a run that wait for the CSV files: the taken
+// answers and the users CSV. A quiz switch takes them together with the
+// reset, so no answer of the old run is lost, and writes them before the
+// new run chooses its CSV number.
+type runCSVRows struct {
+	responses    responsesSnapshot
+	hasResponses bool
+	usersPath    string
+	usersText    string
+	hasUsers     bool
+}
+
+// takeRunRowsLocked takes the rows of the running quiz that wait for the
+// CSV files. The caller holds csvMu and mu.
+func (s *Server) takeRunRowsLocked() runCSVRows {
+	var rows runCSVRows
+	rows.responses, rows.hasResponses = s.takeResponsesLocked()
+	rows.usersPath, rows.usersText, rows.hasUsers = s.usersCSVLocked()
+	return rows
+}
+
+// writeRunRows writes rows taken by takeRunRowsLocked, like one flush. An
+// error is logged as the flush loop logs it. The caller holds csvMu (not mu).
+func (s *Server) writeRunRows(rows runCSVRows) {
+	if rows.hasResponses {
+		s.runSafely("flush_responses_to_csv", func() error { return s.writeResponses(rows.responses) })
+	}
+	if rows.hasUsers {
+		s.runSafely("flush_users_to_csv", func() error { return writeUsersCSV(rows.usersPath, rows.usersText) })
+	}
 }

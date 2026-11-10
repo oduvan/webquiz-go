@@ -55,14 +55,11 @@ func (a *answerRecord) result(showAnswers bool) map[string]any {
 type answerRow struct {
 	UserID         string
 	Username       string
-	QuestionID     int
 	Question       any // the question text as written ("" when the question has none)
 	SelectedAnswer string
 	CorrectAnswer  any
 	IsCorrect      bool
 	TimeTaken      seconds
-	Timestamp      string
-	CheckerError   string
 }
 
 // userStats is an entry of Python's user_stats: the final results of a

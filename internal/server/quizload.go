@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/oduvan/webquiz-go/internal/checker"
+	"github.com/oduvan/webquiz-go/internal/config"
 	"github.com/oduvan/webquiz-go/internal/pyval"
 	"github.com/oduvan/webquiz-go/internal/quiz"
 	"github.com/oduvan/webquiz-go/internal/timelimits"
@@ -135,9 +136,11 @@ func (s *Server) loadQuestions() error {
 // another file runs with its own values.
 //
 // Unlike the Python version, a quiz file that cannot be loaded changes
-// nothing: the old quiz keeps running and the error is returned. Like the
-// Python version, answers that still wait for the 5-second CSV flush are
-// dropped with the old run.
+// nothing: the old quiz keeps running and the error is returned. Also unlike
+// Python, which dropped them, the answers of the old run that still wait
+// for the CSV flush are written to the old run's files first.
+//
+// SwitchQuiz takes csvMu and mu itself: never call it while holding mu.
 func (s *Server) SwitchQuiz(filename string, settings map[string]any) error {
 	_, err := s.switchQuiz(filename, settings)
 	return err
@@ -150,7 +153,13 @@ type switchResult struct {
 }
 
 // switchQuiz does SwitchQuiz and also returns the new run's CSV file and
-// settings, read under the same lock.
+// settings.
+//
+// csvMu is held for the whole switch, so no flush writes files meanwhile.
+// The old run's waiting rows are taken in the same locked step as the
+// reset (no answer of the old run is lost), and written before the new run
+// chooses its CSV number (the new run never takes the old run's number).
+// The folder work runs without mu.
 func (s *Server) switchQuiz(filename string, settings map[string]any) (switchResult, error) {
 	path := filepath.Join(s.quizzesDir, filename)
 	if _, err := os.Stat(path); err != nil {
@@ -160,16 +169,36 @@ func (s *Server) switchQuiz(filename string, settings map[string]any) (switchRes
 	if err != nil {
 		return switchResult{}, err
 	}
-	checkerWarnings := badCheckers(path, loaded) // compiled before the lock is taken
+	checkerWarnings := badCheckers(path, loaded) // compiled before any lock is taken
 
-	s.csvMu.Lock() // a flush that writes files of the old run ends first
+	s.csvMu.Lock()
 	defer s.csvMu.Unlock()
+	if _, err := config.EnsureDir(s.csvDir); err != nil {
+		return switchResult{}, err // nothing has changed yet
+	}
+	oldRows, pageErr := s.startRun(filename, path, loaded, settings, checkerWarnings)
+	s.writeRunRows(oldRows)
+	number := freeCSVNumber(s.csvDir, csvPrefix(filename), os.Lstat)
+
+	var result switchResult
+	s.withLock(func() {
+		files := csvRunFiles(s.csvDir, filename, number, s.cfg.ExtraAnswersWithUsersCSV)
+		s.csvFile, s.userCSVFile, s.answersWithUsersCSVFile = files.answers, files.users, files.answersWithUsers
+		s.log.Info(fmt.Sprintf("Switched to quiz: %s, CSV: %s", filename, s.csvFile))
+		result = switchResult{csvFile: s.csvFile, settings: s.currentQuizSettingsLocked()}
+	})
+	return result, pageErr
+}
+
+// startRun is the locked step of switchQuiz: it takes the old run's rows
+// that wait for the CSV files, forgets every student, puts in the new quiz
+// with its start settings, writes the quiz page and tells the live stats
+// pages. The new run gets its CSV files right after this step. pageErr is
+// the error of writing the quiz page. The caller holds csvMu.
+func (s *Server) startRun(filename, path string, loaded *quiz.Quiz, settings map[string]any, checkerWarnings []string) (oldRows runCSVRows, pageErr error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	files, err := s.newCSVFilesLocked(filename)
-	if err != nil {
-		return switchResult{}, err
-	}
+	oldRows = s.takeRunRowsLocked()
 	s.resetStateLocked()
 	s.log.Info("Server state reset for new quiz")
 	if settings != nil {
@@ -180,7 +209,7 @@ func (s *Server) switchQuiz(filename string, settings map[string]any) (switchRes
 		s.startSettingsQuiz = ""
 	}
 	s.currentQuizFile = path
-	s.csvFile, s.userCSVFile, s.answersWithUsersCSVFile = files.answers, files.users, files.answersWithUsers
+	s.csvFile, s.userCSVFile, s.answersWithUsersCSVFile = "", "", ""
 
 	if loaded.TimeLimitWarning != "" {
 		s.log.Warn(fmt.Sprintf("%s: %s", path, loaded.TimeLimitWarning))
@@ -199,9 +228,7 @@ func (s *Server) switchQuiz(filename string, settings map[string]any) (switchRes
 	}
 	s.quiz = loaded
 
-	if err := s.writeQuizPageLocked(); err != nil {
-		return switchResult{}, err
-	}
+	pageErr = s.writeQuizPageLocked()
 	s.broadcastLiveStats(map[string]any{
 		"type":            "quiz_switched",
 		"current_quiz":    filename,
@@ -209,8 +236,7 @@ func (s *Server) switchQuiz(filename string, settings map[string]any) (switchRes
 		"total_questions": len(loaded.Questions),
 		"message":         "Quiz switched to: " + filename,
 	})
-	s.log.Info(fmt.Sprintf("Switched to quiz: %s, CSV: %s", filename, s.csvFile))
-	return switchResult{csvFile: s.csvFile, settings: s.currentQuizSettingsLocked()}, nil
+	return oldRows, pageErr
 }
 
 // badCheckers compiles the checker code of every question and returns a

@@ -43,7 +43,7 @@ func (s *Server) checkTimeLimitsLocked(now time.Time) {
 			continue
 		}
 		s.log.Info(fmt.Sprintf("Time ran out for user %s on question %d (no answer from the page)", userID, questionID))
-		s.recordAnswerLocked(userID, question, nil, elapsed, recordTimeout, nil)
+		s.recordAnswerLocked(userID, question, nil, elapsed, now, recordTimeout, nil)
 	}
 
 	// Whole-quiz limit.
