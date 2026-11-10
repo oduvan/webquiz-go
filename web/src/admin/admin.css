@@ -626,10 +626,10 @@ body {
   margin: 0 0 0 5px;
 }
 
-.admin-page .question-text,
-.admin-page .question-image,
-.admin-page .question-file,
-.admin-page .option-text {
+.admin-page input.question-text,
+.admin-page input.question-image,
+.admin-page input.question-file,
+.admin-page input.option-text {
   padding: 8px;
   font-size: 14px;
 }
@@ -693,13 +693,13 @@ body {
   margin-top: 10px;
 }
 
-.admin-page .min-correct-input,
-.admin-page .points-input {
-  width: 90px;
+.admin-page input.min-correct-input,
+.admin-page input.points-input {
+  width: 100px;
 }
 
-.admin-page .question-time-limit-input {
-  width: 150px;
+.admin-page input.question-time-limit-input {
+  width: 160px;
   margin-right: 8px;
 }
 
@@ -1004,7 +1004,7 @@ body {
 }
 
 .admin-page .pending-user-info {
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 0;
 }
 
@@ -1417,6 +1417,20 @@ body {
   .admin-page .pending-user-item .approve-btn {
     margin: 10px 0 0;
     width: 100%;
+  }
+
+  .admin-page .actions-sticky {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 6px;
+  }
+
+  .admin-page .actions-sticky button {
+    flex: 1 1 auto;
+    margin: 3px;
+    padding: 8px 10px;
+    font-size: 14px;
   }
 
   .admin-page .back-link .separator {
