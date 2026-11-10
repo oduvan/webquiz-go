@@ -81,11 +81,11 @@ function ServerResults({ final, T, showFinalList, showRightAnswer }: { final: Fi
 
   return (
     <>
-      <p>
+      <p className="mb-1">
         <strong>{T.result_label}</strong> {final.correct_count}/{totalCount} ({percentage}%)
       </p>
       {hasCustomPoints ? (
-        <p>
+        <p className="mb-1">
           <strong>{T.points_label}</strong> {formatPoints(earnedPoints)}/{formatPoints(totalPoints)} ({pointsPercentage}%)
         </p>
       ) : null}
@@ -160,7 +160,7 @@ function ClientResults({ results, T, showFinalList }: { results: ClientTestResul
   const hasCorrectness = results.some((result) => result.isCorrect !== null);
   return (
     <>
-      <p>
+      <p className="mb-1">
         <strong>{T.result_label}</strong> {correctCount}/{totalCount} ({percentage}%)
       </p>
       {showFinalList ? (

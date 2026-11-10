@@ -286,7 +286,13 @@
   background: var(--quiz-option-hover);
 }
 
+/* A focus ring for the keyboard only, not after a click (no ring in browsers
+   without :focus-visible, as the old page had none) */
 .quiz-option:focus {
+  outline: none;
+}
+
+.quiz-option:focus-visible {
   outline: 2px solid var(--quiz-accent);
   outline-offset: 1px;
 }
