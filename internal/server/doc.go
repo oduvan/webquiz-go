@@ -27,12 +27,13 @@
 //   - websocket.go: the WebSocket hub (serveWebSocket, broadcastLiveStats,
 //     broadcastAdmin).
 //   - tunnel.go: the SSH tunnel manager and its status messages.
+//   - files.go: the file manager API (list, view, download, save a quiz).
+//   - transfer_handlers.go: file transfer between servers (internal/transfer).
 //   - admin_auth.go: the admin login (session cookie) and the session check.
 //   - logging.go: the log file logs_dir/NNNN.log in Python's log format.
 //   - Handlers that later tasks build answer 501 until then: student.go and
 //     csvlog.go (Task 7), admin_quiz.go (Task 8), admin_config.go (Task 9),
-//     files.go and transfer_handlers.go (Task 10), startup_log.go and
-//     network.go (Task 11).
+//     startup_log.go and network.go (Task 11).
 //
 // Rules for handlers:
 //
@@ -49,6 +50,8 @@
 //     that starts with s.mu.Lock() and defer s.mu.Unlock(). A panic is
 //     recovered (500 for that request), and without the defer it would leave
 //     mu locked, so every later request would wait forever.
+//   - The transfer manager (s.transfer) takes its own lock and then mu (it
+//     asks for the files in use). Never call it while holding mu.
 //   - s.text, s.isTrustedIP and s.validSession take mu themselves. A Go
 //     mutex cannot be locked twice by the same caller, so inside a locked
 //     section read s.translations[key] and s.cfg directly instead.
