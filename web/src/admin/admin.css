@@ -1,0 +1,1439 @@
+/* Admin page. Tailwind's base resets the browser styles; this file gives the
+   page its look, which follows the old admin.html: the theme colors, the form
+   fields and buttons, the editor's states (collapsed, folded, hidden) and the
+   pop-ups. Rules are scoped to .admin-page so they never reach other pages. */
+
+:root {
+  --bg-color: #f5f5f5;
+  --container-bg: #ffffff;
+  --item-bg: #ffffff;
+  --text-color: #333333;
+  --text-muted: #666666;
+  --border-color: #dddddd;
+  --button-bg: #007bff;
+  --button-hover: #0056b3;
+  --success-bg: #d4edda;
+  --success-border: #c3e6cb;
+  --success-color: #155724;
+  --error-bg: #f8d7da;
+  --error-border: #f5c6cb;
+  --error-color: #721c24;
+  --warning-bg: #fff3cd;
+  --warning-border: #ffeaa7;
+  --warning-color: #856404;
+  --info-bg: #e7f3ff;
+  --info-border: #b6d4fe;
+  --info-color: #084298;
+  --disabled-bg: #cccccc;
+  --light-bg: #fafafa;
+  --success-green: #28a745;
+  --success-green-hover: #218838;
+  --danger-red: #dc3545;
+  --danger-red-hover: #c82333;
+  --orange: #ff9800;
+  --orange-border: #f57c00;
+  --light-gray: #aaaaaa;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+  --question-bg: #e9ecef;
+  --question-bg-hover: #dee2e6;
+  --option-hover: #e8f0fe;
+  --highlight: #e3f2fd;
+}
+
+[data-theme='dark'] {
+  --bg-color: #1a1a1a;
+  --container-bg: #2d2d2d;
+  --item-bg: #383838;
+  --text-color: #e0e0e0;
+  --text-muted: #aaaaaa;
+  --border-color: #555555;
+  --button-bg: #0d6efd;
+  --button-hover: #0b5ed7;
+  --success-bg: #1e3a1e;
+  --success-border: #2d5a2d;
+  --success-color: #a5d6a7;
+  --error-bg: #3a1a1a;
+  --error-border: #5a2d2d;
+  --error-color: #ef9a9a;
+  --warning-bg: #3d3a1a;
+  --warning-border: #5a5a2d;
+  --warning-color: #fff3cd;
+  --info-bg: #1a2a3d;
+  --info-border: #2d4a6b;
+  --info-color: #9ec5fe;
+  --disabled-bg: #555555;
+  --light-bg: #333333;
+  --success-green: #2e7d32;
+  --success-green-hover: #1b5e20;
+  --danger-red: #c62828;
+  --danger-red-hover: #b71c1c;
+  --light-gray: #888888;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+  --question-bg: #3a3a3a;
+  --question-bg-hover: #444444;
+  --option-hover: #404a5a;
+  --highlight: #1a3a52;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---- Page and card ---- */
+
+.admin-page {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.admin-page .container {
+  position: relative;
+  background: var(--container-bg);
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px var(--shadow);
+  margin-bottom: 20px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.admin-page h1 {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin: 0 40px 30px;
+}
+
+.admin-page h2 {
+  font-size: 1.35rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+.admin-page h3 {
+  font-size: 1.15rem;
+  font-weight: bold;
+  margin: 0 0 10px;
+}
+
+.admin-page a {
+  color: var(--button-bg);
+  text-decoration: none;
+}
+
+.admin-page a:hover {
+  text-decoration: underline;
+}
+
+.admin-page small,
+.admin-page .muted {
+  color: var(--text-muted);
+}
+
+/* ---- Fields and buttons ---- */
+
+.admin-page .form-group {
+  margin-bottom: 10px;
+}
+
+.admin-page label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.admin-page label.inline-label {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.admin-page label.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.admin-page label.checkbox-label input {
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.admin-page input[type='password'],
+.admin-page input[type='text'],
+.admin-page input[type='number'],
+.admin-page select {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  font-size: 16px;
+  background: var(--container-bg);
+  color: var(--text-color);
+}
+
+.admin-page textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 8px;
+  background: var(--container-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+}
+
+.admin-page input[type='checkbox'],
+.admin-page input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--button-bg);
+}
+
+.admin-page input:disabled,
+.admin-page select:disabled,
+.admin-page textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-page button {
+  background: var(--button-bg);
+  color: #ffffff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 5px;
+  line-height: 1.2;
+}
+
+.admin-page button:hover {
+  background: var(--button-hover);
+}
+
+.admin-page button:disabled {
+  background: var(--disabled-bg);
+  cursor: not-allowed;
+}
+
+.admin-page .btn-success {
+  background: var(--success-green);
+}
+
+.admin-page .btn-success:hover {
+  background: var(--success-green-hover);
+}
+
+.admin-page .btn-danger {
+  background: var(--danger-red);
+}
+
+.admin-page .btn-danger:hover {
+  background: var(--danger-red-hover);
+}
+
+.admin-page .btn-danger:disabled {
+  background: var(--danger-red);
+  opacity: 0.6;
+}
+
+.admin-page .actions {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* ---- Messages: above the pop-ups, never in the way of a click ---- */
+
+#message-area {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000;
+  width: calc(100% - 32px);
+  max-width: 600px;
+  pointer-events: none;
+}
+
+#message-area .message {
+  padding: 10px 14px;
+  border-radius: 5px;
+  margin: 0 0 8px;
+  box-shadow: 0 2px 8px var(--shadow);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+#message-area .success {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-color);
+}
+
+#message-area .error {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-color);
+}
+
+#message-area .warning {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-color);
+}
+
+/* ---- Quiz list ---- */
+
+.admin-page .quiz-select {
+  font-size: 14px;
+  background: var(--light-bg);
+  font-family: monospace;
+}
+
+.admin-page .quiz-select option {
+  padding: 8px;
+  white-space: normal;
+}
+
+.admin-page .quiz-select option.current-quiz {
+  font-weight: bold;
+  background: var(--warning-bg);
+}
+
+.admin-page .selection-hint {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-top: 5px;
+  font-style: italic;
+}
+
+.admin-page .current-quiz-display {
+  margin-top: 10px;
+  padding: 10px 15px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: 5px;
+  color: var(--success-color);
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .current-quiz-display.no-quiz {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-color);
+}
+
+.admin-page .quiz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 10px -5px;
+}
+
+.admin-page .quiz-actions button {
+  flex: 1 1 200px;
+}
+
+/* ---- Pop-ups ---- */
+
+.admin-page .modal {
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background-color: var(--modal-overlay);
+}
+
+.admin-page .modal-content {
+  position: relative;
+  background-color: var(--container-bg);
+  margin: 5vh auto;
+  padding: 15px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.admin-page .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.admin-page .modal-header h2 {
+  overflow-wrap: anywhere;
+}
+
+.admin-page button.close {
+  background: none;
+  color: var(--light-gray);
+  font-size: 28px;
+  font-weight: bold;
+  padding: 0 6px;
+  margin: 0 0 0 10px;
+  line-height: 1;
+}
+
+.admin-page button.close:hover {
+  background: none;
+  color: var(--text-color);
+}
+
+.admin-page .actions-sticky {
+  position: sticky;
+  bottom: -15px;
+  background: var(--container-bg);
+  padding: 10px 0;
+  margin: 20px -15px -15px;
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -2px 10px var(--shadow);
+  z-index: 10;
+  text-align: center;
+}
+
+.admin-page #save-continue-btn.save-success,
+.admin-page #save-continue-btn.save-success:disabled {
+  background: var(--success-green);
+}
+
+.admin-page #save-continue-btn.save-failed,
+.admin-page #save-continue-btn.save-failed:disabled {
+  background: var(--danger-red);
+}
+
+/* ---- Start pop-up ---- */
+
+.admin-page .start-quiz-content {
+  max-width: 520px;
+}
+
+.admin-page .start-quiz-name {
+  font-weight: 600;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .start-quiz-hint {
+  font-size: 14px;
+  opacity: 0.8;
+  margin: 0 0 12px;
+}
+
+.admin-page .start-quiz-error {
+  color: var(--danger-red);
+  margin: 10px 0;
+}
+
+.admin-page .start-quiz-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 15px;
+}
+
+/* A time limit: the mode, then its seconds on the same line when there is room */
+.admin-page .time-limit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-page .time-limit-row > select {
+  width: auto;
+  margin: 0 10px 6px 0;
+}
+
+.admin-page .time-limit-seconds-group {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-page .time-limit-seconds-group label {
+  display: inline-block;
+  margin: 0 6px 0 0;
+}
+
+.admin-page .time-limit-seconds-group input {
+  width: 100px;
+  margin-right: 6px;
+}
+
+/* ---- Quiz editor ---- */
+
+.admin-page .editor-content {
+  margin-top: 12px;
+}
+
+.admin-page .question-item {
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 10px;
+  margin: 8px 0;
+  background: var(--light-bg);
+  transition: background-color 0.3s ease;
+}
+
+.admin-page .question-item.moved {
+  background: var(--highlight);
+}
+
+.admin-page .question-item.dragging {
+  opacity: 0.5;
+  background: var(--question-bg-hover);
+}
+
+.admin-page .question-item.drag-over {
+  border-top: 3px solid var(--button-bg);
+}
+
+.admin-page .question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  padding: 10px;
+  background: var(--question-bg);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.admin-page .question-header:hover {
+  background: var(--question-bg-hover);
+}
+
+.admin-page .question-header-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-page .question-header-left > * {
+  margin-right: 10px;
+}
+
+.admin-page .drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 16px;
+  padding: 2px 4px;
+  user-select: none;
+}
+
+.admin-page .drag-handle:active {
+  cursor: grabbing;
+}
+
+.admin-page .question-collapse-icon {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+
+.admin-page .question-item.collapsed .question-collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.admin-page .question-number {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.admin-page .question-indicators {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.admin-page .question-indicator {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-right: 5px;
+}
+
+.admin-page .question-indicator.points-indicator {
+  color: darkgoldenrod;
+  font-weight: bold;
+}
+
+.admin-page .question-preview {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .question-header-buttons {
+  display: flex;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.admin-page .question-header-buttons button {
+  padding: 5px 8px;
+  font-size: 12px;
+  margin: 0 0 0 5px;
+}
+
+.admin-page .question-body {
+  overflow: hidden;
+  padding-top: 10px;
+  max-height: none;
+}
+
+/* A collapsed question keeps its fields (they are saved) but shows none */
+.admin-page .question-item.collapsed .question-body {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  visibility: hidden;
+}
+
+.admin-page .question-item.collapsed {
+  padding-bottom: 4px;
+}
+
+.admin-page .field-with-button {
+  display: flex;
+  align-items: center;
+}
+
+.admin-page .field-with-button input {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-page .picker-btn {
+  padding: 5px 8px;
+  font-size: 16px;
+  margin: 0 0 0 5px;
+}
+
+.admin-page input.question-text,
+.admin-page input.question-image,
+.admin-page input.question-file,
+.admin-page input.option-text {
+  padding: 8px;
+  font-size: 14px;
+}
+
+.admin-page .question-type-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.admin-page .question-type-toggle {
+  background: var(--item-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 8px 16px;
+  margin: 0 5px 10px 0;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.admin-page .question-type-toggle:hover {
+  background: var(--option-hover);
+}
+
+.admin-page .question-type-toggle.active {
+  background: var(--button-bg);
+  color: #ffffff;
+  border-color: var(--button-bg);
+}
+
+.admin-page .options-container {
+  margin: 10px 0;
+}
+
+.admin-page .option-item {
+  display: flex;
+  align-items: center;
+  margin: 5px 0;
+}
+
+.admin-page .option-item input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  margin: 0 10px;
+}
+
+.admin-page .option-btn {
+  padding: 2px 6px;
+  font-size: 12px;
+  margin: 0 0 0 4px;
+}
+
+.admin-page .add-option-btn {
+  margin-left: 0;
+}
+
+.admin-page .min-correct-container {
+  background: var(--light-bg);
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+
+.admin-page input.min-correct-input,
+.admin-page input.points-input {
+  width: 100px;
+}
+
+.admin-page input.question-time-limit-input {
+  width: 160px;
+  margin-right: 8px;
+}
+
+.admin-page .code-field {
+  min-height: 60px;
+  font-family: monospace;
+}
+
+.admin-page .checker-field {
+  min-height: 120px;
+}
+
+.admin-page .checker-template-row {
+  display: flex;
+  margin-bottom: 5px;
+}
+
+.admin-page .checker-template-row select {
+  flex: 1;
+}
+
+.admin-page .stick-label {
+  font-weight: normal;
+}
+
+/* Question and option pictures */
+.admin-page .image-preview-container {
+  margin-top: 8px;
+  display: none;
+}
+
+.admin-page .image-preview-container.has-image {
+  display: block;
+}
+
+.admin-page .image-preview {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 8px;
+  border: 2px solid var(--border-color);
+  object-fit: contain;
+  background: var(--light-bg);
+  cursor: pointer;
+}
+
+.admin-page .option-image-preview {
+  max-width: 80px;
+  max-height: 60px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  object-fit: contain;
+  background: var(--light-bg);
+  margin-right: 5px;
+  cursor: pointer;
+}
+
+/* Explanations */
+.admin-page .explanation-group.folded .explanation-body {
+  display: none;
+}
+
+.admin-page .explanation-toggle-btn {
+  margin: 0 0 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.admin-page .explanation-tools {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+.admin-page .explanation-tools button {
+  margin: 0 8px 0 0;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.admin-page .question-explanation {
+  min-height: 120px;
+  font-family: monospace;
+}
+
+.admin-page .explanation-preview {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  min-height: 120px;
+}
+
+.admin-page .explanation-content {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .explanation-content p,
+.admin-page .explanation-content ul,
+.admin-page .explanation-content ol {
+  margin: 0 0 8px;
+}
+
+.admin-page .explanation-content ul {
+  list-style: disc;
+  padding-left: 24px;
+}
+
+.admin-page .explanation-content ol {
+  list-style: decimal;
+  padding-left: 24px;
+}
+
+.admin-page .explanation-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.admin-page .explanation-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.admin-page .explanation-content th,
+.admin-page .explanation-content td {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+}
+
+.admin-page .explanation-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 8px;
+  background: var(--light-bg);
+}
+
+.admin-page .explanation-content blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--border-color);
+}
+
+.admin-page .explanation-preview-empty {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* Image and file pickers */
+.admin-page .image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-gap: 15px;
+  padding: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.admin-page .image-item {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--container-bg);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-page .image-item:hover {
+  border-color: var(--button-bg);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.admin-page .image-item img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.admin-page .image-filename {
+  font-size: 12px;
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+.admin-page .picker-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 10px;
+  color: var(--text-muted);
+}
+
+.admin-page .file-picker-content {
+  max-width: 600px;
+}
+
+.admin-page .file-list {
+  padding: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.admin-page .file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  background: var(--container-bg);
+}
+
+.admin-page .file-item:hover {
+  border-color: var(--button-bg);
+}
+
+.admin-page .file-item-info {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-page .file-item-icon {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.admin-page .file-item-name {
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.admin-page .file-item-size {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-left: 10px;
+}
+
+/* A picture at full size */
+.admin-page .image-fullscreen-modal {
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  cursor: pointer;
+}
+
+.admin-page .image-fullscreen-modal img {
+  max-width: 90%;
+  max-height: 90%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.admin-page .image-fullscreen-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: #ffffff;
+  font-size: 40px;
+  font-weight: bold;
+}
+
+/* ---- Students waiting for approval ---- */
+
+.admin-page .pending-approvals {
+  margin-top: 30px;
+  background: var(--warning-bg);
+  border: 2px solid var(--warning-border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.admin-page .empty-note {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.admin-page .pending-user-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--item-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 15px;
+  margin: 10px 0;
+}
+
+.admin-page .pending-user-info {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.admin-page .pending-user-name {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 5px;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .pending-user-data {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .approve-btn {
+  background: var(--success-green);
+  padding: 10px 20px;
+  font-weight: bold;
+}
+
+.admin-page .approve-btn:hover {
+  background: var(--success-green-hover);
+}
+
+.admin-page .reject-btn {
+  background: var(--danger-red);
+  padding: 10px 20px;
+  font-weight: bold;
+}
+
+.admin-page .reject-btn:hover {
+  background: var(--danger-red-hover);
+}
+
+/* ---- Incoming file transfer requests ---- */
+
+.admin-page .transfer-requests {
+  margin-top: 30px;
+  background: var(--light-bg);
+  border: 2px solid var(--button-bg);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.admin-page .section-hint {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.admin-page .transfer-request-item {
+  background: var(--item-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 15px;
+  margin: 10px 0;
+}
+
+/* One incoming file: name | case | chosen action */
+.admin-page .transfer-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(180px, 1.5fr);
+  grid-gap: 8px 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.admin-page .transfer-file-name {
+  font-weight: bold;
+  word-break: break-word;
+}
+
+.admin-page .transfer-file-meta,
+.admin-page .transfer-case {
+  color: var(--text-muted);
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.admin-page .transfer-case-different {
+  color: var(--warning-color);
+}
+
+.admin-page .transfer-case-in_use {
+  color: var(--danger-red);
+}
+
+.admin-page .transfer-choice select,
+.admin-page .transfer-choice input {
+  padding: 6px 8px;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.admin-page .transfer-error {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: 4px;
+  color: var(--error-color);
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.admin-page .transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.admin-page .transfer-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* ---- Show the answers to everyone ---- */
+
+.admin-page .show-answers-control {
+  margin-top: 20px;
+}
+
+.admin-page .show-answers-box {
+  background: var(--light-bg);
+  padding: 15px;
+  border-radius: 5px;
+  border-left: 4px solid var(--button-bg);
+}
+
+.admin-page .answers-status {
+  margin-bottom: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  background: #4caf50;
+  color: #ffffff;
+  border: 1px solid #45a049;
+}
+
+.admin-page .show-answers-btn {
+  background: var(--orange);
+  border: 2px solid var(--orange-border);
+  padding: 10px 20px;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 0;
+}
+
+.admin-page .show-answers-btn:hover {
+  background: var(--orange-border);
+}
+
+.admin-page .show-answers-btn.forced,
+.admin-page .show-answers-btn.forced:hover {
+  background: var(--disabled-bg);
+  border-color: var(--disabled-bg);
+}
+
+/* ---- Quizzes to download ---- */
+
+.admin-page .downloadable-quizzes {
+  margin-top: 30px;
+}
+
+.admin-page .downloadable-quiz-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  margin-bottom: 10px;
+  background: var(--item-bg);
+}
+
+.admin-page .downloadable-quiz-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-page .downloadable-quiz-name {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.admin-page .downloadable-quiz-url {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.admin-page .download-btn {
+  background: var(--success-green);
+  padding: 8px 16px;
+  font-size: 0.9em;
+}
+
+.admin-page .download-btn:hover {
+  background: var(--success-green-hover);
+}
+
+/* ---- Addresses and tunnel ---- */
+
+.admin-page .network-info {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 5px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.admin-page .info-section {
+  margin: 15px 0;
+}
+
+.admin-page .network-info .info-section {
+  margin: 0;
+}
+
+.admin-page .url-list {
+  margin-top: 10px;
+}
+
+.admin-page .url-item {
+  background: var(--item-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 10px;
+  margin: 5px 0;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .url-item.tunnel-url-item {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+}
+
+.admin-page .url-item .label {
+  font-weight: bold;
+  color: var(--button-bg);
+}
+
+.admin-page .url-item .url {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+.admin-page .tunnel-info {
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  border-radius: 5px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.admin-page .tunnel-info h3 {
+  color: var(--info-color);
+}
+
+.admin-page .tunnel-info span {
+  overflow-wrap: anywhere;
+}
+
+.admin-page .public-key-row {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 5px;
+}
+
+.admin-page #tunnel-public-key {
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 12px;
+  min-height: 30px;
+  resize: vertical;
+  background: var(--light-bg);
+}
+
+.admin-page #copy-public-key-btn {
+  padding: 8px 12px;
+  margin: 0 0 0 10px;
+  white-space: nowrap;
+}
+
+.admin-page #copy-public-key-btn.copied {
+  background: #4caf50;
+}
+
+.admin-page .tunnel-error {
+  color: var(--error-color);
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Links and footer ---- */
+
+.admin-page .back-link {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.admin-page .back-link .separator {
+  margin: 0 10px;
+}
+
+.admin-page .admin-footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 30px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.admin-page .footer-version {
+  margin-bottom: 10px;
+}
+
+.admin-page .footer-docs-link {
+  margin-left: 15px;
+}
+
+.admin-page .footer-update {
+  display: inline-block;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-color);
+  padding: 10px 15px;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+
+.admin-page .footer-update a {
+  font-weight: bold;
+}
+
+.admin-page .footer-restart {
+  margin-top: 10px;
+}
+
+/* ---- Phones ---- */
+
+@media (max-width: 768px) {
+  .admin-page {
+    padding: 10px;
+  }
+
+  .admin-page .container {
+    padding: 16px;
+  }
+
+  .admin-page h1 {
+    font-size: 1.35rem;
+    margin-bottom: 20px;
+  }
+
+  .admin-page button {
+    padding: 10px 16px;
+  }
+
+  .admin-page .quiz-select {
+    font-size: 16px; /* no zoom on iOS */
+  }
+
+  .admin-page .selection-hint {
+    display: none; /* no Ctrl+click on a phone */
+  }
+
+  .admin-page .modal-content {
+    width: calc(100% - 20px);
+    margin: 10px auto;
+    max-height: calc(100vh - 20px);
+  }
+
+  .admin-page .question-header {
+    padding: 8px;
+  }
+
+  .admin-page .question-header-left > * {
+    margin-right: 6px;
+  }
+
+  .admin-page .question-type-toggle {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+
+  .admin-page .transfer-file-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page .transfer-choice select,
+  .admin-page .transfer-choice input {
+    font-size: 16px; /* no zoom on iOS */
+  }
+
+  .admin-page .transfer-actions button {
+    flex: 1;
+  }
+
+  .admin-page .pending-user-item .approve-btn {
+    margin: 10px 0 0;
+    width: 100%;
+  }
+
+  .admin-page .actions-sticky {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 6px;
+  }
+
+  .admin-page .actions-sticky button {
+    flex: 1 1 auto;
+    margin: 3px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .admin-page .back-link .separator {
+    margin: 0 4px;
+  }
+}
