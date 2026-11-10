@@ -90,7 +90,7 @@ After partitioning, insert the SD card back into the Raspberry Pi and start the 
 
 ### The WebQuiz Program on the Raspberry Pi
 
-The Go version of WebQuiz (0.1 and later) is one ready-made program file for the Raspberry Pi. It does not need Python or `pip`. There are two files on the [Releases](https://github.com/oduvan/webquiz-go/releases) page:
+WebQuiz 2.0 is one ready-made program file for the Raspberry Pi. It does not need Python or `pip`. There are two files on the [Releases](https://github.com/oduvan/webquiz-go/releases) page:
 
 - `webquiz-linux-arm64.zip` — for a 64-bit system on Raspberry Pi 3, 4 and 5;
 - `webquiz-linux-arm.zip` — for a 32-bit system and for older or smaller boards (Zero, 1, 2).

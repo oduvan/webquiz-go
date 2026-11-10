@@ -37,7 +37,7 @@ body:
     attributes:
       label: Версія WebQuiz
       description: Яку версію WebQuiz ви використовуєте? (видно в панелі адміністратора або запустіть `webquiz --version`)
-      placeholder: "напр., 0.1"
+      placeholder: "напр., 2.0"
     validations:
       required: true
 

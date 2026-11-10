@@ -37,7 +37,7 @@ body:
     attributes:
       label: WebQuiz Version
       description: What version of WebQuiz are you using? (visible in admin panel or run `webquiz --version`)
-      placeholder: "e.g., 0.1"
+      placeholder: "e.g., 2.0"
     validations:
       required: true
 

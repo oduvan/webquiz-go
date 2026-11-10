@@ -2,7 +2,7 @@
 
 The tunnel makes a WebQuiz server on a local computer reachable from the internet, through an SSH tunnel server. Students then open a public address such as `https://tunnel.example.com/tests/a3f7b2/`.
 
-WebQuiz in Go (0.1 and later) uses the same protocol and the same tunnel server setup as 1.19 (Python). One tunnel server can serve 1.19 Python servers and Go servers at the same time, and nothing changes on the tunnel server when you update.
+WebQuiz 2.0 (Go) uses the same protocol and the same tunnel server setup as 1.19 (Python). One tunnel server can serve 1.19 and 2.0 servers at the same time, and nothing changes on the tunnel server when you update.
 
 The code is in `internal/tunnel` (the tunnel itself) and `internal/server/tunnel.go` (the admin buttons and the status messages). The user guide describes the same in `docs/en/040_config.md`.
 
