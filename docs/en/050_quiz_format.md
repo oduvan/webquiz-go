@@ -56,7 +56,7 @@ description: "Basic arithmetic operations for 5th grade students"
 
 Determines whether to show the user the correct answer after submitting their choice, as well as the behavior for progressing to the next question.
 
-- **`true`** (default) — after answering, the user sees visual feedback (green/red colors), the correct answer, and must click the **"Continue"** button to proceed to the next question
+- **`true`** (default) — after answering, the user sees visual feedback (green/red colors), the correct answer, and must click the **"Continue"** button to proceed to the next question. Next to the button, the page also says in words whether the answer counts: **"✓ Correct"** or **"✗ Incorrect"**. This helps with questions that have several right answers: when the student picks only some of them, the picked options are marked as right, but the answer can still count as wrong.
 - **`false`** — the user **does not see** the correct answer, there is no visual feedback, and **the quiz automatically advances to the next question** immediately after submitting the answer (no button click needed)
 
 ```

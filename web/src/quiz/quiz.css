@@ -506,6 +506,28 @@
   color: #a5d6a7;
 }
 
+/* ---- The verdict next to "Continue" (new in 2.0) ---- */
+
+.answer-verdict {
+  white-space: nowrap; /* "✓" stays with its word */
+}
+
+.answer-verdict.correct {
+  color: #2d731c;
+}
+
+.answer-verdict.incorrect {
+  color: #dc3545;
+}
+
+[data-theme='dark'] .answer-verdict.correct {
+  color: #4caf50;
+}
+
+[data-theme='dark'] .answer-verdict.incorrect {
+  color: #ff6b6b;
+}
+
 /* ---- Explanation step (Markdown rendered by the server) ---- */
 
 .explanation-step {

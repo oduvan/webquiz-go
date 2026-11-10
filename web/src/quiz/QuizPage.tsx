@@ -171,10 +171,18 @@ function TestSection({ state, controller }: { state: ViewState; controller: Quiz
           </Button>
         </div>
       </div>
-      <div className="button-container my-5 flex items-center px-3 md:px-0">
+      {/* flex-wrap: on a very narrow phone the verdict and "Continue" may take two lines */}
+      <div className="button-container my-5 flex flex-wrap items-center px-3 md:px-0">
         <Button id="submit-answer-btn" className={test.submit.hidden ? 'hidden' : ''} disabled={test.submit.disabled} onClick={controller.submitClicked}>
           {T.submit_answer}
         </Button>
+        {/* The verdict in words (new in 2.0): colors and labels alone did not say
+            that a partly right answer counts as wrong */}
+        {test.verdict ? (
+          <span id="answer-verdict" role="status" className={'answer-verdict mr-3 text-lg font-bold ' + test.verdict}>
+            {test.verdict === 'correct' ? T.answer_verdict_correct : T.answer_verdict_incorrect}
+          </span>
+        ) : null}
         <Button
           id="continue-btn"
           className={'ml-auto' + (test.continueButton.hidden ? ' hidden' : '')}
