@@ -120,7 +120,8 @@ export function QuestionCard({ view, controller }: { view: QuestionView; control
       ) : null}
       {question.image ? (
         <a href={makeRelativePath(question.image)} target="_blank" rel="noopener noreferrer">
-          <img src={makeRelativePath(question.image)} alt="" className="question-image quiz-question-img" />
+          {/* The file name as alt text: a missing image still shows as a box with its name */}
+          <img src={makeRelativePath(question.image)} alt={fileName(question.image)} className="question-image quiz-question-img" />
         </a>
       ) : null}
       {question.file ? (

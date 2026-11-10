@@ -24,26 +24,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// The banner element is always in the page, hidden with the "hidden" class while
+// nothing waits (like the old page's banner).
+function bannerShown(): boolean {
+  const banner = container.querySelector('#connection-banner');
+  return banner !== null && !banner.classList.contains('hidden') && banner.textContent === 'Connection lost';
+}
+
 describe('ConnectionBanner', () => {
   it('shows while a request waits and hides when it is done', async () => {
     const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('offline')).mockResolvedValue(new Response('{}'));
     vi.stubGlobal('fetch', fetchMock);
     act(() => root.render(<ConnectionBanner text="Connection lost" />));
-    expect(container.querySelector('#connection-banner')).toBeNull();
+    expect(container.querySelector('#connection-banner')!.className).toBe('hidden');
+    expect(bannerShown()).toBe(false);
 
     let done = false;
     const request = fetchWithRetry('api/x').then(() => (done = true));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(container.querySelector('#connection-banner')?.textContent).toBe('Connection lost');
+    expect(bannerShown()).toBe(true);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
       await request;
     });
     expect(done).toBe(true);
-    expect(container.querySelector('#connection-banner')).toBeNull();
+    expect(bannerShown()).toBe(false);
   });
 
   it('shows at once when a request already waits before the banner is drawn', async () => {
@@ -54,12 +62,12 @@ describe('ConnectionBanner', () => {
     await vi.advanceTimersByTimeAsync(0);
 
     act(() => root.render(<ConnectionBanner text="Connection lost" />));
-    expect(container.querySelector('#connection-banner')?.textContent).toBe('Connection lost');
+    expect(bannerShown()).toBe(true);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
       await request;
     });
-    expect(container.querySelector('#connection-banner')).toBeNull();
+    expect(bannerShown()).toBe(false);
   });
 });

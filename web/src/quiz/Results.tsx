@@ -1,7 +1,7 @@
 import type { Translations } from '../shared/boot';
 import { formatPoints } from '../shared/points';
 import { Button } from '../shared/ui';
-import { answerParts, questionDisplay } from './format';
+import { answerParts, fileName, questionDisplay } from './format';
 import type { ClientTestResult, FinalResults, ResultsContent, ServerTestResult } from './types';
 
 // The results screen: the score, the points (when some question is not worth 1 point),
@@ -15,7 +15,7 @@ function QuestionCell({ question, image, file, T }: { question: unknown; image: 
       {display.text}
       {display.image ? (
         <div className="mt-1">
-          <img src={display.image} alt="" className="results-question-image" />
+          <img src={display.image} alt={fileName(display.image)} className="results-question-image" />
         </div>
       ) : null}
       {display.file ? (
@@ -33,7 +33,7 @@ function QuestionCell({ question, image, file, T }: { question: unknown; image: 
 function AnswerText({ answer }: { answer: unknown }) {
   const { multiple, parts } = answerParts(answer);
   const show = (part: { image?: string; text?: string }) =>
-    part.image ? <img src={part.image} alt="" className="results-answer-image" /> : part.text;
+    part.image ? <img src={part.image} alt={fileName(part.image)} className="results-answer-image" /> : part.text;
   if (multiple) {
     return (
       <>

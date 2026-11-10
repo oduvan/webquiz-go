@@ -195,8 +195,9 @@ test('text, text with image and image-only questions', async ({ page, launch }) 
   await clickContinue(page);
 
   await waitForQuestionText(page, 'Question with image?');
-  // The image file does not exist (as in the Python test), so only the element is checked.
-  // Its address is relative, so it also works under the tunnel's path prefix.
+  // The image file does not exist (as in the Python test); the image is still shown
+  // (as a box with its file name). Its address is relative, for the tunnel's path prefix.
+  await expect(page.locator('.question-image')).toBeVisible();
   await expect(page.locator('.question-image')).toHaveAttribute('src', 'imgs/test.jpg');
   await (await optionByText(page, 'With image B')).click();
   await submitAnswer(page);

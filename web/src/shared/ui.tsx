@@ -34,12 +34,12 @@ function subscribeToConnection(onChange: () => void): () => void {
 
 // Shown while any request waits for the connection (see fetchWithRetry). It reads
 // the current state when it is drawn: a page may start requests before React draws it.
+// Like the old page's banner, the element is always there, hidden with "hidden".
 export function ConnectionBanner({ text }: { text: string }) {
   const waiting = useSyncExternalStore(subscribeToConnection, isConnectionWaiting);
-  if (!waiting) return null;
   return (
-    <div id="connection-banner">
-      <Banner>{text}</Banner>
+    <div id="connection-banner" className={waiting ? '' : 'hidden'}>
+      {waiting ? <Banner>{text}</Banner> : null}
     </div>
   );
 }
