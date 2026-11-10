@@ -167,6 +167,13 @@ func (h *wsHub) closeHub() []*wsClient {
 // broadcastLiveStats). Any origin is accepted, as aiohttp did; the routes
 // are for the local network only.
 func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request, hub *wsHub, initialState func() any) error {
+	return s.serveWebSocketJoin(w, r, hub, func(c *wsClient) bool { return s.joinHub(hub, c, initialState) })
+}
+
+// serveWebSocketJoin is serveWebSocket with its own join step: join adds
+// the client to the hub with its initial message (see joinHub) and tells
+// whether it did.
+func (s *Server) serveWebSocketJoin(w http.ResponseWriter, r *http.Request, hub *wsHub, join func(c *wsClient) bool) error {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		return nil // Accept has answered the request
@@ -178,7 +185,7 @@ func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request, hub *wsH
 			_ = conn.CloseNow() // also when initialState panicked
 		}
 	}()
-	if joined = s.joinHub(hub, c, initialState); !joined {
+	if joined = join(c); !joined {
 		return nil
 	}
 	s.log.Info(fmt.Sprintf("New %s client connected. Total clients: %d", hub.connName, hub.count()))
