@@ -294,12 +294,12 @@ At the bottom of each admin interface page, there are convenient links:
 
 ---
 
-### Package Version Check
+### Version Check
 
-The admin panel automatically checks if the WebQuiz package has been updated while the server is running.
-If a new version is detected (for example, after updating via `pip install --upgrade webquiz`), a notification will appear at the bottom of the panel:
+The admin panel checks if a newer WebQuiz version was published on the [GitHub releases page](https://github.com/oduvan/webquiz-go/releases). It also checks if the program file was replaced while the server is running.
+If you replace the program file with a new one, a notification will appear at the bottom of the panel:
 
-- **"New version installed (vX.Y)" + "Restart Required"** — means a new version of the package has been installed, but the server is still running the old version.
+- **"New version installed (vX.Y)" + "Restart Required"** — means a new version has been installed, but the server is still running the old version.
 
 To apply the update, you need to restart the WebQuiz server.
 

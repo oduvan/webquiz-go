@@ -88,6 +88,33 @@
 
 ---
 
+### Програма WebQuiz на Raspberry Pi
+
+WebQuiz 2.0 — це один готовий файл програми для Raspberry Pi. Йому не потрібні Python чи `pip`. На сторінці [Releases](https://github.com/oduvan/webquiz-go/releases) є два файли:
+
+- `webquiz-linux-arm64.zip` — для 64-бітної системи на Raspberry Pi 3, 4 і 5;
+- `webquiz-linux-arm.zip` — для 32-бітної системи та для старих або менших плат (Zero, 1, 2).
+
+Готовий образ перейде з версії на Python на цю програму в наступному оновленні. До того часу образ працює так, як описано в цьому розділі.
+
+Якщо хочете запустити програму самі (наприклад, на Raspberry Pi з власною системою), скопіюйте файл на Raspberry Pi, розпакуйте його та запустіть:
+
+```
+unzip webquiz-linux-arm64.zip
+chmod +x webquiz-linux-arm64
+./webquiz-linux-arm64
+```
+
+WebQuiz зберігає свої файли (`webquiz.yaml`, `quizzes/`, `data/`, `logs/`) у папці, де лежить програма. Щоб тримати їх в іншому місці, наприклад на розділі `data`, укажіть папку у змінній середовища `WEBQUIZ_BINARY_DIR`:
+
+```
+WEBQUIZ_BINARY_DIR=/path/to/data ./webquiz-linux-arm64
+```
+
+Ця сама змінна працює у файлі служби systemd (`Environment=WEBQUIZ_BINARY_DIR=/path/to/data`).
+
+---
+
 ### Конфігурація Wi-Fi
 
 Після другого запуску у розділі **`data`** з’явиться файл **`wifi.conf.example`**, який служить шаблоном для створення вашого власного файлу **`wifi.conf`**.

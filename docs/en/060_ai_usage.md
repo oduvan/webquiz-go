@@ -681,7 +681,8 @@ Format: WebQuiz YAML
 Add 3 text questions with open-ended answers to existing quiz.
 
 Requirements:
-- Use checker field for answer validation
+- Use checker field for answer validation. The student's answer is in the variable user_answer. The answer is correct when the code ends without an error, so use assert with a message
+- Do not use try, except, raise, import, class, with or global in the checker code, and do not write "return" outside a function
 - default_value field for initial value in text field
 - correct_value field to display correct answer
 - points field (2-3 points for text questions)
@@ -689,7 +690,7 @@ Requirements:
 Example format:
 
   - question: "What is the distance from Kyiv to Lviv?"
-    checker: "return distance(answer) == 540"
+    checker: "assert distance(user_answer) == 540, 'Expected 540 km'"
     default_value: ""
     correct_value: "540 km"
     points: 2
