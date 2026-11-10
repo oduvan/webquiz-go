@@ -1,0 +1,19 @@
+{
+  "name": "webquiz-harness",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "run": "tsx run.ts",
+    "student": "tsx student.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "playwright": "1.63.0",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^3",
+    "yaml": "^2"
+  }
+}
