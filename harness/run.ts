@@ -1,13 +1,20 @@
-// Run one scenario: server, browser, teacher, scripted students, and the API the AI agents use.
+// Run one scenario: server, browser, teacher, students, and the API the AI agents use.
 //
 //     npx tsx harness/run.ts normal-lesson [--no-agents] [--class-size N]
+//     npx tsx harness/run.ts teacher-first-lesson
 //
-// It prints "READY <run_dir>" once the teacher has started the quiz. The AI
-// agent students (started by the Claude session) then use
-// `npx tsx harness/student.ts <name> <command>`. When they are done, save each
-// agent's report as <run_dir>/agents/<name>.md and create <run_dir>/agents_done.
-// The run then waits for the server to finish its own time checks, stops
-// everything and writes <run_dir>/report.md.
+// Student scenario: it prints "READY <run_dir>" once the scripted teacher has
+// started the quiz. The AI agent students (started by the Claude session) then
+// use `npx tsx harness/student.ts <name> <command>`.
+//
+// Teacher scenario: it sets up the server (config, quiz files, pictures,
+// attachments) and prints "READY <run_dir>" at once. The AI agent teacher then
+// uses `npx tsx harness/teacher.ts <name> <command>`; its `students N` command
+// starts automatic students.
+//
+// When the agents are done, save each agent's report as <run_dir>/agents/<name>.md
+// and create <run_dir>/agents_done. The run then waits for the students and the
+// server's own time checks, stops everything and writes <run_dir>/report.md.
 
 import { ChildProcess, spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, writeFileSync } from 'node:fs';
@@ -16,17 +23,33 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringify } from 'yaml';
+import { AutoClass } from './auto';
 import { analyze } from './checks';
 import { Classroom, CommandError, sleep } from './classroom';
-import { bigClassScenario, SCENARIOS, type Scenario } from './scenarios';
+import { formatTeacherStep } from './elements';
+import { makePicture } from './pngs';
+import {
+  bigClassScenario,
+  SCENARIOS,
+  TEACHER_SCENARIOS,
+  type AnswerSpec,
+  type Dict,
+  type QuizData,
+  type Scenario,
+  type ScenarioFiles,
+  type TeacherScenario,
+} from './scenarios';
 import { scriptedStudent, teacherApproves, teacherStart } from './scripted';
 import { formatStep } from './steps';
+import { TeacherDesk } from './teacher-desk';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SERVER_PORT = 8199;
 const API_PORT = 8198;
 const MASTER_KEY = 'harness';
 const DEFAULT_GRACE_SECONDS = 5;
+/** After agents_done, how long the automatic students may still take to finish. */
+const AUTO_FINISH_SECONDS = 150;
 
 const clock = () => performance.now() / 1000;
 
@@ -65,24 +88,63 @@ async function waitForPort(port: number, seconds = 20): Promise<void> {
   throw new Error(`nothing listens on port ${port}`);
 }
 
-async function startServer(runDir: string, scenario: Scenario): Promise<ChildProcess> {
-  mkdirSync(path.join(runDir, 'quizzes'), { recursive: true });
-  writeFileSync(path.join(runDir, 'quizzes', scenario.quiz_file), stringify(scenario.quiz), 'utf-8');
-  const config: Record<string, Record<string, unknown>> = {
+function stamp(): string {
+  const now = new Date();
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
+}
+
+/**
+ * Write the quiz files, pictures, attachments and the config of a run.
+ * A config section (object) is merged with the harness's own; a top-level value (like language) is set.
+ */
+function prepareFolder(
+  runDir: string,
+  quizzes: Record<string, QuizData>,
+  files: ScenarioFiles | undefined,
+  extra: Record<string, Dict | string | number | boolean> | undefined,
+): string {
+  const quizzesDir = path.join(runDir, 'quizzes');
+  mkdirSync(quizzesDir, { recursive: true });
+  for (const [name, quiz] of Object.entries(quizzes)) {
+    writeFileSync(path.join(quizzesDir, name), stringify(quiz), 'utf-8');
+  }
+  if (files?.images) {
+    mkdirSync(path.join(quizzesDir, 'imgs'), { recursive: true });
+    for (const [name, spec] of Object.entries(files.images)) {
+      writeFileSync(path.join(quizzesDir, 'imgs', name), makePicture(spec));
+    }
+  }
+  if (files?.attachments) {
+    mkdirSync(path.join(quizzesDir, 'attach'), { recursive: true });
+    for (const [name, content] of Object.entries(files.attachments)) {
+      writeFileSync(path.join(quizzesDir, 'attach', name), content, 'utf-8');
+    }
+  }
+  const config: Record<string, unknown> = {
     server: { port: SERVER_PORT },
     paths: {
-      quizzes_dir: path.join(runDir, 'quizzes'),
+      quizzes_dir: quizzesDir,
       logs_dir: path.join(runDir, 'logs'),
       csv_dir: path.join(runDir, 'data'),
       static_dir: path.join(runDir, 'static'),
     },
     admin: { master_key: MASTER_KEY },
   };
-  for (const [section, values] of Object.entries(scenario.config ?? {})) {
-    config[section] = { ...(config[section] ?? {}), ...values };
+  for (const [section, values] of Object.entries(extra ?? {})) {
+    const current = config[section];
+    if (values !== null && typeof values === 'object' && !Array.isArray(values)) {
+      config[section] = { ...(current && typeof current === 'object' ? (current as Dict) : {}), ...values };
+    } else {
+      config[section] = values;
+    }
   }
   const configPath = path.join(runDir, 'config.yaml');
   writeFileSync(configPath, stringify(config), 'utf-8');
+  return configPath;
+}
+
+async function startServer(runDir: string, configPath: string): Promise<ChildProcess> {
   const log = openSync(path.join(runDir, 'server.log'), 'w');
   const child = spawn(findBinary(), ['--config', configPath, '--port', String(SERVER_PORT)], {
     cwd: runDir,
@@ -131,20 +193,32 @@ function recordLiveStats(classroom: Classroom, stop: { done: boolean }): Promise
   });
 }
 
-/** The HTTP API behind `npx tsx harness/student.ts`. */
-function startApi(classroom: Classroom): Promise<http.Server> {
+/** The HTTP API behind `harness/student.ts` (POST /cmd) and `harness/teacher.ts` (POST /teacher). */
+function startApi(classroom: Classroom, desks: Map<string, TeacherDesk>): Promise<http.Server> {
   const server = http.createServer((request, response) => {
     const reply = (status: number, text: string) => {
       response.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
       response.end(text);
     };
-    if (request.method !== 'POST' || request.url !== '/cmd') return reply(404, 'not found');
+    if (request.method !== 'POST' || (request.url !== '/cmd' && request.url !== '/teacher')) return reply(404, 'not found');
     let raw = '';
     request.setEncoding('utf-8');
     request.on('data', (chunk) => (raw += chunk));
     request.on('end', () => {
       void (async () => {
         try {
+          if (request.url === '/teacher') {
+            const data = JSON.parse(raw) as { teacher: string; cmd: string; args?: unknown[] };
+            const desk = desks.get(data.teacher);
+            if (!desk) {
+              const names = [...desks.keys()];
+              throw new CommandError(`unknown teacher '${data.teacher}'${names.length ? `, the teacher is: ${names.join(', ')}` : ''}`);
+            }
+            const args = (Array.isArray(data.args) ? data.args : []).map((arg) => String(arg));
+            const record = await desk.command(data.cmd, args);
+            reply(200, formatTeacherStep(record));
+            return;
+          }
           const data = JSON.parse(raw) as { student: string; cmd: string; arg?: string | null };
           const record = await classroom.command(data.student, data.cmd, data.arg ?? null);
           reply(200, formatStep(record));
@@ -174,13 +248,29 @@ function effectiveLimits(scenario: Scenario, settings: Record<string, any> | und
   return limits;
 }
 
-async function run(scenario: Scenario, withAgents: boolean): Promise<string> {
-  const now = new Date();
-  const two = (n: number) => String(n).padStart(2, '0');
-  const stamp = `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
-  const runDir = path.join(ROOT, 'harness', 'runs', `${stamp}-${scenario.name}`);
+/** A wrong answer for every choice question that the scenario does not give one for. */
+function wrongAnswers(scenario: Scenario): Record<number, AnswerSpec> {
+  const wrong: Record<number, AnswerSpec> = { ...(scenario.wrong_answers ?? {}) };
+  scenario.quiz.questions.forEach((question, index) => {
+    const id = index + 1;
+    if (id in wrong) return;
+    const options = question.options as unknown[] | undefined;
+    if (Array.isArray(options)) {
+      const right = Array.isArray(question.correct_answer) ? (question.correct_answer as number[]) : [question.correct_answer];
+      const other = options.findIndex((_, i) => !right.includes(i));
+      if (other !== -1) wrong[id] = String(options[other]);
+    } else if (question.correct_value !== undefined) {
+      wrong[id] = { text: `${question.correct_value}0` };
+    }
+  });
+  return wrong;
+}
+
+async function runStudents(scenario: Scenario, withAgents: boolean): Promise<string> {
+  const runDir = path.join(ROOT, 'harness', 'runs', `${stamp()}-${scenario.name}`);
   mkdirSync(path.join(runDir, 'agents'), { recursive: true });
-  const server = await startServer(runDir, scenario);
+  const configPath = prepareFolder(runDir, { [scenario.quiz_file]: scenario.quiz }, scenario.files, scenario.config);
+  const server = await startServer(runDir, configPath);
   const classroom = new Classroom(`http://127.0.0.1:${SERVER_PORT}`, runDir);
   const stop = { done: false };
   let api: http.Server | null = null;
@@ -192,15 +282,17 @@ async function run(scenario: Scenario, withAgents: boolean): Promise<string> {
 
     const agents = withAgents ? scenario.agents : {};
     for (const [name, agent] of Object.entries(agents)) await classroom.addStudent(name, agent.device);
-    api = await startApi(classroom);
+    api = await startApi(classroom, new Map());
 
     const meta = {
+      kind: 'students',
       scenario: scenario.name,
       description: scenario.description,
       settings,
       limits: effectiveLimits(scenario, settings),
       grace: graceSeconds(),
       question_text: Object.fromEntries(scenario.quiz.questions.map((q, i) => [i + 1, q.question])),
+      sticky: scenario.quiz.questions.flatMap((q, i) => (q.stick_to_the_previous ? [[i, i + 1]] : [])),
       scripted: scenario.scripted,
       agents,
       expectations: scenario.expectations,
@@ -211,10 +303,11 @@ async function run(scenario: Scenario, withAgents: boolean): Promise<string> {
 
     const started = clock();
     const deadline = started + scenario.max_seconds;
-    for (const name of Object.keys(scenario.scripted)) await classroom.addStudent(name);
+    for (const [name, plan] of Object.entries(scenario.scripted)) await classroom.addStudent(name, plan.device ?? 'desktop');
     const questionIds = Object.fromEntries(scenario.quiz.questions.map((q, i) => [q.question as string, i + 1]));
-    const students: Promise<void>[] = Object.entries(scenario.scripted).map(([name, plan]) =>
-      scriptedStudent(classroom, name, plan, scenario.answers, questionIds, deadline),
+    const key = { right: scenario.answers, wrong: wrongAnswers(scenario) };
+    const students: Promise<void>[] = Object.entries(scenario.scripted).map(([name, plan], index) =>
+      scriptedStudent(classroom, name, plan, key, questionIds, deadline, index + 1),
     );
     if (scenario.approvals) {
       students.push(
@@ -248,6 +341,64 @@ async function run(scenario: Scenario, withAgents: boolean): Promise<string> {
   return runDir;
 }
 
+async function runTeacher(scenario: TeacherScenario): Promise<string> {
+  const runDir = path.join(ROOT, 'harness', 'runs', `${stamp()}-${scenario.name}`);
+  mkdirSync(path.join(runDir, 'agents'), { recursive: true });
+  const configPath = prepareFolder(runDir, scenario.quizzes, scenario.files, scenario.config);
+  const server = await startServer(runDir, configPath);
+  const classroom = new Classroom(`http://127.0.0.1:${SERVER_PORT}`, runDir);
+  const stop = { done: false };
+  const autoStop = { done: false };
+  let api: http.Server | null = null;
+  let recorder: Promise<void> | null = null;
+  const started = clock();
+  const deadline = started + scenario.max_seconds;
+  const autoClass = new AutoClass(classroom, {
+    quizzesDir: path.join(runDir, 'quizzes'),
+    stop: autoStop,
+    deadline: deadline + AUTO_FINISH_SECONDS,
+  });
+  try {
+    await classroom.start();
+    recorder = recordLiveStats(classroom, stop);
+    const desks = new Map<string, TeacherDesk>();
+    for (const [name, agent] of Object.entries(scenario.teacher_agents)) {
+      desks.set(name, await TeacherDesk.create(classroom, name, agent.device, (count) => autoClass.start(count)));
+    }
+    api = await startApi(classroom, desks);
+    const meta = {
+      kind: 'teacher',
+      scenario: scenario.name,
+      description: scenario.description,
+      grace: graceSeconds(),
+      master_key: MASTER_KEY,
+      teachers: scenario.teacher_agents,
+      quiz_files: Object.keys(scenario.quizzes),
+    };
+    writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+    writeFileSync(path.join(runDir, 'READY'), 'ready\n');
+    console.log(`READY ${runDir}`);
+
+    while (!existsSync(path.join(runDir, 'agents_done')) && clock() < deadline) await sleep(2);
+    console.log('The teacher is done; waiting for the automatic students.');
+    if (!(await autoClass.finish(AUTO_FINISH_SECONDS))) {
+      autoStop.done = true;
+      await autoClass.finish(20);
+    }
+    await sleep(graceSeconds() + 7); // server time checks and the CSV flush
+  } finally {
+    autoStop.done = true;
+    stop.done = true;
+    if (recorder) await recorder;
+    if (api) await new Promise<void>((resolve) => api!.close(() => resolve()));
+    await classroom.stop();
+    await stopServer(server);
+  }
+  const found = await analyze(runDir);
+  console.log(`DONE ${runDir} — ${found} problem(s) in the data checks. See report.md and timelines/.`);
+  return runDir;
+}
+
 function fail(message: string): never {
   console.error(`error: ${message}`);
   process.exit(2);
@@ -264,7 +415,15 @@ async function main(): Promise<void> {
     else if (args[i].startsWith('--')) fail(`unknown option ${args[i]}`);
     else name = args[i];
   }
-  if (!name || !(name in SCENARIOS)) fail(`usage: run.ts <${Object.keys(SCENARIOS).sort().join('|')}> [--no-agents] [--class-size N]`);
+  if (name && name in TEACHER_SCENARIOS) {
+    if (!withAgents || classSize !== undefined) fail('a teacher scenario takes no options: its teacher is an AI agent');
+    await runTeacher(TEACHER_SCENARIOS[name]);
+    process.exit(0);
+  }
+  if (!name || !(name in SCENARIOS)) {
+    const names = [...Object.keys(SCENARIOS), ...Object.keys(TEACHER_SCENARIOS)].sort().join('|');
+    fail(`usage: run.ts <${names}> [--no-agents] [--class-size N]`);
+  }
   let scenario = SCENARIOS[name];
   if (classSize !== undefined) {
     if (name !== 'big-class' || !Number.isInteger(classSize) || classSize < 20) {
@@ -272,7 +431,7 @@ async function main(): Promise<void> {
     }
     scenario = bigClassScenario(classSize);
   }
-  await run(scenario, withAgents);
+  await runStudents(scenario, withAgents);
   process.exit(0);
 }
 

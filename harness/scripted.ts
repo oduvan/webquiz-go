@@ -5,6 +5,8 @@
 // agents, so their steps are recorded the same way.
 
 import path from 'node:path';
+import { AUTO_STATE_JS, type AutoState } from './auto';
+import { baseName, fieldValue } from './answers';
 import type { Classroom } from './classroom';
 import { sleep } from './classroom';
 import type { Action, AnswerSpec, Plan } from './scenarios';
@@ -18,14 +20,41 @@ type Resolved = { kind: 'options'; labels: string[] } | { kind: 'text'; value: s
 /**
  * Turn an answer spec into the option labels or the text to type.
  *
- * null means the scenario's correct answer for this question id (so it also
- * works when every student gets the questions in a different order).
+ * null means the scenario's correct answer for this question id, and {wrong: true}
+ * its wrong answer (so both also work when every student gets the questions in a
+ * different order).
  */
-export function resolveAnswer(spec: AnswerSpec, questionId: number, answers: Record<number, AnswerSpec>): Resolved {
+export function resolveAnswer(
+  spec: AnswerSpec,
+  questionId: number,
+  answers: Record<number, AnswerSpec>,
+  wrongs: Record<number, AnswerSpec> = {},
+): Resolved {
   if (spec === null) spec = answers[questionId];
-  if (spec !== null && typeof spec === 'object' && !Array.isArray(spec)) return { kind: 'text', value: spec.text };
+  if (spec !== null && typeof spec === 'object' && !Array.isArray(spec) && 'wrong' in spec) {
+    spec = wrongs[questionId];
+    if (spec === undefined || spec === null) throw new Error(`no wrong answer for question ${questionId}`);
+  }
+  if (spec !== null && typeof spec === 'object' && !Array.isArray(spec) && 'text' in spec) return { kind: 'text', value: spec.text };
   if (typeof spec === 'string') return { kind: 'options', labels: [spec] };
   return { kind: 'options', labels: [...(spec as string[])] };
+}
+
+/** The answers of one scenario: the correct and the wrong one of each question id. */
+export interface AnswerKey {
+  right: Record<number, AnswerSpec>;
+  wrong: Record<number, AnswerSpec>;
+}
+
+/** The option on the screen with this text, or with this picture ("/imgs/circle.png"). */
+async function optionIndex(classroom: Classroom, name: string, label: string): Promise<number> {
+  const state = await classroom.evaluate<AutoState>(name, AUTO_STATE_JS);
+  const options = state ? state.options : [];
+  const byText = options.find((option) => option.text === label);
+  if (byText) return byText.index;
+  const byImage = options.find((option) => option.image !== null && baseName(option.image) === baseName(label));
+  if (byImage) return byImage.index;
+  throw new Error(`no option '${label}' on the screen`);
 }
 
 async function giveAnswer(
@@ -33,18 +62,41 @@ async function giveAnswer(
   name: string,
   spec: AnswerSpec,
   questionNumber: number,
-  answers: Record<number, AnswerSpec>,
+  key: AnswerKey,
   submit = true,
 ): Promise<void> {
-  const answer = resolveAnswer(spec, questionNumber, answers);
+  const answer = resolveAnswer(spec, questionNumber, key.right, key.wrong);
   if (answer.kind === 'text') {
-    await classroom.command(name, 'type', answer.value, { screenshot: false, settle: 0.2 });
+    await classroom.command(name, 'type', answer.value, { screenshot: false, settle: 0.2, selector: '#text-answer-input' });
   } else {
     for (const label of answer.labels) {
-      await classroom.command(name, 'click', label, { screenshot: false, settle: 0.2 });
+      let index: number;
+      try {
+        index = await optionIndex(classroom, name, label);
+      } catch {
+        // Not on the screen: the click by text records the failure as a step
+        await classroom.command(name, 'click', label, { screenshot: false, settle: 0.2 });
+        continue;
+      }
+      await classroom.command(name, 'click', label, {
+        screenshot: false,
+        settle: 0.2,
+        selector: `#current-question-container .option[data-option-index="${index}"]`,
+      });
     }
   }
   if (submit) await classroom.clickSelector(name, '#submit-answer-btn', true);
+}
+
+/** Type the name and every registration field, then press the register button. */
+export async function register(classroom: Classroom, name: string, number: number): Promise<void> {
+  const state = await classroom.evaluate<AutoState>(name, AUTO_STATE_JS);
+  await classroom.command(name, 'type', name, { screenshot: false, settle: 0.2, selector: '#username' });
+  for (const field of state ? state.fields : []) {
+    const value = fieldValue(field.label || field.name, name, number);
+    await classroom.command(name, 'type', value, { screenshot: false, settle: 0.1, selector: field.selector });
+  }
+  await classroom.clickSelector(name, '.register-btn', true);
 }
 
 /** Sleep until `seconds` after `start` (a clock() value). */
@@ -59,7 +111,7 @@ async function handleQuestion(
   name: string,
   action: Action,
   number: number,
-  answers: Record<number, AnswerSpec>,
+  answers: AnswerKey,
   shownAt: number,
   quizStart: number,
 ): Promise<boolean> {
@@ -131,19 +183,19 @@ async function waitForApproval(classroom: Classroom, name: string, checks: numbe
  * plan.actions: {position: action}; position 1 is the first question this student sees.
  * plan.check: when approval is on, the times (seconds after registering) to press "Check".
  * questionIds: {question text: question id}, to find the correct answer in a random order.
- * deadline: a clock() value.
+ * deadline: a clock() value. studentNumber: gives each student other registration values.
  */
 export async function scriptedStudent(
   classroom: Classroom,
   name: string,
   plan: Plan,
-  answers: Record<number, AnswerSpec>,
+  answers: AnswerKey,
   questionIds: Record<string, number>,
   deadline: number,
+  studentNumber = 1,
 ): Promise<void> {
   await classroom.command(name, 'open', null, { screenshot: false });
-  await classroom.command(name, 'type', name, { screenshot: false, settle: 0.2 });
-  await classroom.clickSelector(name, '.register-btn', true);
+  await register(classroom, name, studentNumber);
 
   if (plan.check && !(await waitForApproval(classroom, name, plan.check))) {
     await classroom.command(name, 'look', null, { screenshot: true });
@@ -173,6 +225,12 @@ export async function scriptedStudent(
     }
     if (state.can_continue) {
       await classroom.clickSelector(name, '#continue-btn', false);
+      continue;
+    }
+    if (state.can_next) {
+      // The explanation step after an answer: read it for a moment, then go on
+      await sleep(0.8);
+      await classroom.clickSelector(name, '#explanation-next-btn', true);
       continue;
     }
     await sleep(POLL);
