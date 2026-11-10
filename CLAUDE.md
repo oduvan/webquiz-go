@@ -139,7 +139,7 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 - **Quiz download folder validation** - path traversal protection (no `..`, no absolute paths, stays inside `quizzes/`)
 - **Version check** - the admin panel compares the running version with `--version` of the file on disk ("restart required"), and asks GitHub releases of `oduvan/webquiz-go` for a newer one
 - **Quiz interface language** - `language` (`uk` or `en`, default `uk`) from `internal/i18n`; the pages get the texts in the boot data; hot-reloadable
-- **Dark/Light theme** - toggle on every page, `theme` key in localStorage, CSS variables
+- **Dark/Light theme** - toggle on every page, `theme` key in localStorage, CSS variables. The button (and the student's name badge on the quiz page) sit at the top of the page with `position: absolute` and scroll away with it, as in 1.19; never `position: fixed`, which covered the text on a phone
 - **Quiz file attachments** - `file` field, files in `quizzes/attach/`, served at `/attach/` with forced download
 - **Question text copy prevention** - questions have `user-select: none` and a `copy` handler; text inputs stay selectable
 - **File manager** shows the whole `webquiz.yaml` (also `master_key`) to every computer on the local network, as in 1.19

@@ -24,8 +24,11 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* At the top right of the page. It scrolls away with the page, as in 1.19
+   (position: absolute there too): fixed on the screen, it covered the text
+   under it on a phone. */
 .theme-toggle {
-  position: fixed;
+  position: absolute;
   top: 10px;
   right: 10px;
   z-index: 50;
