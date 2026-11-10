@@ -107,7 +107,7 @@ To take the quiz:
 3. Click the **Register** button — the system will load the example quiz from the configuration file, and you can complete it like a normal user.
 4. After finishing the quiz, open the **data** folder — you'll find a file with the results in CSV format. If needed, also check the **logs** folder to ensure the server is running without errors.
 
-![Quiz completion](../imgs/reg_default_test.png)
+![Quiz completion](../imgs/done_default_test.png)
 
 #### If the Connection Drops
 
