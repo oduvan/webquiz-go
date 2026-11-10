@@ -9,7 +9,7 @@ import (
 	"github.com/oduvan/webquiz-go/internal/testutil"
 )
 
-func answersWithUsersQuiz() map[string]any {
+func paAnswersWithUsersQuiz() map[string]any {
 	return map[string]any{"default.yaml": map[string]any{
 		"title":             "Answers-with-users CSV Quiz",
 		"show_right_answer": true,
@@ -20,12 +20,12 @@ func answersWithUsersQuiz() map[string]any {
 	}}
 }
 
-func extraCSVServer(t *testing.T, config map[string]any) *testutil.TestServer {
+func paExtraCSVServer(t *testing.T, config map[string]any) *testutil.TestServer {
 	t.Helper()
-	return testutil.StartServer(t, testutil.Options{Config: config, Quizzes: answersWithUsersQuiz(), ServerOptions: partAFast()})
+	return testutil.StartServer(t, testutil.Options{Config: config, Quizzes: paAnswersWithUsersQuiz(), ServerOptions: partAFast()})
 }
 
-func submitAll(t *testing.T, ts *testutil.TestServer, userID string, answers [][2]int) {
+func paSubmitAll(t *testing.T, ts *testutil.TestServer, userID string, answers [][2]int) {
 	t.Helper()
 	for _, a := range answers {
 		if res := partAAnswer(t, ts, userID, a[0], a[1]); res.Status != 200 {
@@ -37,9 +37,9 @@ func submitAll(t *testing.T, ts *testutil.TestServer, userID string, answers [][
 // py: tests/test_answers_with_users_csv.py::test_answers_with_users_csv_not_created_when_disabled
 func TestAnswersWithUsersCSVNotCreatedWhenDisabled(t *testing.T) {
 	t.Parallel()
-	ts := extraCSVServer(t, nil)
+	ts := paExtraCSVServer(t, nil)
 	userID := ts.RegisterStudent(t, "alice")
-	submitAll(t, ts, userID, [][2]int{{1, 1}, {2, 0}})
+	paSubmitAll(t, ts, userID, [][2]int{{1, 1}, {2, 0}})
 	partAWaitCSV(t, ts, "default", "", 2) // the regular answers CSV exists and was flushed
 	time.Sleep(200 * time.Millisecond)    // several more flushes
 	if files := partACSVFiles(t, ts, "*.answers_with_users.csv"); len(files) != 0 {
@@ -50,9 +50,9 @@ func TestAnswersWithUsersCSVNotCreatedWhenDisabled(t *testing.T) {
 // py: tests/test_answers_with_users_csv.py::test_answers_with_users_csv_created_when_enabled
 func TestAnswersWithUsersCSVCreatedWhenEnabled(t *testing.T) {
 	t.Parallel()
-	ts := extraCSVServer(t, map[string]any{"extra_answers_with_users_csv": true})
+	ts := paExtraCSVServer(t, map[string]any{"extra_answers_with_users_csv": true})
 	userID := ts.RegisterStudent(t, "bob")
-	submitAll(t, ts, userID, [][2]int{{1, 1}, {2, 0}})
+	paSubmitAll(t, ts, userID, [][2]int{{1, 1}, {2, 0}})
 	headers, rows := partAWaitCSV(t, ts, "default", ".answers_with_users", 2)
 	if want := []string{"user_id", "username", "question", "selected_answer", "correct_answer", "is_correct", "time_taken_seconds"}; !slices.Equal(headers, want) {
 		t.Errorf("headers %v", headers)
@@ -79,12 +79,12 @@ func TestAnswersWithUsersCSVCreatedWhenEnabled(t *testing.T) {
 // py: tests/test_answers_with_users_csv.py::test_answers_with_users_csv_includes_registration_fields
 func TestAnswersWithUsersCSVIncludesRegistrationFields(t *testing.T) {
 	t.Parallel()
-	ts := extraCSVServer(t, map[string]any{
+	ts := paExtraCSVServer(t, map[string]any{
 		"extra_answers_with_users_csv": true,
 		"registration":                 map[string]any{"fields": []any{"School", "Grade Level"}},
 	})
 	userID := partARegister(t, ts, map[string]any{"username": "carol", "school": "Lyceum 1", "grade_level": "10-B"})["user_id"].(string)
-	submitAll(t, ts, userID, [][2]int{{1, 1}, {2, 0}})
+	paSubmitAll(t, ts, userID, [][2]int{{1, 1}, {2, 0}})
 	headers, rows := partAWaitCSV(t, ts, "default", ".answers_with_users", 2)
 	want := []string{"user_id", "username", "school", "grade_level", "question", "selected_answer", "correct_answer", "is_correct", "time_taken_seconds"}
 	if !slices.Equal(headers, want) || len(rows) != 2 {
@@ -100,12 +100,12 @@ func TestAnswersWithUsersCSVIncludesRegistrationFields(t *testing.T) {
 // py: tests/test_answers_with_users_csv.py::test_answers_with_users_csv_appends_across_flushes
 func TestAnswersWithUsersCSVAppendsAcrossFlushes(t *testing.T) {
 	t.Parallel()
-	ts := extraCSVServer(t, map[string]any{"extra_answers_with_users_csv": true})
+	ts := paExtraCSVServer(t, map[string]any{"extra_answers_with_users_csv": true})
 	user1 := ts.RegisterStudent(t, "user1")
-	submitAll(t, ts, user1, [][2]int{{1, 1}})
+	paSubmitAll(t, ts, user1, [][2]int{{1, 1}})
 	partAWaitCSV(t, ts, "default", ".answers_with_users", 1) // the first flush happened
 	user2 := ts.RegisterStudent(t, "user2")
-	submitAll(t, ts, user2, [][2]int{{1, 0}, {2, 0}})
+	paSubmitAll(t, ts, user2, [][2]int{{1, 0}, {2, 0}})
 	_, rows := partAWaitCSV(t, ts, "default", ".answers_with_users", 3)
 	names := map[string]bool{}
 	for _, row := range rows {
@@ -123,10 +123,10 @@ func TestAnswersWithUsersCSVAppendsAcrossFlushes(t *testing.T) {
 // py: tests/test_answers_with_users_csv.py::test_answers_with_users_csv_config_validation_rejects_non_bool
 func TestAnswersWithUsersCSVConfigValidationRejectsNonBool(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, testutil.Options{Quizzes: answersWithUsersQuiz()})
+	ts := testutil.StartServer(t, testutil.Options{Quizzes: paAnswersWithUsersQuiz()})
 	res := ts.Put(t, "/api/admin/config", map[string]any{"content": "extra_answers_with_users_csv: \"yes\"\n"},
 		testutil.WithCookies(ts.AdminCookies(t, "test123")...))
-	skipWithoutConfigSave(t, res)
+	paSkipWithoutConfigSave(t, res)
 	found := false
 	if errors, ok := res.JSON(t)["errors"].([]any); ok {
 		for _, item := range errors {

@@ -16,15 +16,15 @@ import (
 // These ports read the same facts from there; the <h1> and the footer are
 // drawn by the page from boot.title and boot.version.
 
-func oneQuiz(name string, quiz map[string]any) testutil.Options {
+func paOneQuiz(name string, quiz map[string]any) testutil.Options {
 	return testutil.Options{Quizzes: map[string]any{name: quiz}}
 }
 
-func simpleQuestion(text string, options []any, correct int) map[string]any {
+func paSimpleQuestion(text string, options []any, correct int) map[string]any {
 	return map[string]any{"question": text, "options": options, "correct_answer": correct}
 }
 
-func bootQuestions(t *testing.T, html string) []any {
+func paBootQuestions(t *testing.T, html string) []any {
 	t.Helper()
 	questions, ok := pageBoot(t, html)["questions"].([]any)
 	if !ok {
@@ -36,14 +36,14 @@ func bootQuestions(t *testing.T, html string) []any {
 // py: tests/test_index_generation.py::test_questions_data_embedded_correctly
 func TestQuestionsDataEmbeddedCorrectly(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("test_quiz.yaml", map[string]any{
+	ts := testutil.StartServer(t, paOneQuiz("test_quiz.yaml", map[string]any{
 		"title": "Data Embedding Test",
 		"questions": []any{
-			simpleQuestion("What is 2 + 2?", []any{"3", "4", "5", "6"}, 1),
+			paSimpleQuestion("What is 2 + 2?", []any{"3", "4", "5", "6"}, 1),
 			map[string]any{"question": "What color is the sky?", "options": []any{"Red", "Blue", "Green"}, "correct_answer": 1, "image": "/imgs/sky.png"},
 		},
 	}))
-	questions := bootQuestions(t, readIndex(t, ts))
+	questions := paBootQuestions(t, readIndex(t, ts))
 	if len(questions) != 2 {
 		t.Fatalf("should embed both questions, got %d", len(questions))
 	}
@@ -72,8 +72,8 @@ func TestQuestionsDataEmbeddedCorrectly(t *testing.T) {
 // py: tests/test_index_generation.py::test_quiz_title_embedded
 func TestQuizTitleEmbedded(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("title_test.yaml", map[string]any{
-		"title": "Amazing Quiz Title!", "questions": []any{simpleQuestion("Test question?", []any{"A", "B"}, 0)},
+	ts := testutil.StartServer(t, paOneQuiz("title_test.yaml", map[string]any{
+		"title": "Amazing Quiz Title!", "questions": []any{paSimpleQuestion("Test question?", []any{"A", "B"}, 0)},
 	}))
 	html := readIndex(t, ts)
 	if !strings.Contains(html, "<title>Amazing Quiz Title!</title>") {
@@ -99,15 +99,15 @@ func TestWebquizVersionEmbedded(t *testing.T) {
 // py: tests/test_index_generation.py::test_correct_answers_excluded_from_client_data
 func TestCorrectAnswersExcludedFromClientData(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("security_test.yaml", map[string]any{
+	ts := testutil.StartServer(t, paOneQuiz("security_test.yaml", map[string]any{
 		"title": "Security Test Quiz",
 		"questions": []any{
-			simpleQuestion("Secret answer test?", []any{"Wrong", "Correct!", "Also wrong"}, 1),
-			simpleQuestion("Another secret?", []any{"A", "B", "C", "D"}, 3),
+			paSimpleQuestion("Secret answer test?", []any{"Wrong", "Correct!", "Also wrong"}, 1),
+			paSimpleQuestion("Another secret?", []any{"A", "B", "C", "D"}, 3),
 		},
 	}))
 	html := readIndex(t, ts)
-	for _, q := range bootQuestions(t, html) {
+	for _, q := range paBootQuestions(t, html) {
 		if _, has := q.(map[string]any)["correct_answer"]; has {
 			t.Errorf("question %v should not contain correct_answer", q)
 		}
@@ -122,16 +122,16 @@ func TestCorrectAnswersExcludedFromClientData(t *testing.T) {
 // py: tests/test_index_generation.py::test_optional_fields_included
 func TestOptionalFieldsIncluded(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("optional_fields.yaml", map[string]any{
+	ts := testutil.StartServer(t, paOneQuiz("optional_fields.yaml", map[string]any{
 		"title": "Optional Fields Test",
 		"questions": []any{
-			simpleQuestion("Text only question?", []any{"A", "B"}, 0),
+			paSimpleQuestion("Text only question?", []any{"A", "B"}, 0),
 			map[string]any{"question": "Question with image?", "options": []any{"Yes", "No"}, "correct_answer": 0, "image": "/imgs/test.jpg"},
 			map[string]any{"options": []any{"Option 1", "Option 2"}, "correct_answer": 1, "image": "/imgs/image_only.png"},
 			map[string]any{"image": "/imgs/question1.png", "options": []any{"/imgs/a.png", "/imgs/b.png", "/imgs/c.png"}, "correct_answer": 1},
 		},
 	}))
-	questions := bootQuestions(t, readIndex(t, ts))
+	questions := paBootQuestions(t, readIndex(t, ts))
 	if len(questions) != 4 {
 		t.Fatalf("got %d questions", len(questions))
 	}
@@ -162,8 +162,8 @@ func TestOptionalFieldsIncluded(t *testing.T) {
 // py: tests/test_index_generation.py::test_template_placeholder_replacement
 func TestTemplatePlaceholderReplacement(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("placeholder_test.yaml", map[string]any{
-		"title": "Placeholder Test Quiz", "questions": []any{simpleQuestion("Test?", []any{"Yes", "No"}, 0)},
+	ts := testutil.StartServer(t, paOneQuiz("placeholder_test.yaml", map[string]any{
+		"title": "Placeholder Test Quiz", "questions": []any{paSimpleQuestion("Test?", []any{"Yes", "No"}, 0)},
 	}))
 	html := readIndex(t, ts)
 	for _, marker := range []string{"__WEBQUIZ_BOOT__", "__WEBQUIZ_TITLE__"} {
@@ -173,7 +173,7 @@ func TestTemplatePlaceholderReplacement(t *testing.T) {
 	}
 	boot := pageBoot(t, html)
 	version, _ := boot["version"].(string)
-	if !strings.Contains(html, "Placeholder Test Quiz") || len(bootQuestions(t, html)) != 1 || version == "" {
+	if !strings.Contains(html, "Placeholder Test Quiz") || len(paBootQuestions(t, html)) != 1 || version == "" {
 		t.Errorf("the data is missing:\n%s", html)
 	}
 }
@@ -212,8 +212,8 @@ func TestIndexHTMLContentIsValidHTML(t *testing.T) {
 func TestRegenerationOnQuizSwitch(t *testing.T) {
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{Quizzes: map[string]any{
-		"default.yaml": map[string]any{"title": "First Quiz", "questions": []any{simpleQuestion("Question 1?", []any{"A", "B"}, 0)}},
-		"quiz2.yaml":   map[string]any{"title": "Second Quiz", "questions": []any{simpleQuestion("Question 2?", []any{"X", "Y", "Z"}, 1)}},
+		"default.yaml": map[string]any{"title": "First Quiz", "questions": []any{paSimpleQuestion("Question 1?", []any{"A", "B"}, 0)}},
+		"quiz2.yaml":   map[string]any{"title": "Second Quiz", "questions": []any{paSimpleQuestion("Question 2?", []any{"X", "Y", "Z"}, 1)}},
 	}})
 	initial := readIndex(t, ts)
 	if !strings.Contains(initial, "First Quiz") || !strings.Contains(initial, "Question 1?") {
@@ -228,7 +228,7 @@ func TestRegenerationOnQuizSwitch(t *testing.T) {
 		strings.Contains(updated, "First Quiz") || strings.Contains(updated, "Question 1?") {
 		t.Errorf("updated page:\n%s", updated)
 	}
-	questions := bootQuestions(t, updated)
+	questions := paBootQuestions(t, updated)
 	if len(questions) != 1 || jsonText(questions[0].(map[string]any)["options"]) != `["X","Y","Z"]` {
 		t.Errorf("questions: %v", questions)
 	}
@@ -237,15 +237,15 @@ func TestRegenerationOnQuizSwitch(t *testing.T) {
 // py: tests/test_index_generation.py::test_multiple_quiz_data_formats
 func TestMultipleQuizDataFormats(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("varied.yaml", map[string]any{
+	ts := testutil.StartServer(t, paOneQuiz("varied.yaml", map[string]any{
 		"title": "Varied Format Quiz", "description": "Testing different formats",
 		"questions": []any{
-			simpleQuestion("Simple text question?", []any{"A", "B"}, 0),
+			paSimpleQuestion("Simple text question?", []any{"A", "B"}, 0),
 			map[string]any{"image": "/imgs/visual.png", "options": []any{"Visual A", "Visual B", "Visual C"}, "correct_answer": 2},
 			map[string]any{"question": "Mixed question with image?", "image": "/imgs/mixed.jpg", "options": []any{"/imgs/opt1.png", "/imgs/opt2.png"}, "correct_answer": 1},
 		},
 	}))
-	questions := bootQuestions(t, readIndex(t, ts))
+	questions := paBootQuestions(t, readIndex(t, ts))
 	if len(questions) != 3 {
 		t.Fatalf("got %d questions", len(questions))
 	}
@@ -270,12 +270,12 @@ func TestMultipleQuizDataFormats(t *testing.T) {
 // py: tests/test_index_generation.py::test_empty_quiz_handling
 func TestEmptyQuizHandling(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("empty.yaml", map[string]any{"title": "Empty Quiz", "questions": []any{}}))
+	ts := testutil.StartServer(t, paOneQuiz("empty.yaml", map[string]any{"title": "Empty Quiz", "questions": []any{}}))
 	html := readIndex(t, ts)
 	if !strings.Contains(html, "<title>Empty Quiz</title>") {
 		t.Errorf("no title:\n%s", html)
 	}
-	if got := bootQuestions(t, html); len(got) != 0 {
+	if got := paBootQuestions(t, html); len(got) != 0 {
 		t.Errorf("questions should be empty: %v", got)
 	}
 }
@@ -283,9 +283,9 @@ func TestEmptyQuizHandling(t *testing.T) {
 // py: tests/test_index_generation.py::test_special_characters_in_quiz_data
 func TestSpecialCharactersInQuizData(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("special_chars.yaml", map[string]any{
+	ts := testutil.StartServer(t, paOneQuiz("special_chars.yaml", map[string]any{
 		"title": `Quiz "with" special & characters`,
-		"questions": []any{simpleQuestion(`What about "quotes" & <tags>?`,
+		"questions": []any{paSimpleQuestion(`What about "quotes" & <tags>?`,
 			[]any{`Option with "quotes"`, "Option with & ampersand", "Option with <html> tags", "Option with 'single quotes'"}, 0)},
 	}))
 	html := readIndex(t, ts)
@@ -296,7 +296,7 @@ func TestSpecialCharactersInQuizData(t *testing.T) {
 	if boot["title"] != `Quiz "with" special & characters` {
 		t.Errorf("boot title: %v", boot["title"])
 	}
-	q := bootQuestions(t, html)[0].(map[string]any)
+	q := paBootQuestions(t, html)[0].(map[string]any)
 	if q["question"] != `What about "quotes" & <tags>?` {
 		t.Errorf("question: %v", q["question"])
 	}
@@ -345,8 +345,8 @@ func TestQuestionTextCopyPrevention(t *testing.T) {
 func TestVeryLongQuizTitles(t *testing.T) {
 	t.Parallel()
 	longTitle := strings.Repeat("This is a very ", 50) + "long quiz title!"
-	ts := testutil.StartServer(t, oneQuiz("long_title.yaml", map[string]any{
-		"title": longTitle, "questions": []any{simpleQuestion("Short question?", []any{"A", "B"}, 0)},
+	ts := testutil.StartServer(t, paOneQuiz("long_title.yaml", map[string]any{
+		"title": longTitle, "questions": []any{paSimpleQuestion("Short question?", []any{"A", "B"}, 0)},
 	}))
 	html := readIndex(t, ts)
 	if !strings.Contains(html, "<title>"+longTitle+"</title>") || pageBoot(t, html)["title"] != longTitle {
@@ -360,8 +360,8 @@ func TestVeryLongQuizTitles(t *testing.T) {
 // py: tests/test_index_generation.py::test_tags_in_quiz_title_are_escaped
 func TestTagsInQuizTitleAreEscaped(t *testing.T) {
 	t.Parallel()
-	ts := testutil.StartServer(t, oneQuiz("tags_title.yaml", map[string]any{
-		"title": "VTX <vtx_band> setup", "questions": []any{simpleQuestion("Q?", []any{"A", "B"}, 0)},
+	ts := testutil.StartServer(t, paOneQuiz("tags_title.yaml", map[string]any{
+		"title": "VTX <vtx_band> setup", "questions": []any{paSimpleQuestion("Q?", []any{"A", "B"}, 0)},
 	}))
 	html := readIndex(t, ts)
 	if !strings.Contains(html, "<title>VTX &lt;vtx_band&gt; setup</title>") {
@@ -380,14 +380,14 @@ func TestTagsInQuizTitleAreEscaped(t *testing.T) {
 func TestScriptEndTagInQuestionDoesNotBreakPage(t *testing.T) {
 	t.Parallel()
 	text := "What does </script><b>bold</b> do?"
-	ts := testutil.StartServer(t, oneQuiz("script_tag.yaml", map[string]any{
-		"title": "Script tag quiz", "questions": []any{simpleQuestion(text, []any{"</script>", "B"}, 0)},
+	ts := testutil.StartServer(t, paOneQuiz("script_tag.yaml", map[string]any{
+		"title": "Script tag quiz", "questions": []any{paSimpleQuestion(text, []any{"</script>", "B"}, 0)},
 	}))
 	html := readIndex(t, ts)
 	if strings.Contains(html, "</script><b>") {
 		t.Error("the raw text is in the page: it would close the script")
 	}
-	q := bootQuestions(t, html)[0].(map[string]any)
+	q := paBootQuestions(t, html)[0].(map[string]any)
 	if q["question"] != text || q["options"].([]any)[0] != "</script>" {
 		t.Errorf("question: %v", q)
 	}
@@ -415,8 +415,8 @@ func TestTagsInRegistrationLabelsAreEscaped(t *testing.T) {
 func TestTagsInQuizTitlesAreEscapedOnSelectionPage(t *testing.T) {
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{Quizzes: map[string]any{
-		"first.yaml":  map[string]any{"title": "First <one>", "questions": []any{simpleQuestion("Q?", []any{"A", "B"}, 0)}},
-		"second.yaml": map[string]any{"title": "Second", "questions": []any{simpleQuestion("Q?", []any{"A", "B"}, 0)}},
+		"first.yaml":  map[string]any{"title": "First <one>", "questions": []any{paSimpleQuestion("Q?", []any{"A", "B"}, 0)}},
+		"second.yaml": map[string]any{"title": "Second", "questions": []any{paSimpleQuestion("Q?", []any{"A", "B"}, 0)}},
 	}})
 	html := readIndex(t, ts)
 	if strings.Contains(html, "<one>") {

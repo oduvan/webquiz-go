@@ -7,7 +7,7 @@ import (
 	"github.com/oduvan/webquiz-go/internal/testutil"
 )
 
-func fieldsServer(t *testing.T, quizzes map[string]any, fields ...any) *testutil.TestServer {
+func paFieldsServer(t *testing.T, quizzes map[string]any, fields ...any) *testutil.TestServer {
 	t.Helper()
 	return testutil.StartServer(t, testutil.Options{
 		Config:        map[string]any{"registration": map[string]any{"fields": fields}},
@@ -19,7 +19,7 @@ func fieldsServer(t *testing.T, quizzes map[string]any, fields ...any) *testutil
 // py: tests/test_registration_fields.py::test_registration_with_no_fields
 func TestRegistrationWithNoFields(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil)
+	ts := paFieldsServer(t, nil)
 	res := ts.PostJSON(t, "/api/register", map[string]any{"username": "testuser"})
 	data := res.JSON(t)
 	if res.Status != 200 || data["user_id"] == nil || data["username"] != "testuser" {
@@ -30,7 +30,7 @@ func TestRegistrationWithNoFields(t *testing.T) {
 // py: tests/test_registration_fields.py::test_registration_with_single_field
 func TestRegistrationWithSingleField(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil, "Grade")
+	ts := paFieldsServer(t, nil, "Grade")
 	res := ts.PostJSON(t, "/api/register", map[string]any{"username": "student1", "grade": "10"})
 	data := res.JSON(t)
 	if res.Status != 200 || data["user_id"] == nil || data["username"] != "student1" {
@@ -41,7 +41,7 @@ func TestRegistrationWithSingleField(t *testing.T) {
 // py: tests/test_registration_fields.py::test_registration_with_multiple_fields
 func TestRegistrationWithMultipleFields(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil, "Grade", "School")
+	ts := paFieldsServer(t, nil, "Grade", "School")
 	res := ts.PostJSON(t, "/api/register", map[string]any{"username": "student2", "grade": "11", "school": "Central HS"})
 	if res.Status != 200 || res.JSON(t)["user_id"] == nil {
 		t.Errorf("%d %s", res.Status, res.Body)
@@ -51,7 +51,7 @@ func TestRegistrationWithMultipleFields(t *testing.T) {
 // py: tests/test_registration_fields.py::test_registration_field_validation
 func TestRegistrationFieldValidation(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil, "Grade", "School")
+	ts := paFieldsServer(t, nil, "Grade", "School")
 	for _, body := range []map[string]any{
 		{"username": "student3", "school": "Test School"}, // grade missing
 		{"username": "student3", "grade": "9"},            // school missing
@@ -66,7 +66,7 @@ func TestRegistrationFieldValidation(t *testing.T) {
 // py: tests/test_registration_fields.py::test_user_csv_creation
 func TestUserCSVCreation(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil, "Grade", "School")
+	ts := paFieldsServer(t, nil, "Grade", "School")
 	partARegister(t, ts, map[string]any{"username": "student4", "grade": "12", "school": "North HS"})
 	headers, _ := partAWaitCSV(t, ts, "test_quiz", ".users", 1)
 	for _, name := range []string{"user_id", "username", "grade", "school", "registered_at", "total_questions_asked", "correct_answers", "total_time"} {
@@ -79,7 +79,7 @@ func TestUserCSVCreation(t *testing.T) {
 // py: tests/test_registration_fields.py::test_user_csv_content
 func TestUserCSVContent(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil, "Grade")
+	ts := paFieldsServer(t, nil, "Grade")
 	userID := partARegister(t, ts, map[string]any{"username": "student5", "grade": "9"})["user_id"].(string)
 	_, rows := partAWaitCSV(t, ts, "test_quiz", ".users", 1)
 	if len(rows) != 1 {
@@ -95,7 +95,7 @@ func TestUserCSVContent(t *testing.T) {
 // py: tests/test_registration_fields.py::test_user_csv_total_time_format
 func TestUserCSVTotalTimeFormat(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, map[string]any{"test_quiz.yaml": map[string]any{
+	ts := paFieldsServer(t, map[string]any{"test_quiz.yaml": map[string]any{
 		"title":       "Time Test Quiz",
 		"description": "Quiz for testing time format",
 		"questions": []any{
@@ -133,7 +133,7 @@ func TestUserCSVTotalTimeFormat(t *testing.T) {
 // py: tests/test_registration_fields.py::test_answers_csv_uses_user_id
 func TestAnswersCSVUsesUserID(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil)
+	ts := paFieldsServer(t, nil)
 	userID := ts.RegisterStudent(t, "answeruser")
 	if res := partAAnswer(t, ts, userID, 1, 1); res.Status != 200 {
 		t.Fatalf("%d %s", res.Status, res.Body)
@@ -150,7 +150,7 @@ func TestAnswersCSVUsesUserID(t *testing.T) {
 // py: tests/test_registration_fields.py::test_csv_naming_convention
 func TestCSVNamingConvention(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil, "Grade")
+	ts := paFieldsServer(t, nil, "Grade")
 	userID := partARegister(t, ts, map[string]any{"username": "pairtest", "grade": "10"})["user_id"].(string)
 	partAAnswer(t, ts, userID, 1, 1)
 	partAWaitCSV(t, ts, "test_quiz", ".users", 1)
@@ -174,7 +174,7 @@ func TestCSVNamingConvention(t *testing.T) {
 // py: tests/test_registration_fields.py::test_user_id_format
 func TestUserIDFormat(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil)
+	ts := paFieldsServer(t, nil)
 	userID := ts.RegisterStudent(t, "formattest")
 	if len(userID) != 6 || strings.Trim(userID, "0123456789") != "" || userID < "100000" {
 		t.Errorf("user_id %q is not 6 digits in 100000..999999", userID)
@@ -184,7 +184,7 @@ func TestUserIDFormat(t *testing.T) {
 // py: tests/test_registration_fields.py::test_user_id_uniqueness
 func TestUserIDUniqueness(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil)
+	ts := paFieldsServer(t, nil)
 	seen := map[string]bool{}
 	for i := 0; i < 10; i++ {
 		userID := ts.RegisterStudent(t, "user"+string(rune('0'+i)))
@@ -201,7 +201,7 @@ func TestUserIDUniqueness(t *testing.T) {
 // py: tests/test_registration_fields.py::test_registration_with_cyrillic_field_labels
 func TestRegistrationWithCyrillicFieldLabels(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, nil, "Клас", "Школа")
+	ts := paFieldsServer(t, nil, "Клас", "Школа")
 	userID := partARegister(t, ts, map[string]any{"username": "ukrainian_student", "клас": "8", "школа": "Гімназія №5"})["user_id"].(string)
 	headers, rows := partAWaitCSV(t, ts, "test_quiz", ".users", 1)
 	if !partAHas(headers, "клас") || !partAHas(headers, "школа") {
@@ -224,7 +224,7 @@ func TestRegistrationWithCyrillicFieldLabels(t *testing.T) {
 // py: tests/test_registration_fields.py::test_user_csv_statistics
 func TestUserCSVStatistics(t *testing.T) {
 	t.Parallel()
-	ts := fieldsServer(t, map[string]any{"stats_quiz.yaml": map[string]any{
+	ts := paFieldsServer(t, map[string]any{"stats_quiz.yaml": map[string]any{
 		"title": "Statistics Test Quiz",
 		"questions": []any{
 			map[string]any{"question": "Question 1", "options": []any{"A", "B", "C"}, "correct_answer": 0},

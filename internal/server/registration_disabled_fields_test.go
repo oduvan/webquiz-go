@@ -10,16 +10,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// skipWithoutConfigSave skips a test while PUT /api/admin/config is still the
+// paSkipWithoutConfigSave skips a test while PUT /api/admin/config is still the
 // 501 stub (Task 9 builds it). The test runs once that task is merged.
-func skipWithoutConfigSave(t *testing.T, res *testutil.Response) {
+func paSkipWithoutConfigSave(t *testing.T, res *testutil.Response) {
 	t.Helper()
 	if res.Status == 501 {
 		t.Skip("PUT /api/admin/config is not built yet (Task 9)")
 	}
 }
 
-func disabledFieldsServer(t *testing.T, registration map[string]any) *testutil.TestServer {
+func paDisabledFieldsServer(t *testing.T, registration map[string]any) *testutil.TestServer {
 	t.Helper()
 	return testutil.StartServer(t, testutil.Options{Config: map[string]any{"registration": registration}})
 }
@@ -27,7 +27,7 @@ func disabledFieldsServer(t *testing.T, registration map[string]any) *testutil.T
 // py: tests/test_registration_disabled_fields.py::test_disabled_field_not_required_at_register
 func TestDisabledFieldNotRequiredAtRegister(t *testing.T) {
 	t.Parallel()
-	ts := disabledFieldsServer(t, map[string]any{"fields": []any{"Grade"}, "disabled_fields": []any{"School"}})
+	ts := paDisabledFieldsServer(t, map[string]any{"fields": []any{"Grade"}, "disabled_fields": []any{"School"}})
 	res := ts.PostJSON(t, "/api/register", map[string]any{"username": "student_a", "grade": "10"})
 	if res.Status != 200 || res.JSON(t)["user_id"] == nil {
 		t.Errorf("%d %s", res.Status, res.Body)
@@ -37,7 +37,7 @@ func TestDisabledFieldNotRequiredAtRegister(t *testing.T) {
 // py: tests/test_registration_disabled_fields.py::test_disabled_field_becomes_required_when_enabled
 func TestDisabledFieldBecomesRequiredWhenEnabled(t *testing.T) {
 	t.Parallel()
-	ts := disabledFieldsServer(t, map[string]any{"fields": []any{}, "disabled_fields": []any{"Grade"}})
+	ts := paDisabledFieldsServer(t, map[string]any{"fields": []any{}, "disabled_fields": []any{"Grade"}})
 	if res := ts.PostJSON(t, "/api/register", map[string]any{"username": "stu1"}); res.Status != 200 {
 		t.Fatalf("without grade: %d %s", res.Status, res.Body)
 	}
@@ -45,7 +45,7 @@ func TestDisabledFieldBecomesRequiredWhenEnabled(t *testing.T) {
 	res := ts.Put(t, "/api/admin/config", map[string]any{"data": map[string]any{
 		"registration": map[string]any{"fields": []any{"Grade"}, "disabled_fields": []any{}},
 	}}, testutil.WithCookies(cookies...))
-	skipWithoutConfigSave(t, res)
+	paSkipWithoutConfigSave(t, res)
 	if res.Status != 200 {
 		t.Fatalf("config save: %d %s", res.Status, res.Body)
 	}
@@ -66,7 +66,7 @@ func TestPartialSavePersistsDisabledFields(t *testing.T) {
 	res := ts.Put(t, "/api/admin/config", map[string]any{"data": map[string]any{
 		"registration": map[string]any{"fields": []any{"Grade"}, "disabled_fields": []any{"School", "Teacher"}},
 	}}, testutil.WithCookies(cookies...))
-	skipWithoutConfigSave(t, res)
+	paSkipWithoutConfigSave(t, res)
 	if res.Status != 200 {
 		t.Fatalf("config save: %d %s", res.Status, res.Body)
 	}
@@ -102,7 +102,7 @@ func TestFilesPageExposesDisabledFields(t *testing.T) {
 	admin := ts.AdminClient(t, "test123")
 	content := "registration:\n  fields:\n    - Grade\n  disabled_fields:\n    - School\n    - Teacher\n"
 	res := admin.Put(t, "/api/admin/config", map[string]any{"content": content})
-	skipWithoutConfigSave(t, res)
+	paSkipWithoutConfigSave(t, res)
 	if res.Status != 200 {
 		t.Fatalf("config save: %d %s", res.Status, res.Body)
 	}
@@ -125,7 +125,7 @@ func TestValidationRejectsNonListDisabledFields(t *testing.T) {
 	res := ts.Put(t, "/api/admin/config", map[string]any{"data": map[string]any{
 		"registration": map[string]any{"disabled_fields": "not_a_list"},
 	}}, testutil.WithCookies(cookies...))
-	skipWithoutConfigSave(t, res)
+	paSkipWithoutConfigSave(t, res)
 	data := res.JSON(t)
 	text, _ := data["error"].(string)
 	errors, _ := data["errors"].([]any)
@@ -148,7 +148,7 @@ func TestValidationRejectsNonStringDisabledFields(t *testing.T) {
 	res := ts.Put(t, "/api/admin/config", map[string]any{"data": map[string]any{
 		"registration": map[string]any{"disabled_fields": []any{"ok", 42}},
 	}}, testutil.WithCookies(cookies...))
-	skipWithoutConfigSave(t, res)
+	paSkipWithoutConfigSave(t, res)
 	text, _ := res.JSON(t)["error"].(string)
 	if res.Status != 400 || !strings.Contains(strings.ToLower(text), "validation failed") {
 		t.Errorf("%d %s", res.Status, res.Body)
@@ -161,7 +161,7 @@ func TestValidationRejectsNonStringDisabledFields(t *testing.T) {
 // py: tests/test_registration_disabled_fields.py::test_disabled_field_omitted_from_registration_html
 func TestDisabledFieldOmittedFromRegistrationHTML(t *testing.T) {
 	t.Parallel()
-	ts := disabledFieldsServer(t, map[string]any{"fields": []any{"Grade"}, "disabled_fields": []any{"School"}})
+	ts := paDisabledFieldsServer(t, map[string]any{"fields": []any{"Grade"}, "disabled_fields": []any{"School"}})
 	res := ts.GetJSON(t, "/")
 	if res.Status != 200 {
 		t.Fatalf("%d", res.Status)

@@ -122,8 +122,8 @@ func partAAnswer(t *testing.T, ts *testutil.TestServer, userID string, question 
 	return ts.PostJSON(t, "/api/submit-answer", map[string]any{"user_id": userID, "question_id": question, "selected_answer": answer})
 }
 
-// floatField reads a JSON number field (json.Number) as a float.
-func floatField(t *testing.T, data map[string]any, name string) float64 {
+// paFloatField reads a JSON number field (json.Number) as a float.
+func paFloatField(t *testing.T, data map[string]any, name string) float64 {
 	t.Helper()
 	number, ok := data[name].(interface{ Float64() (float64, error) })
 	if !ok {

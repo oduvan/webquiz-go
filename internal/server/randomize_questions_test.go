@@ -9,10 +9,10 @@ import (
 	"github.com/oduvan/webquiz-go/internal/testutil"
 )
 
-// randomQuiz makes a quiz of n questions "Q1".."Qn" with two options each,
+// paRandomQuiz makes a quiz of n questions "Q1".."Qn" with two options each,
 // the way the Python tests wrote them. Option values and correct answers do
 // not matter to most tests (the correct answer is 0 for odd ids, 1 for even).
-func randomQuiz(title string, n int, settings map[string]any) map[string]any {
+func paRandomQuiz(title string, n int, settings map[string]any) map[string]any {
 	questions := []any{}
 	for i := 1; i <= n; i++ {
 		questions = append(questions, map[string]any{
@@ -28,19 +28,19 @@ func randomQuiz(title string, n int, settings map[string]any) map[string]any {
 	return quiz
 }
 
-func randomServer(t *testing.T, quiz map[string]any, config map[string]any) *testutil.TestServer {
+func paRandomServer(t *testing.T, quiz map[string]any, config map[string]any) *testutil.TestServer {
 	t.Helper()
 	return testutil.StartServer(t, testutil.Options{Config: config, Quizzes: map[string]any{"test.yaml": quiz}})
 }
 
 // verifyOrder registers a student and returns the id and the verify-user reply.
-func registerAndVerify(t *testing.T, ts *testutil.TestServer, name string) (string, map[string]any) {
+func paRegisterAndVerify(t *testing.T, ts *testutil.TestServer, name string) (string, map[string]any) {
 	t.Helper()
 	userID := ts.RegisterStudent(t, name)
-	return userID, verifyUser(t, ts, userID)
+	return userID, paVerifyUser(t, ts, userID)
 }
 
-func verifyUser(t *testing.T, ts *testutil.TestServer, userID string) map[string]any {
+func paVerifyUser(t *testing.T, ts *testutil.TestServer, userID string) map[string]any {
 	t.Helper()
 	res := ts.GetJSON(t, "/api/verify-user/"+userID)
 	if res.Status != 200 {
@@ -49,8 +49,8 @@ func verifyUser(t *testing.T, ts *testutil.TestServer, userID string) map[string
 	return res.JSON(t)
 }
 
-// orderOf reads question_order as ints.
-func orderOf(t *testing.T, data map[string]any) []int {
+// paOrderOf reads question_order as ints.
+func paOrderOf(t *testing.T, data map[string]any) []int {
 	t.Helper()
 	list, ok := data["question_order"].([]any)
 	if !ok {
@@ -67,8 +67,8 @@ func orderOf(t *testing.T, data map[string]any) []int {
 	return out
 }
 
-// skipIfStub skips the test while a route is still the 501 stub of another task.
-func skipIfStub(t *testing.T, res *testutil.Response, what string) {
+// paSkipIfStub skips the test while a route is still the 501 stub of another task.
+func paSkipIfStub(t *testing.T, res *testutil.Response, what string) {
 	t.Helper()
 	if res.Status == 501 {
 		t.Skip(what + " is not built yet")
@@ -78,8 +78,8 @@ func skipIfStub(t *testing.T, res *testutil.Response, what string) {
 // py: tests/test_randomize_questions.py::test_randomization_disabled_by_default
 func TestRandomizationDisabledByDefault(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Default Behavior Quiz", 3, nil), nil)
-	_, data := registerAndVerify(t, ts, "testuser")
+	ts := paRandomServer(t, paRandomQuiz("Default Behavior Quiz", 3, nil), nil)
+	_, data := paRegisterAndVerify(t, ts, "testuser")
 	if data["valid"] != true {
 		t.Errorf("%v", data)
 	}
@@ -91,9 +91,9 @@ func TestRandomizationDisabledByDefault(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_randomization_enabled
 func TestRandomizationEnabled(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true}), nil)
-	_, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true}), nil)
+	_, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
 	slices.Sort(order)
 	if data["valid"] != true || !slices.Equal(order, []int{1, 2, 3, 4, 5}) {
 		t.Errorf("%v", data)
@@ -103,11 +103,11 @@ func TestRandomizationEnabled(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_different_users_get_different_orders
 func TestDifferentUsersGetDifferentOrders(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 6, map[string]any{"randomize_questions": true}), nil)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 6, map[string]any{"randomize_questions": true}), nil)
 	seen := map[string]bool{}
 	for i := 0; i < 5; i++ {
-		_, data := registerAndVerify(t, ts, fmt.Sprintf("user%d", i))
-		seen[fmt.Sprint(orderOf(t, data))] = true
+		_, data := paRegisterAndVerify(t, ts, fmt.Sprintf("user%d", i))
+		seen[fmt.Sprint(paOrderOf(t, data))] = true
 	}
 	if len(seen) < 2 {
 		t.Errorf("expected at least some users to have different question orders, got %v", seen)
@@ -117,11 +117,11 @@ func TestDifferentUsersGetDifferentOrders(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_question_order_persists_across_verifications
 func TestQuestionOrderPersistsAcrossVerifications(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	first := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	first := paOrderOf(t, data)
 	for i := 0; i < 5; i++ {
-		if got := orderOf(t, verifyUser(t, ts, userID)); !slices.Equal(got, first) {
+		if got := paOrderOf(t, paVerifyUser(t, ts, userID)); !slices.Equal(got, first) {
 			t.Fatalf("order changed: %v then %v", first, got)
 		}
 	}
@@ -130,7 +130,7 @@ func TestQuestionOrderPersistsAcrossVerifications(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_randomization_with_approval_workflow
 func TestRandomizationWithApprovalWorkflow(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}),
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}),
 		map[string]any{"registration": map[string]any{"approve": true}})
 	res := ts.PostJSON(t, "/api/register", map[string]any{"username": "testuser"})
 	reg := res.JSON(t)
@@ -138,17 +138,17 @@ func TestRandomizationWithApprovalWorkflow(t *testing.T) {
 		t.Fatalf("%d %s", res.Status, res.Body)
 	}
 	userID := reg["user_id"].(string)
-	before := orderOf(t, verifyUser(t, ts, userID))
-	if res := approveUser(t, ts, userID, testutil.WithCookies(ts.AdminCookies(t, "test123")...)); res.Status != 200 {
+	before := paOrderOf(t, paVerifyUser(t, ts, userID))
+	if res := paApproveUser(t, ts, userID, testutil.WithCookies(ts.AdminCookies(t, "test123")...)); res.Status != 200 {
 		t.Fatalf("approve: %d %s", res.Status, res.Body)
 	}
-	data := verifyUser(t, ts, userID)
-	if data["approved"] != true || !slices.Equal(orderOf(t, data), before) {
+	data := paVerifyUser(t, ts, userID)
+	if data["approved"] != true || !slices.Equal(paOrderOf(t, data), before) {
 		t.Errorf("after approval: %v, order before %v", data, before)
 	}
 }
 
-func validateQuizContent(t *testing.T, ts *testutil.TestServer, quiz map[string]any) (*testutil.Response, map[string]any) {
+func paValidateQuizContent(t *testing.T, ts *testutil.TestServer, quiz map[string]any) (*testutil.Response, map[string]any) {
 	t.Helper()
 	content, err := testutil.YAML(quiz)
 	if err != nil {
@@ -156,7 +156,7 @@ func validateQuizContent(t *testing.T, ts *testutil.TestServer, quiz map[string]
 	}
 	res := ts.PostJSON(t, "/api/admin/validate-quiz", map[string]any{"content": string(content)},
 		testutil.WithCookies(ts.AdminCookies(t, "test123")...))
-	skipIfStub(t, res, "POST /api/admin/validate-quiz (Task 8)")
+	paSkipIfStub(t, res, "POST /api/admin/validate-quiz (Task 8)")
 	return res, res.JSON(t)
 }
 
@@ -165,8 +165,8 @@ func TestYAMLValidationAcceptsRandomizeQuestionsBoolean(t *testing.T) {
 	t.Parallel()
 	quiz := map[string]any{"title": "Valid Quiz", "randomize_questions": true,
 		"questions": []any{map[string]any{"question": "Q1", "options": []any{"A", "B"}, "correct_answer": 0}}}
-	ts := randomServer(t, quiz, nil)
-	res, data := validateQuizContent(t, ts, quiz)
+	ts := paRandomServer(t, quiz, nil)
+	res, data := paValidateQuizContent(t, ts, quiz)
 	errors, _ := data["errors"].([]any)
 	if res.Status != 200 || data["valid"] != true || len(errors) != 0 {
 		t.Errorf("%d %s", res.Status, res.Body)
@@ -176,11 +176,11 @@ func TestYAMLValidationAcceptsRandomizeQuestionsBoolean(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_yaml_validation_rejects_non_boolean_randomize_questions
 func TestYAMLValidationRejectsNonBooleanRandomizeQuestions(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, map[string]any{"title": "Default",
+	ts := paRandomServer(t, map[string]any{"title": "Default",
 		"questions": []any{map[string]any{"question": "Q", "options": []any{"A"}, "correct_answer": 0}}}, nil)
 	invalid := map[string]any{"title": "Invalid Quiz", "randomize_questions": "yes",
 		"questions": []any{map[string]any{"question": "Q1", "options": []any{"A", "B"}, "correct_answer": 0}}}
-	res, data := validateQuizContent(t, ts, invalid)
+	res, data := paValidateQuizContent(t, ts, invalid)
 	found := false
 	for _, item := range data["errors"].([]any) {
 		if s, _ := item.(string); strings.Contains(s, "randomize_questions") && strings.Contains(s, "boolean") {
@@ -195,8 +195,8 @@ func TestYAMLValidationRejectsNonBooleanRandomizeQuestions(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_randomization_false_behaves_like_disabled
 func TestRandomizationFalseBehavesLikeDisabled(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Non-Randomized Quiz", 2, map[string]any{"randomize_questions": false}), nil)
-	_, data := registerAndVerify(t, ts, "testuser")
+	ts := paRandomServer(t, paRandomQuiz("Non-Randomized Quiz", 2, map[string]any{"randomize_questions": false}), nil)
+	_, data := paRegisterAndVerify(t, ts, "testuser")
 	if _, has := data["question_order"]; has {
 		t.Errorf("question_order present: %v", data)
 	}
@@ -205,9 +205,9 @@ func TestRandomizationFalseBehavesLikeDisabled(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_question_order_all_ids_present
 func TestQuestionOrderAllIDsPresent(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 10, map[string]any{"randomize_questions": true}), nil)
-	_, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 10, map[string]any{"randomize_questions": true}), nil)
+	_, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
 	sorted := slices.Clone(order)
 	slices.Sort(sorted)
 	if len(order) != 10 || !slices.Equal(sorted, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}) {
@@ -218,9 +218,9 @@ func TestQuestionOrderAllIDsPresent(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_randomization_with_single_question
 func TestRandomizationWithSingleQuestion(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Single Question Quiz", 1, map[string]any{"randomize_questions": true}), nil)
-	_, data := registerAndVerify(t, ts, "testuser")
-	if got := orderOf(t, data); !slices.Equal(got, []int{1}) {
+	ts := paRandomServer(t, paRandomQuiz("Single Question Quiz", 1, map[string]any{"randomize_questions": true}), nil)
+	_, data := paRegisterAndVerify(t, ts, "testuser")
+	if got := paOrderOf(t, data); !slices.Equal(got, []int{1}) {
 		t.Errorf("order %v", got)
 	}
 }
@@ -230,14 +230,14 @@ func TestYAMLValidationAcceptsOtherTopLevelFields(t *testing.T) {
 	t.Parallel()
 	quiz := map[string]any{"title": "Full Featured Quiz", "show_right_answer": false, "randomize_questions": true,
 		"questions": []any{map[string]any{"question": "Q1", "options": []any{"A", "B"}, "correct_answer": 0}}}
-	ts := randomServer(t, quiz, nil)
-	res, data := validateQuizContent(t, ts, quiz)
+	ts := paRandomServer(t, quiz, nil)
+	res, data := paValidateQuizContent(t, ts, quiz)
 	if res.Status != 200 || data["valid"] != true {
 		t.Errorf("%d %s", res.Status, res.Body)
 	}
 }
 
-func nextIndex(t *testing.T, data map[string]any) string {
+func paNextIndex(t *testing.T, data map[string]any) string {
 	t.Helper()
 	return fmt.Sprint(data["next_question_index"])
 }
@@ -245,10 +245,10 @@ func nextIndex(t *testing.T, data map[string]any) string {
 // py: tests/test_randomize_questions.py::test_progress_tracking_with_randomization
 func TestProgressTrackingWithRandomization(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true, "show_right_answer": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
-	if nextIndex(t, data) != "0" {
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true, "show_right_answer": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
+	if paNextIndex(t, data) != "0" {
 		t.Fatalf("next_question_index %v", data["next_question_index"])
 	}
 	for i := 0; i < 2; i++ {
@@ -256,7 +256,7 @@ func TestProgressTrackingWithRandomization(t *testing.T) {
 			t.Fatalf("answer %d: %d %s", order[i], res.Status, res.Body)
 		}
 		// A page refresh asks again: the next question is the one after the answered ones.
-		if got := nextIndex(t, verifyUser(t, ts, userID)); got != fmt.Sprint(i+1) {
+		if got := paNextIndex(t, paVerifyUser(t, ts, userID)); got != fmt.Sprint(i+1) {
 			t.Errorf("after %d answers next_question_index = %s", i+1, got)
 		}
 	}
@@ -265,15 +265,15 @@ func TestProgressTrackingWithRandomization(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_progress_tracking_without_randomization
 func TestProgressTrackingWithoutRandomization(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Non-Randomized Quiz", 3, map[string]any{"randomize_questions": false, "show_right_answer": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	if nextIndex(t, data) != "0" {
+	ts := paRandomServer(t, paRandomQuiz("Non-Randomized Quiz", 3, map[string]any{"randomize_questions": false, "show_right_answer": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	if paNextIndex(t, data) != "0" {
 		t.Fatalf("next_question_index %v", data["next_question_index"])
 	}
 	if res := partAAnswer(t, ts, userID, 1, 0); res.Status != 200 {
 		t.Fatalf("%d %s", res.Status, res.Body)
 	}
-	if got := nextIndex(t, verifyUser(t, ts, userID)); got != "1" {
+	if got := paNextIndex(t, paVerifyUser(t, ts, userID)); got != "1" {
 		t.Errorf("next_question_index = %s", got)
 	}
 }
@@ -281,9 +281,9 @@ func TestProgressTrackingWithoutRandomization(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_final_results_with_randomization
 func TestFinalResultsWithRandomization(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true, "show_right_answer": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true, "show_right_answer": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
 	if len(order) != 5 {
 		t.Fatalf("order %v", order)
 	}
@@ -292,7 +292,7 @@ func TestFinalResultsWithRandomization(t *testing.T) {
 			t.Fatalf("answer %d: %d %s", id, res.Status, res.Body)
 		}
 	}
-	data = verifyUser(t, ts, userID)
+	data = paVerifyUser(t, ts, userID)
 	final, _ := data["final_results"].(map[string]any)
 	results, _ := final["test_results"].([]any)
 	if data["test_completed"] != true || fmt.Sprint(final["total_count"]) != "5" || len(results) != 5 {
@@ -315,9 +315,9 @@ func TestFinalResultsWithRandomization(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_cannot_skip_questions_with_randomization
 func TestCannotSkipQuestionsWithRandomization(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 5, map[string]any{"randomize_questions": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
 
 	res := partAAnswer(t, ts, userID, order[2], 0)
 	body := res.JSON(t)
@@ -336,9 +336,9 @@ func TestCannotSkipQuestionsWithRandomization(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_cannot_answer_already_answered_questions_with_randomization
 func TestCannotAnswerAlreadyAnsweredQuestionsWithRandomization(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
 	if res := partAAnswer(t, ts, userID, order[0], 0); res.Status != 200 {
 		t.Fatalf("%d %s", res.Status, res.Body)
 	}
@@ -351,9 +351,9 @@ func TestCannotAnswerAlreadyAnsweredQuestionsWithRandomization(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_cannot_answer_after_completing_quiz_with_randomization
 func TestCannotAnswerAfterCompletingQuizWithRandomization(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 2, map[string]any{"randomize_questions": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 2, map[string]any{"randomize_questions": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
 	for _, id := range order {
 		if res := partAAnswer(t, ts, userID, id, 0); res.Status != 200 {
 			t.Fatalf("answer %d: %d %s", id, res.Status, res.Body)
@@ -369,7 +369,7 @@ func TestCannotAnswerAfterCompletingQuizWithRandomization(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_sequential_answering_allowed_without_randomization
 func TestSequentialAnsweringAllowedWithoutRandomization(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Non-Randomized Quiz", 3, map[string]any{"randomize_questions": false}), nil)
+	ts := paRandomServer(t, paRandomQuiz("Non-Randomized Quiz", 3, map[string]any{"randomize_questions": false}), nil)
 	userID := ts.RegisterStudent(t, "testuser")
 	for _, id := range []int{1, 2, 3} {
 		if res := partAAnswer(t, ts, userID, id, 0); res.Status != 200 {
@@ -381,9 +381,9 @@ func TestSequentialAnsweringAllowedWithoutRandomization(t *testing.T) {
 // py: tests/test_randomize_questions.py::test_validation_error_message_quality
 func TestValidationErrorMessageQuality(t *testing.T) {
 	t.Parallel()
-	ts := randomServer(t, randomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}), nil)
-	userID, data := registerAndVerify(t, ts, "testuser")
-	order := orderOf(t, data)
+	ts := paRandomServer(t, paRandomQuiz("Randomized Quiz", 3, map[string]any{"randomize_questions": true}), nil)
+	userID, data := paRegisterAndVerify(t, ts, "testuser")
+	order := paOrderOf(t, data)
 	res := partAAnswer(t, ts, userID, order[2], 0)
 	body := res.JSON(t)
 	text, _ := body["error"].(string)
