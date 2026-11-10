@@ -225,3 +225,16 @@ func TestProgramFailsWhenThePortIsTaken(t *testing.T) {
 		t.Errorf("output:\n%s", output)
 	}
 }
+
+func httpGet(url string) (*http.Response, error) { return http.Get(url) }
+
+// listenTaken holds a port until the test ends.
+func listenTaken(t *testing.T) int {
+	t.Helper()
+	taken, err := net.Listen("tcp4", "0.0.0.0:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { taken.Close() })
+	return taken.Addr().(*net.TCPAddr).Port
+}
