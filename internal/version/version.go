@@ -18,7 +18,7 @@ const RepoURL = "https://github.com/oduvan/webquiz-go"
 // PagesURL is the address of the WebQuiz Go GitHub Pages site.
 const PagesURL = "https://oduvan.github.io/webquiz-go/"
 
-// Version is the version of the running program, like "0.1".
+// Version is the version of the running program, like "2.0".
 //
 // It is declared without a value so that "-ldflags -X" can set it; when the
 // build does not set it, init fills it from the embedded VERSION file.

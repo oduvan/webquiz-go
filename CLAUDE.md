@@ -11,7 +11,7 @@
 ---
 
 ## Project Overview
-WebQuiz in Go (versions start again at 0.1) is the rewrite of the Python/aiohttp WebQuiz 1.19 (<https://github.com/oduvan/webquiz>): a quiz system with multi-quiz management, real-time WebSocket stats, admin approval workflow and question randomization. One static binary per platform, no Python. Same HTTP API, config keys, quiz format, CSV files and folders as 1.19, except what `docs` and `.github/release-notes/v0.1.md` list as differences.
+WebQuiz 2.0 is the Go rewrite of the Python/aiohttp WebQuiz 1.19 (<https://github.com/oduvan/webquiz>): a quiz system with multi-quiz management, real-time WebSocket stats, admin approval workflow and question randomization. One static binary per platform, no Python. Same HTTP API, config keys, quiz format, CSV files and folders as 1.19, except what `docs` and `.github/release-notes/v2.0.md` list as differences.
 
 ## Architecture
 - **Backend**: Go 1.26, `net/http` (Go 1.22 route patterns), middleware, `github.com/coder/websocket`. Module `github.com/oduvan/webquiz-go`, built with `CGO_ENABLED=0`
@@ -64,7 +64,7 @@ Same paths, methods, JSON fields, status codes and error texts as 1.19.
 - File transfer: `GET /api/admin/transfer`, `POST /api/admin/transfer/send` (`{to, files: [{type, name}]}`), `POST /api/admin/transfer/{request_id}/accept` (optional `{files: [{type, name, action: save|replace|rename|skip, new_name}]}`; 400 keeps the request open), `POST /api/admin/transfer/{request_id}/reject`
 
 **Server-to-server (through the tunnel, protected by the offer token, not by IP):**
-- `POST /api/transfer/offer`, `GET /api/transfer/download/{token}/{type}/{filename}`, `POST /api/transfer/result`. The JSON must stay byte-compatible with the Python server (1.19 Python servers and Go servers can send files to each other)
+- `POST /api/transfer/offer`, `GET /api/transfer/download/{token}/{type}/{filename}`, `POST /api/transfer/result`. The JSON must stay byte-compatible with the Python server (1.19 and 2.0 servers can send files to each other)
 
 **Pages (admin pages: local network only):**
 - `GET /` quiz page; `GET /admin/`, `/live-stats/`, `/files/` (also without the final slash), `GET /files/csv/{filename}` (`?question=`, `?user=`, `?embedded=1`); `/assets/`, `/imgs/`

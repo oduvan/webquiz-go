@@ -39,7 +39,7 @@ WEBQUIZ_GO_BINARY=/path/to/webquiz-go/bin/webquiz WEBQUIZ_TEST_PORT_BASE=18800 S
   python -m pytest /path/to/pytests-go -q -o addopts="" -p no:cacheprovider --rootdir=/path/to/pytests-go -n 4 -rf
 ```
 
-Result for 0.1 (two runs, the same both times): **657 passed, 59 failed, 47 errors, 148 skipped** (911 tests).
+Result for 2.0 (two runs, the same both times): **657 passed, 59 failed, 47 errors, 148 skipped** (911 tests).
 
 - Skipped (148): the Selenium tests (`SKIP_SELENIUM`). Their ports are the Playwright tests in `e2e/`.
 - 133 of the passing tests are Python unit tests that never start the Go program (for example `test_checker.py`, `test_tunnel.py`, `test_harness_checks.py`). They say nothing about Go.
