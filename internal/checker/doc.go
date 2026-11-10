@@ -78,6 +78,13 @@
 //     a[1:3] = [5] and a[1:3] += [5] are refused when the quiz is saved.
 //   - In a chained comparison like a < f() < b the middle value is computed
 //     twice.
+//   - In x[k] += y, x and k are computed twice: d[f()] += 1 calls f twice.
+//   - x *= 2 on a list makes a new list: other names for the old list keep
+//     it as it was. (x += [2] changes the list itself, as in Python.)
+//   - x += *a, b is not supported (a syntax error when the quiz is saved).
+//     Write x += tuple(a) + (b,).
+//   - Text like b'ab' is a Starlark bytes value: b'ab'[1] is b'b', not 98,
+//     and it cannot be looped over.
 //   - Some other Python methods are missing, for example text translate and
 //     encode. Errors other than assert messages, unknown names, and the
 //     errors of int(), float(), the helpers, math, "%", format() and join()
@@ -89,16 +96,27 @@
 //     like, a format width, zfill, ljust, rjust or center) may not be larger
 //     than half of MaxMemory. For sets and dicts made in one step (set(),
 //     frozenset(), dict(), update(), union(), intersection() and
-//     symmetric_difference()) every item counts as 128 bytes, for
-//     enumerate() and zip() as about 72 bytes. The text of repr() and str()
-//     may not be larger than 4 MB, a precision in a format not larger than
-//     1,000,000 digits, and numbers made with "*" or "**" not longer than
-//     about a million bits. The answer then counts as wrong. An error message
-//     larger than 4 MB, like the message of a long assert, is replaced by
-//     the "too much memory" error. Python 1.19 had no such limits.
+//     symmetric_difference()) every item counts as 128 bytes: the items of
+//     all arguments and the items that the set or dict already has. For
+//     enumerate() every item counts as about 72 bytes, for zip() as 40
+//     bytes and 16 for each argument. map() and zip() stop at the shortest
+//     argument, as in Python, and read only that many items; for map() the
+//     items of all arguments together count as a list. The text of repr()
+//     and str() may not be larger than 4 MB, a precision in a format not
+//     larger than 1,000,000 digits, and numbers made with "*" or "**" not
+//     longer than about a million bits. The answer then counts as wrong. An
+//     error message larger than 4 MB, like the message of a long assert, is
+//     replaced by the "too much memory" error. Python 1.19 had no such
+//     limits.
+//   - A lookup with a very long key that is missing, like d[k] where k is
+//     a 60 MB text, first makes Starlark's "key ... not in dict" text (up
+//     to about 1 GB) before the checker replaces it with the memory error.
 //   - The memory watch measures the memory of the whole program. A checker
 //     that uses much memory can make another check that runs at the same
 //     time fail too.
+//   - Checkers are written by the teacher. The limits above stop mistakes,
+//     but a checker written on purpose to use up memory can still stop the
+//     server. Python 1.19 had no limits at all.
 //
 // Some code that failed in 1.19 works now. 1.19 ran exec() with separate
 // globals and locals, so a function defined in a checker could not call
@@ -106,6 +124,6 @@
 // generator expression could not read variables of the checker: all of these
 // failed with NameError. Here they work. print() did not exist in 1.19 and
 // now does nothing. Starlark builtins such as getattr, hasattr, dir and hash
-// are available too, but not bytes(): its name is not defined, as in 1.19.
-// Text like b'abc' works.
+// are available too, but not bytes() and fail(): their names are not
+// defined, as in 1.19. Text like b'abc' works.
 package checker

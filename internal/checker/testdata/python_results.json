@@ -1868,6 +1868,22 @@
    "error_type": "NameError"
   },
   {
+   "name": "fail() is not in the sandbox",
+   "checker": "if user_answer != 'ok':\n    fail('wrong')",
+   "answer": "ok",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "fail() is not in the sandbox",
+   "checker": "if user_answer != 'ok':\n    fail('wrong')",
+   "answer": "no",
+   "correct": false,
+   "error": "name 'fail' is not defined",
+   "error_type": "NameError"
+  },
+  {
    "name": "bytes literal",
    "checker": "assert b'ab' + b'c' == b'abc' and user_answer, 'empty'",
    "answer": "x",
@@ -1930,6 +1946,38 @@
    "correct": true,
    "error": null,
    "error_type": null
+  },
+  {
+   "name": "zip and map stop at the shortest",
+   "checker": "w = user_answer.split()\nr = list(zip(w, range(10 ** 9), 'abc'))\nm = list(map(lambda a, b: a + b, w, 'xyz'))\nassert len(r) == 2 and m == ['ax', 'by'], f'{r} {m}'",
+   "answer": "a b",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "zip and map stop at the shortest",
+   "checker": "w = user_answer.split()\nr = list(zip(w, range(10 ** 9), 'abc'))\nm = list(map(lambda a, b: a + b, w, 'xyz'))\nassert len(r) == 2 and m == ['ax', 'by'], f'{r} {m}'",
+   "answer": "a b c d",
+   "correct": false,
+   "error": "[('a', 0, 'a'), ('b', 1, 'b'), ('c', 2, 'c')] ['ax', 'by', 'cz']",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "map sees a change of the list",
+   "checker": "x = [1, 2, 3]\nr = list(map(lambda v, x=x: x.pop() if v == 1 else v, x))\nassert r == [3, 2] and user_answer, f'{r}'",
+   "answer": "x",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "map sees a change of the list",
+   "checker": "x = [1, 2, 3]\nr = list(map(lambda v, x=x: x.pop() if v == 1 else v, x))\nassert r == [3, 2] and user_answer, f'{r}'",
+   "answer": "",
+   "correct": false,
+   "error": "[3, 2]",
+   "error_type": "AssertionError"
   },
   {
    "name": "format field names with a sign",

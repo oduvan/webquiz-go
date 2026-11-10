@@ -172,6 +172,11 @@ func TestCheckBuiltins(t *testing.T) {
 		{"str and repr like Python", "assert str(1e15) == '1000000000000000.0' and repr('a') == \"'a'\" and str([1, 'a']) == \"[1, 'a']\"", "", true, ""},
 		{"min and max of text", "assert max(user_answer) == 'c' and min(user_answer) == 'a'", "bca", true, ""},
 		{"enumerate and zip text", "assert list(enumerate('ab')) == [(0, 'a'), (1, 'b')] and list(zip('ab', 'cd')) == [('a', 'c'), ('b', 'd')]", "", true, ""},
+		{"zip and map stop at the shortest", "assert list(zip([1, 2, 3], 'ab', range(10 ** 9))) == [(1, 'a', 0), (2, 'b', 1)] and list(map(lambda a, b: a + b, [1, 2, 3], range(10 ** 9))) == [1, 3, 5]", "", true, ""},
+		{"zip of other values", "assert list(zip()) == [] and list(zip({1: 2, 3: 4}, {5})) == [(1, 5)] and list(zip('\u00e9e', 'ab')) == [('\u00e9', 'a'), ('e', 'b')] and list(map(int, '12')) == [1, 2]", "", true, ""},
+		{"zip of a number", "x = zip([1], 5)", "", false, "'int' object is not iterable"},
+		{"map sees changes to the list, as in Python", "x = [1, 2, 3]\nassert list(map(lambda v: x.pop() if v == 1 else v, x)) == [3, 2]\nz = [1, 2]\nassert list(map(lambda a: z.append(0) or a if len(z) < 5 else a, z)) == [1, 2, 0, 0, 0]", "", true, ""},
+		{"map of a number", "x = map(str, 5)", "", false, "'int' object is not iterable"},
 		{"set and dict methods", "s = {1, 2}\ns.update([3])\nassert s == {1, 2, 3} and s.union([4]) == {1, 2, 3, 4} and s.intersection([1, 5]) == {1} and s.symmetric_difference([1, 5]) == {2, 3, 5}\nd = dict([('a', 1)], b=2)\nd.update({'c': 3})\nd.update([('e', 5)], f=6)\nassert d == {'a': 1, 'b': 2, 'c': 3, 'e': 5, 'f': 6}", "", true, ""},
 		{"a set of many items", "assert len(set(range(50000))) == 50000 and len(dict(zip(range(50000), range(50000)))) == 50000", "", true, ""},
 		{"reversed text", "assert ''.join(reversed(user_answer)) == user_answer", "abba", true, ""},
@@ -191,6 +196,7 @@ func TestCheckRuntimeErrors(t *testing.T) {
 		{"undefined name not reached", "if user_answer == 'never':\n    oops()\nassert True", "x", true, ""},
 		// The 1.19 sandbox had no bytes(); b'...' literals still work.
 		{"bytes is not defined", "x = bytes(range(10 ** 12))", "", false, "name 'bytes' is not defined"},
+		{"fail is not defined", "s = 'a' * 1000\nfail(*[s] * 100000)", "", false, "name 'fail' is not defined"},
 		{"bytes literal", "assert b'ab' + b'c' == b'abc'", "", true, ""},
 		{"used before assignment", "y = x\nx = 1", "", false, "name 'x' is not defined"},
 		{"missing method", "x = [1].nosuch()", "", false, "list has no .nosuch field or method"},
@@ -351,6 +357,14 @@ func TestHugeStringFails(t *testing.T) {
 		{"x = set().union(range(600000))", []string{tooMuchMemory}},
 		{"s = set()\ns.update(range(600000))", []string{tooMuchMemory}},
 		{"x = {1}.symmetric_difference(range(600000))", []string{tooMuchMemory}},
+		// The items of all the arguments add up.
+		{"p = [[0] * 500000] * 8\ns = set()\ns.update(*p)", []string{tooMuchMemory}},
+		{"p = [[0] * 500000] * 8\ns = set().union(*p)", []string{tooMuchMemory}},
+		// zip() and map() with many long arguments.
+		{"x = [0] * 1000000\nz = zip(*[x] * 250)", []string{tooMuchMemory}},
+		{"x = [0] * 1000000\nm = map(lambda *a: 0, *[x] * 250)", []string{tooMuchMemory}},
+		{"x = list(zip(range(2 ** 62), range(2 ** 62)))", []string{tooMuchMemory}},
+		{"def f(*a):\n    return len(a)\nx = f(*range(2 ** 62))", []string{tooMuchMemory}},
 		// An error text larger than 4 MB is replaced.
 		{"d = {}\nx = d['\\x00' * 1100000]", []string{tooMuchMemory}},
 		{"assert False, 'x' * 5000000", []string{tooMuchMemory}},
@@ -474,6 +488,10 @@ func TestAugmentedAssignment(t *testing.T) {
 			t.Errorf("Validate(%q) = %v, want nil", code, err)
 		}
 	}
+	// A starred item in the value is a known difference (doc.go).
+	if err := Validate("x += *a, b"); err == nil || err.Msg != "invalid syntax" {
+		t.Errorf("Validate(x += *a, b) = %v, want invalid syntax", err)
+	}
 	// Starlark cannot assign to a slice, with or without +=.
 	for _, code := range []string{"x[1:2] += [1]", "x[1:2] = [1]"} {
 		if err := Validate(code); err == nil || err.Msg != "can't assign to sliceexpr" {
@@ -500,6 +518,68 @@ func TestIterateReportsStop(t *testing.T) {
 	union := starlark.NewBuiltin("union", hashMethod).BindReceiver(starlark.NewSet(0))
 	if got, err := hashMethod(thread, union, starlark.Tuple{r}, nil); err == nil || err.Error() != tooMuchMemory {
 		t.Errorf("union = %v, %v; want the stop error", got, err)
+	}
+}
+
+// TestListCopyCountsSteps: a builtin that copies a list counts a step for
+// every item and sees the stop of the check.
+func TestListCopyCountsSteps(t *testing.T) {
+	list := starlark.NewList([]starlark.Value{starlark.MakeInt(1), starlark.MakeInt(2), starlark.MakeInt(3)})
+	thread := &starlark.Thread{}
+	thread.SetLocal(stateKey, &runState{stopped: make(chan struct{})})
+	thread.Steps = MaxSteps - 2
+	if got, err := items(thread, list); err == nil || err.Error() != tooManySteps {
+		t.Errorf("items near the step limit = %v, %v; want %q", got, err, tooManySteps)
+	}
+
+	thread = &starlark.Thread{}
+	state := &runState{stopped: make(chan struct{})}
+	thread.SetLocal(stateKey, state)
+	state.stop(thread, tooMuchMemory)
+	if got, err := items(thread, list); err == nil || err.Error() != tooMuchMemory {
+		t.Errorf("items after a stop = %v, %v; want %q", got, err, tooMuchMemory)
+	}
+}
+
+// TestHashItemsAddUp: set and dict methods count the items that the set or
+// dict already has, and the items of every argument.
+func TestHashItemsAddUp(t *testing.T) {
+	zeros := func(n int) *starlark.List {
+		values := make([]starlark.Value, n)
+		for i := range values {
+			values[i] = starlark.MakeInt(0)
+		}
+		return starlark.NewList(values)
+	}
+	limit := int(maxRepeatBytes / hashItemBytes)
+	half := zeros(limit / 2)
+	if err := checkHashItems(0, starlark.Tuple{half, half}, nil); err != nil {
+		t.Errorf("two halves of the limit: %v", err)
+	}
+	if err := checkHashItems(1, starlark.Tuple{half, half}, nil); err == nil || err.Error() != tooMuchMemory {
+		t.Errorf("one item more than the limit = %v; want %q", err, tooMuchMemory)
+	}
+	if err := checkHashItems(0, starlark.Tuple{half, half}, []starlark.Tuple{{starlark.String("k"), starlark.None}}); err == nil || err.Error() != tooMuchMemory {
+		t.Errorf("one keyword argument more than the limit = %v; want %q", err, tooMuchMemory)
+	}
+
+	// The methods count the items of the set or dict itself.
+	thread := &starlark.Thread{}
+	one := starlark.NewSet(1)
+	if err := one.Insert(starlark.MakeInt(1)); err != nil {
+		t.Fatal(err)
+	}
+	union := starlark.NewBuiltin("union", hashMethod).BindReceiver(one)
+	if _, err := hashMethod(thread, union, starlark.Tuple{half, half}, nil); err == nil || err.Error() != tooMuchMemory {
+		t.Errorf("union = %v; want %q", err, tooMuchMemory)
+	}
+	d := starlark.NewDict(1)
+	if err := d.SetKey(starlark.MakeInt(1), starlark.None); err != nil {
+		t.Fatal(err)
+	}
+	update := starlark.NewBuiltin("update", hashMethod).BindReceiver(d)
+	if _, err := hashMethod(thread, update, starlark.Tuple{zeros(limit)}, nil); err == nil || err.Error() != tooMuchMemory {
+		t.Errorf("dict update = %v; want %q", err, tooMuchMemory)
 	}
 }
 
@@ -696,6 +776,11 @@ func TestDocAdviceWorks(t *testing.T) {
 		{"unpack a list of letters", "a, b = list(user_answer)\nassert (a, b) == ('o', 'k')", "ok", true, ""},
 		{"tuple in brackets", "x = (1,)\nassert len(x) == 1", "", true, ""},
 		{"slice syntax", "assert 'abcdefg'[1:5:2] == 'bd'", "", true, ""},
+		{"add a starred tuple", "a = [1]\nx = ()\nx += tuple(a) + (2,)\nassert x == (1, 2)", "", true, ""},
+		// The known differences, as doc.go describes them.
+		{"bytes are Starlark bytes", "assert b'ab'[1] == b'b'", "", true, ""},
+		{"x *= 2 makes a new list", "x = [1]\ny = x\nx *= 2\nassert y == [1] and x == [1, 1]", "", true, ""},
+		{"x[k] += y computes k twice", "n = [0]\ndef f():\n    n[0] += 1\n    return 0\nd = [0]\nd[f()] += 1\nassert n[0] == 2", "", true, ""},
 		{"format with precision", "x = float(user_answer)\nassert False, f'{x:.2f} ' + format(x, '.1f')", "2.345", false, "2.35 2.3"},
 	})
 }

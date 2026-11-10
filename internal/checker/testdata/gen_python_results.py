@@ -145,11 +145,15 @@ CASES = [
      "answers": ["１.５", "Infinity", "-inf", "+nan", "+1E-3", "1_0e1_0", " 1.5 ", "\x1c1.5", "١٫٥", "in_f", ".5_0", "1e5_"]},
     # Names and statements that fix round 3 changed
     {"name": "bytes() is not in the sandbox", "checker": "b = bytes(user_answer, 'utf-8')\nassert b", "answers": ["x"]},
+    {"name": "fail() is not in the sandbox", "checker": "if user_answer != 'ok':\n    fail('wrong')", "answers": ["ok", "no"]},
     {"name": "bytes literal", "checker": "assert b'ab' + b'c' == b'abc' and user_answer, 'empty'", "answers": ["x", ""]},
     {"name": "+= with a tuple", "checker": "x = []\nx += user_answer.strip(),\nassert x == ['ok'], f'{x}'", "answers": ["ok", "no"]},
     {"name": "%= with a tuple", "checker": "s = '%s-%s'\ns %= user_answer.strip(), 'x'\nassert s == 'a-x', s", "answers": ["a", "b"]},
     # Only NaN: Starlark cannot compare other numbers with a bool.
     {"name": "NaN compared with a bool", "checker": "x = float(user_answer)\nassert not (x <= True) and not (False > x) and x != True, f'{x}'", "answers": ["nan", "-nan"]},
+    {"name": "zip and map stop at the shortest", "checker": "w = user_answer.split()\nr = list(zip(w, range(10 ** 9), 'abc'))\nm = list(map(lambda a, b: a + b, w, 'xyz'))\nassert len(r) == 2 and m == ['ax', 'by'], f'{r} {m}'", "answers": ["a b", "a b c d"]},
+    # x=x: in 1.19 a lambda could not read the checker's variables.
+    {"name": "map sees a change of the list", "checker": "x = [1, 2, 3]\nr = list(map(lambda v, x=x: x.pop() if v == 1 else v, x))\nassert r == [3, 2] and user_answer, f'{r}'", "answers": ["x", ""]},
     {"name": "format field names with a sign", "checker": "d = {'-1': user_answer.strip()}\nassert '{0[-1]}'.format(d) == 'ok', '{0[-1]}!'.format(d)", "answers": ["ok", "no"]},
     # Python features the Go checker cannot run
     {"name": "try and except", "checker": "try:\n    v = float(user_answer)\nexcept ValueError:\n    v = None\nassert v == 1.5, 'Expected 1.5'",

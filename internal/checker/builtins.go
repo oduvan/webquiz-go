@@ -74,6 +74,7 @@ func newPredeclared() starlark.StringDict {
 		"type":            builtin("type", typeBuiltin),
 		"print":           builtin("print", printBuiltin),
 		"dict":            builtin("dict", dictBuiltin),
+		"zip":             builtin("zip", zipBuiltin),
 	}
 	// These accept text like Python does: list("ab") is ["a", "b"].
 	for name, textArgs := range map[string]func(int) bool{
@@ -85,7 +86,6 @@ func newPredeclared() starlark.StringDict {
 		"enumerate": firstArg,
 		"any":       firstArg,
 		"all":       firstArg,
-		"zip":       func(int) bool { return true },
 		"min":       nil,
 		"max":       nil,
 	} {
@@ -119,8 +119,9 @@ func isPredeclared(name string) bool {
 
 // hidden holds Starlark builtins that a checker cannot use: the name is not
 // defined, as in 1.19. bytes(n) makes n bytes in one step, before any limit
-// can stop it. Text like b'abc' still works.
-var hidden = map[string]bool{"bytes": true}
+// can stop it, and fail(*args) joins the text of all its arguments without
+// a size check. Text like b'abc' still works.
+var hidden = map[string]bool{"bytes": true, "fail": true}
 
 const stateKey = "webquiz.checker"
 
@@ -141,8 +142,12 @@ func newMeter(thread *starlark.Thread) meter {
 }
 
 // step counts one item and tells when the check must stop.
-func (m meter) step() error {
-	m.thread.Steps++
+func (m meter) step() error { return m.add(1) }
+
+// add counts n steps at once, for work done in one go, like copying a
+// list, and tells when the check must stop.
+func (m meter) add(n int) error {
+	m.thread.Steps += uint64(n)
 	if m.thread.Steps >= MaxSteps && m.state != nil {
 		m.state.stop(m.thread, tooManySteps)
 	}
@@ -211,8 +216,13 @@ func knownLength(v starlark.Value) (int, bool) {
 
 // tooManyItems tells whether a list of n items would be larger than
 // maxRepeatBytes. An item takes about 16 bytes.
-func tooManyItems(n int) bool {
-	return uint64(n)*16 > maxRepeatBytes
+func tooManyItems(n int) bool { return tooLarge(n, 16) }
+
+// tooLarge tells whether n items of itemBytes bytes each would be larger
+// than maxRepeatBytes. It divides instead of multiplying, so that a huge
+// n, like the length of range(2 ** 62), cannot overflow.
+func tooLarge(n int, itemBytes uint64) bool {
+	return n < 0 || itemBytes > 0 && uint64(n) > maxRepeatBytes/itemBytes
 }
 
 // items collects the items of v. Lists and tuples are used as they are. It
@@ -226,6 +236,10 @@ func items(thread *starlark.Thread, v starlark.Value) (starlark.Tuple, error) {
 	case starlark.Tuple:
 		return v, nil
 	case *starlark.List:
+		// The copy is quick, but it counts as work, like a loop would.
+		if err := newMeter(thread).add(v.Len()); err != nil {
+			return nil, err
+		}
 		out := make(starlark.Tuple, v.Len())
 		for i := range out {
 			out[i] = v.Index(i)
@@ -243,10 +257,114 @@ func items(thread *starlark.Thread, v starlark.Value) (starlark.Tuple, error) {
 	return out, err
 }
 
+// lockstep opens an iterator for every argument of zip() and map(), which
+// take one item of each argument at a time. Text gives its characters.
+// Nothing is copied: zip(range(10 ** 9), 'ab') reads only two items of the
+// range. rows is the length of the shortest argument, or -1 when no length
+// is known. The caller must call Done on the iterators.
+func lockstep(args starlark.Tuple) (iters []starlark.Iterator, rows int, err error) {
+	rows = -1
+	for _, arg := range args {
+		var it starlark.Iterator
+		switch v := arg.(type) {
+		case starlark.String:
+			it = &charIterator{text: string(v)}
+		case *starlark.List:
+			it = &listIterator{list: v}
+		case starlark.Iterable:
+			it = v.Iterate()
+		default:
+			done(iters)
+			return nil, 0, fmt.Errorf("'%s' object is not iterable", pyTypeName(arg))
+		}
+		iters = append(iters, it)
+		if n, ok := knownLength(arg); ok && (rows < 0 || n < rows) {
+			rows = n
+		}
+	}
+	return iters, rows, nil
+}
+
+func done(iters []starlark.Iterator) {
+	for _, it := range iters {
+		it.Done()
+	}
+}
+
+// charIterator gives the characters of a text, one at a time.
+type charIterator struct{ text string }
+
+func (it *charIterator) Next(p *starlark.Value) bool {
+	if it.text == "" {
+		return false
+	}
+	r, size := utf8.DecodeRuneInString(it.text)
+	*p = starlark.String(string(r))
+	it.text = it.text[size:]
+	return true
+}
+
+func (it *charIterator) Done() {}
+
+// listIterator goes through a list like Python's list iterator does: the
+// function given to map() may change the list, and the loop sees the
+// change. Starlark's own iterator would refuse the change.
+type listIterator struct {
+	list *starlark.List
+	next int
+}
+
+func (it *listIterator) Next(p *starlark.Value) bool {
+	if it.next >= it.list.Len() {
+		return false
+	}
+	*p = it.list.Index(it.next)
+	it.next++
+	return true
+}
+
+func (it *listIterator) Done() {}
+
+// zipBuiltin is zip(): a list of tuples, as long as the shortest argument.
+// The size of the result is checked before it is made.
+func zipBuiltin(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if len(kwargs) > 0 {
+		return nil, errors.New("zip does not accept keyword arguments")
+	}
+	iters, rows, err := lockstep(args)
+	if err != nil {
+		return nil, err
+	}
+	defer done(iters)
+	// A row is a tuple: about 40 bytes, and 16 for each item.
+	rowBytes := 40 + 16*uint64(len(args))
+	if rows > 0 && tooLarge(rows, rowBytes) {
+		return nil, errors.New(tooMuchMemory)
+	}
+	result := make([]starlark.Value, 0, max(rows, 0))
+	m := newMeter(thread)
+	for len(iters) > 0 {
+		if err := m.step(); err != nil {
+			return nil, err
+		}
+		if tooLarge(len(result)+1, rowBytes) {
+			return nil, errors.New(tooMuchMemory)
+		}
+		row := make(starlark.Tuple, len(iters))
+		for i, it := range iters {
+			if !it.Next(&row[i]) {
+				return unlessStopped(thread, starlark.NewList(result), nil)
+			}
+		}
+		result = append(result, row)
+	}
+	return starlark.NewList(result), nil
+}
+
 // resultItemBytes is about how much memory these builtins take for each
 // item of their result: a set keeps a hash table entry for every item,
-// enumerate and zip make a tuple for every item. The builtin makes the
-// whole result in one step, so the size is checked before.
+// enumerate makes a tuple for every item. The builtin makes the whole
+// result in one step, so the size is checked before.
 var resultItemBytes = map[string]uint64{
 	"set":       hashItemBytes,
 	"frozenset": hashItemBytes,
@@ -257,20 +375,31 @@ var resultItemBytes = map[string]uint64{
 // takes, with the room that the hash table keeps free.
 const hashItemBytes = 128
 
-// checkHashItems refuses arguments that would put too many items into a
-// set or a dict in one step.
-func checkHashItems(args starlark.Tuple) error {
+// checkHashItems refuses a call that would put too many items into one set
+// or dict in one step: the items it already has, the items of all the
+// arguments and the keyword arguments, added up.
+func checkHashItems(existing int, args starlark.Tuple, kwargs []starlark.Tuple) error {
+	total := existing + len(kwargs)
+	if tooLarge(total, hashItemBytes) {
+		return errors.New(tooMuchMemory)
+	}
 	for _, arg := range args {
-		if n, ok := knownLength(arg); ok && uint64(n)*hashItemBytes > maxRepeatBytes {
+		n, ok := knownLength(arg)
+		if !ok {
+			continue
+		}
+		// Both are small here, so the sum cannot overflow.
+		if tooLarge(n, hashItemBytes) || tooLarge(total+n, hashItemBytes) {
 			return errors.New(tooMuchMemory)
 		}
+		total += n
 	}
 	return nil
 }
 
 // dictBuiltin is dict(), after checkHashItems.
 func dictBuiltin(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := checkHashItems(args); err != nil {
+	if err := checkHashItems(0, args, kwargs); err != nil {
 		return nil, err
 	}
 	v, err := starlark.Universe["dict"].(*starlark.Builtin).CallInternal(thread, args, kwargs)
@@ -278,9 +407,14 @@ func dictBuiltin(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tup
 }
 
 // hashMethod calls the Starlark dict or set method of the same name, like
-// update() or union(), after checkHashItems.
+// update() or union(), after checkHashItems. The items of the dict or set
+// count too: union() copies them, and update() makes the table larger.
 func hashMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := checkHashItems(args); err != nil {
+	existing := 0
+	if receiver, ok := b.Receiver().(starlark.Sequence); ok {
+		existing = receiver.Len()
+	}
+	if err := checkHashItems(existing, args, kwargs); err != nil {
 		return nil, err
 	}
 	native, err := b.Receiver().(starlark.HasAttrs).Attr(b.Name())
@@ -310,22 +444,16 @@ func unlessStopped(thread *starlark.Thread, v starlark.Value, err error) (starla
 // max).
 func textBuiltin(name, original string, textArg func(int) bool) *starlark.Builtin {
 	starlarkBuiltin := starlark.Universe[original].(*starlark.Builtin)
+	itemBytes := resultItemBytes[name]
 	return builtin(name, func(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		itemBytes := resultItemBytes[name]
-		if name == "zip" {
-			itemBytes = 40 + 16*uint64(len(args))
-		}
 		converted := make(starlark.Tuple, len(args))
-		shortest := -1
 		for i, arg := range args {
 			converted[i] = arg
 			isIterable := textArg != nil && textArg(i) || textArg == nil && len(args) == 1
 			if !isIterable {
 				continue
 			}
-			// zip() is as long as its shortest argument, so it can only
-			// check after it has them all.
-			if n, ok := knownLength(arg); ok && name != "zip" && uint64(n)*itemBytes > maxRepeatBytes {
+			if n, ok := knownLength(arg); ok && tooLarge(n, itemBytes) {
 				return nil, errors.New(tooMuchMemory)
 			}
 			switch arg.(type) {
@@ -334,14 +462,11 @@ func textBuiltin(name, original string, textArg func(int) bool) *starlark.Builti
 				if err != nil {
 					return nil, err
 				}
-				converted[i] = collected
-				if shortest < 0 || len(collected) < shortest {
-					shortest = len(collected)
+				if tooLarge(len(collected), itemBytes) {
+					return nil, errors.New(tooMuchMemory)
 				}
+				converted[i] = collected
 			}
-		}
-		if shortest > 0 && uint64(shortest)*itemBytes > maxRepeatBytes {
-			return nil, errors.New(tooMuchMemory)
 		}
 		if name == "enumerate" && len(kwargs) == 1 && kwargs[0][0] == starlark.String("start") && len(converted) == 1 {
 			// Python allows enumerate(x, start=1); Starlark only enumerate(x, 1).
@@ -1226,31 +1351,37 @@ func isinstanceBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tu
 	return starlark.False, nil
 }
 
+// mapBuiltin is map(), which gives a list here. It stops at the shortest
+// argument, as in Python, and reads the arguments one item at a time.
 func mapBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(kwargs) > 0 || len(args) < 2 {
 		return nil, errors.New("map() must have at least two arguments.")
 	}
-	lists := make([]starlark.Tuple, len(args)-1)
-	shortest := -1
-	for i, arg := range args[1:] {
-		list, err := items(thread, arg)
-		if err != nil {
-			return nil, err
-		}
-		lists[i] = list
-		if shortest < 0 || len(list) < shortest {
-			shortest = len(list)
-		}
+	iters, rows, err := lockstep(args[1:])
+	if err != nil {
+		return nil, err
 	}
-	out := make([]starlark.Value, 0, shortest)
+	defer done(iters)
+	// Every call gets one item of each argument: all of them together may
+	// not be more than a list could hold.
+	argBytes := 16 * uint64(len(iters))
+	if rows > 0 && tooLarge(rows, argBytes) {
+		return nil, errors.New(tooMuchMemory)
+	}
+	var out []starlark.Value
 	m := newMeter(thread)
-	for i := 0; i < shortest; i++ {
+	for {
 		if err := m.step(); err != nil {
 			return nil, err
 		}
-		call := make(starlark.Tuple, len(lists))
-		for j, list := range lists {
-			call[j] = list[i]
+		if tooLarge(len(out)+1, argBytes) {
+			return nil, errors.New(tooMuchMemory)
+		}
+		call := make(starlark.Tuple, len(iters))
+		for i, it := range iters {
+			if !it.Next(&call[i]) {
+				return unlessStopped(thread, starlark.NewList(out), nil)
+			}
 		}
 		v, err := starlark.Call(thread, args[0], call, nil)
 		if err != nil {
@@ -1258,7 +1389,6 @@ func mapBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tupl
 		}
 		out = append(out, v)
 	}
-	return starlark.NewList(out), nil
 }
 
 func filterBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
