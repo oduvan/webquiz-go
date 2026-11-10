@@ -134,10 +134,7 @@ func TestTimeLimitNullTurnsTheLimitOff(t *testing.T) {
 
 // py: tests/test_quiz_start_settings.py::test_restart_of_the_same_quiz_keeps_the_start_settings
 //
-// The Python test saved the config (PUT /api/admin/config, Task 9), which
-// restarts the running quiz. Saving the same quiz in the editor restarts it
-// the same way (a switch to the same file without settings), so this test
-// uses that.
+// Saving the config restarts the running quiz; the start settings stay.
 func TestRestartOfTheSameQuizKeepsTheStartSettings(t *testing.T) {
 	t.Parallel()
 	quiz := startSettingsQuiz(map[string]any{"show_right_answer": true})
@@ -145,11 +142,18 @@ func TestRestartOfTheSameQuizKeepsTheStartSettings(t *testing.T) {
 	if res := startQuiz(t, admin, "q.yaml", map[string]any{"show_right_answer": false}); res.Status != 200 {
 		t.Fatalf("%d %s", res.Status, res.Body)
 	}
-	if res := admin.Put(t, "/api/admin/quiz/q.yaml", map[string]any{"mode": "wizard", "quiz_data": quiz}); res.Status != 200 {
-		t.Fatalf("save: %d %s", res.Status, res.Body)
+	// Not in the Python test: a student registered before the save is gone
+	// after it, so the save really restarted the quiz.
+	userID := ts.PostJSON(t, "/api/register", map[string]any{"username": "Before"}).JSON(t)["user_id"].(string)
+	saved := admin.Put(t, "/api/admin/config", map[string]any{"content": "registration:\n  fields:\n    - \"Grade\"\n"})
+	if saved.Status != 200 {
+		t.Fatalf("config save: %d %s", saved.Status, saved.Body)
 	}
 	if quizPageBoot(t, ts)["show_right_answer"] != false {
 		t.Error("the restart dropped the start settings")
+	}
+	if verify := ts.GetJSON(t, "/api/verify-user/"+userID).JSON(t); verify["valid"] != false {
+		t.Errorf("the config save did not restart the quiz: %v", verify)
 	}
 }
 
