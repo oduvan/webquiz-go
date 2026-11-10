@@ -8,8 +8,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/oduvan/webquiz-go/internal/config"
 	"github.com/oduvan/webquiz-go/internal/tunnel"
@@ -96,4 +99,128 @@ func TestNoTunnelWithoutServer(t *testing.T) {
 	if s.tunnel != nil {
 		t.Error("a tunnel added by a config change must wait for a restart")
 	}
+}
+
+// Not a port. An admin page that connects while the tunnel reports a status
+// change gets that report: the report waits until the page has joined the
+// hub and comes after the page's initial state. Before, the page read the
+// status, then the tunnel changed it and reported it to the pages that were
+// already there, and only then the new page joined: it kept the old status.
+func TestAdminSocketMissesNoTunnelStatus(t *testing.T) {
+	keys := t.TempDir()
+	s := newTestServer(t, map[string]string{"q.yaml": quizText("Q")}, func(cfg *config.Config, _ *Options) {
+		cfg.Tunnel = config.TunnelConfig{
+			Server:     "tunnel.example.com",
+			PublicKey:  filepath.Join(keys, "id_ed25519.pub"),
+			PrivateKey: filepath.Join(keys, "id_ed25519"),
+			Config:     &config.TunnelServerConfig{Username: "u", SocketDirectory: "/tmp/s", BaseURL: "https://tunnel.example.com/t"},
+		}
+	})
+	page := &wsClient{send: make(chan []byte, 4), done: make(chan struct{})}
+
+	// The page has made its initial state and waits to join the hub.
+	s.adminClients.mu.Lock()
+	hubLocked := true
+	joinResult := make(chan bool, 1)
+	go func() { joinResult <- s.joinAdminSocket(page) }()
+	joined := sync.OnceValue(func() bool { return <-joinResult })
+	disconnected := make(chan struct{})
+	disconnecting := false
+	// Also when the test fails: let the page join, take it out of the hub
+	// again (it has no connection for the server's Close) and wait for the
+	// tunnel's Disconnect.
+	defer func() {
+		if hubLocked {
+			s.adminClients.mu.Unlock()
+		}
+		if joined() {
+			s.adminClients.done(page)
+		}
+		if disconnecting {
+			<-disconnected
+		}
+	}()
+	waitForStack(t, "the page to wait for the hub", func(stack string) bool {
+		return stackWaitsForLockIn(stack, "server.(*wsHub).add(")
+	})
+
+	// At this moment the tunnel reports a status: the report must wait.
+	disconnecting = true
+	go func() {
+		s.tunnel.Disconnect()
+		close(disconnected)
+	}()
+	waitForStack(t, "the tunnel report to wait for the page", func(stack string) bool {
+		return stackWaitsForLockIn(stack, "tunnel.(*Manager).notifyStatus(")
+	})
+	s.adminClients.mu.Unlock()
+	hubLocked = false
+
+	if !joined() {
+		t.Fatal("the page did not join")
+	}
+	for _, want := range []string{"initial_state", "tunnel_status"} {
+		select {
+		case data := <-page.send:
+			var message map[string]any
+			if err := json.Unmarshal(data, &message); err != nil {
+				t.Fatal(err)
+			}
+			if message["type"] != want {
+				t.Errorf("message %v, want type %s", message, want)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("the page got no %s message", want)
+		}
+	}
+}
+
+// waitForStack waits until the stack of some goroutine, as runtime.Stack
+// writes it, makes match return true, and fails the test after 10 seconds.
+func waitForStack(t *testing.T, what string, match func(stack string) bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		buf := make([]byte, 1<<16)
+		for {
+			n := runtime.Stack(buf, true)
+			if n < len(buf) {
+				buf = buf[:n]
+				break
+			}
+			buf = make([]byte, 2*len(buf))
+		}
+		for _, stack := range strings.Split(string(buf), "\n\n") {
+			if match(stack) {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// stackWaitsForLockIn tells whether a goroutine stack waits to lock a
+// sync.Mutex in the function fn, for example "server.(*wsHub).add(".
+func stackWaitsForLockIn(stack, fn string) bool {
+	header, rest, _ := strings.Cut(stack, "\n")
+	if !strings.Contains(header, "[sync.Mutex.Lock") {
+		return false
+	}
+	// Function lines start without a tab. The line after
+	// "sync.(*Mutex).Lock(" names the function that called it.
+	var funcs []string
+	for _, line := range strings.Split(rest, "\n") {
+		if line != "" && !strings.HasPrefix(line, "\t") {
+			funcs = append(funcs, line)
+		}
+	}
+	for i, f := range funcs {
+		if strings.HasPrefix(f, "sync.(*Mutex).Lock(") && i+1 < len(funcs) {
+			return strings.Contains(funcs[i+1], fn)
+		}
+	}
+	return false
 }

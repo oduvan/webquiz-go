@@ -1,11 +1,13 @@
 package tunnel
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 // py: tests/test_tunnel.py::test_tunnel_manager_initialization
@@ -144,6 +146,47 @@ func TestStatusCallbackPanicIsLogged(t *testing.T) {
 		t.Errorf("the log has no \"Error in status callback: broken callback\":\n%s", logs)
 	}
 	m.Close() // reports the status again; it must not hang or panic
+}
+
+// Not a port. WithStatus holds back status reports while its function runs:
+// a change that happens meanwhile is reported after the function returns.
+// The admin WebSocket relies on it to put the status in a new page's first
+// message without missing a change that happens at the same moment.
+func TestWithStatusHoldsBackReports(t *testing.T) {
+	checkGoroutines(t)
+	m, srv := newTunnelSetup(t, "abc123", 8080)
+	srv.failNextDials(1)
+	result := make(chan error, 1)
+
+	m.WithStatus(func(status Status) {
+		if status.Error != "" {
+			t.Errorf("status = %+v, want no error yet", status)
+		}
+		go func() { result <- m.Connect(context.Background()) }()
+		// The failed Connect changes the status and then waits to report it.
+		waitForGoroutine(t, "the failed Connect to wait with its report", func(stack string) bool {
+			return waitsForLockIn(stack, "tunnel.(*Manager).notifyStatus(")
+		})
+		if st := m.Status(); !strings.HasPrefix(string(st.Error), "Failed to establish SSH tunnel: ") {
+			t.Errorf("status while the report waits = %+v, want the error of the failed Connect", st)
+		}
+		if got := m.statuses.all(); len(got) != 0 {
+			t.Errorf("reports while WithStatus runs: %+v, want none", got)
+		}
+	})
+
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Error("Connect() succeeded, want the failure the test set up")
+		}
+	case <-time.After(waitTimeout):
+		t.Fatal("Connect still waits after WithStatus returned")
+	}
+	reports := m.statuses.all()
+	if len(reports) != 1 || !strings.HasPrefix(string(reports[0].Error), "Failed to establish SSH tunnel: ") {
+		t.Errorf("reports = %+v, want one with the error of the failed Connect", reports)
+	}
 }
 
 // py: tests/test_tunnel.py::test_public_endpoint_requires_connection

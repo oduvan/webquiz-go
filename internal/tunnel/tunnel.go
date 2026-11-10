@@ -114,7 +114,7 @@ type Manager struct {
 	logger atomic.Pointer[slog.Logger]
 
 	keysMu   sync.Mutex // EnsureKeys runs one call at a time
-	notifyMu sync.Mutex // status reports go out one at a time
+	notifyMu sync.Mutex // status reports go out one at a time; WithStatus holds them back
 
 	mu       sync.Mutex // guards the fields below
 	cfg      Config
@@ -230,6 +230,18 @@ func (m *Manager) notifyStatus() {
 		}
 	}()
 	m.onStatus(status)
+}
+
+// WithStatus calls fn with the current status while it holds back status
+// reports: a change that happens while fn runs is reported after fn returns.
+// The admin WebSocket uses it to put the status in a new page's first
+// message without missing a change that happens at the same moment (the
+// same idea as transfer.Manager.WithIncoming). fn must not call Connect,
+// Disconnect or Close: they wait for the reports that fn holds back.
+func (m *Manager) WithStatus(fn func(Status)) {
+	m.notifyMu.Lock()
+	defer m.notifyMu.Unlock()
+	fn(m.Status())
 }
 
 // generateSocketID returns a random socket name of 6 or 8 hex characters.

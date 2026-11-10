@@ -64,6 +64,20 @@ func (s *Server) onTunnelStatus(status tunnel.Status) {
 	s.broadcastAdmin(map[string]any{"type": "tunnel_status", "tunnel": s.tunnelInfo(status)})
 }
 
+// withTunnelInfo calls fn with the tunnel status for the admin page (nil
+// when no tunnel is configured). While fn runs, the tunnel holds back its
+// status reports (tunnel.Manager.WithStatus): a change that happens
+// meanwhile reaches the admin pages after fn, so a page that joins the hub
+// in fn cannot miss it. fn must not call the tunnel's Connect, Disconnect or
+// Close, and nobody may call them while holding mu (fn takes mu).
+func (s *Server) withTunnelInfo(fn func(tunnelInfo any)) {
+	if s.tunnel == nil {
+		fn(nil)
+		return
+	}
+	s.tunnel.WithStatus(func(status tunnel.Status) { fn(s.tunnelInfo(status)) })
+}
+
 // tunnelInfo is the tunnel status for the admin page: configured, server and
 // socket_name, then the status fields (connected, url, error, keys_status,
 // public_key_content) with the tunnel package's JSON rules (null for an

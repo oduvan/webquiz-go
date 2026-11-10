@@ -158,9 +158,11 @@ func (s *Server) transferResult(w http.ResponseWriter, r *http.Request) error {
 }
 
 // joinAdminSocket adds a new admin page to the hub with its initial_state
-// message. It holds the transfer manager's lock around the whole step, so
-// the page gets a transfer request that arrives at the same moment either
-// in transfer_requests or as a transfer_request message.
+// message. It holds the transfer manager's lock and the tunnel's status lock
+// around the whole step, so the page gets a transfer request or a tunnel
+// status change that comes at the same moment either in its initial state
+// or as a message after it, never neither. Lock order: the transfer
+// manager's lock, the tunnel's status lock, then mu.
 func (s *Server) joinAdminSocket(c *wsClient) bool {
 	joined := false
 	s.transfer.WithIncoming(func(requests []transfer.RequestView, err error) {
@@ -168,7 +170,9 @@ func (s *Server) joinAdminSocket(c *wsClient) bool {
 			s.log.Error(fmt.Sprintf("Error sending initial state to admin WebSocket client: %v", err))
 			return
 		}
-		joined = s.joinHub(s.adminClients, c, func() any { return s.adminInitialStateLocked(requests) })
+		s.withTunnelInfo(func(tunnelInfo any) {
+			joined = s.joinHub(s.adminClients, c, func() any { return s.adminInitialStateLocked(requests, tunnelInfo) })
+		})
 	})
 	return joined
 }

@@ -71,6 +71,11 @@
 //     mu locked, so every later request would wait forever.
 //   - The transfer manager (s.transfer) takes its own lock and then mu (it
 //     asks for the files in use). Never call it while holding mu.
+//   - A new admin page (joinAdminSocket) takes the transfer manager's lock,
+//     then the tunnel's status lock (tunnel.Manager.WithStatus), then mu, so
+//     it misses no transfer request and no tunnel status change. The tunnel
+//     takes its status lock to report a change, so never call the tunnel's
+//     Connect, Disconnect or Close while holding mu.
 //   - s.text, s.isTrustedIP and s.validSession take mu themselves. A Go
 //     mutex cannot be locked twice by the same caller, so inside a locked
 //     section read s.translations[key] and s.cfg directly instead.

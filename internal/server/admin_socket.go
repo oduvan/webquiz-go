@@ -26,9 +26,10 @@ func (s *Server) registrationFieldsLocked(user *User) map[string]any {
 }
 
 // adminInitialStateLocked is the initial_state message of websocket_admin,
-// with the transfer requests that wait for the admin. The caller holds mu
-// (and the transfer manager's lock, see joinAdminSocket).
-func (s *Server) adminInitialStateLocked(transferRequests []transfer.RequestView) map[string]any {
+// with the transfer requests that wait for the admin and the tunnel status
+// (nil without a tunnel). The caller holds mu, the transfer manager's lock
+// and the tunnel's status lock (see joinAdminSocket).
+func (s *Server) adminInitialStateLocked(transferRequests []transfer.RequestView, tunnelInfo any) map[string]any {
 	pending := map[string]any{}
 	if s.cfg.Registration.Approve {
 		for userID, user := range s.users {
@@ -39,10 +40,6 @@ func (s *Server) adminInitialStateLocked(transferRequests []transfer.RequestView
 				}
 			}
 		}
-	}
-	var tunnelInfo any
-	if s.tunnel != nil {
-		tunnelInfo = s.tunnelInfo(s.tunnel.Status())
 	}
 	return map[string]any{
 		"type":              "initial_state",

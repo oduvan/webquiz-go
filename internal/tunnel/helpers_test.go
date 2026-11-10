@@ -179,6 +179,30 @@ func waitForGoroutine(t *testing.T, what string, match func(stack string) bool) 
 	})
 }
 
+// waitsForLockIn tells whether a goroutine stack, as runtime.Stack writes
+// it, waits to lock a sync.Mutex in the function fn, for example
+// "tunnel.(*Manager).notifyStatus(".
+func waitsForLockIn(stack, fn string) bool {
+	header, rest, _ := strings.Cut(stack, "\n")
+	if !strings.Contains(header, "[sync.Mutex.Lock") {
+		return false
+	}
+	// Function lines start without a tab. The line after
+	// "sync.(*Mutex).Lock(" names the function that called it.
+	var funcs []string
+	for _, line := range strings.Split(rest, "\n") {
+		if line != "" && !strings.HasPrefix(line, "\t") {
+			funcs = append(funcs, line)
+		}
+	}
+	for i, f := range funcs {
+		if strings.HasPrefix(f, "sync.(*Mutex).Lock(") && i+1 < len(funcs) {
+			return strings.Contains(funcs[i+1], fn)
+		}
+	}
+	return false
+}
+
 // tcpServer is a plain TCP server on 127.0.0.1 that runs handle for each
 // connection. Create it before the manager, so it closes after the manager.
 type tcpServer struct {
