@@ -37,7 +37,8 @@ WebQuiz 2.0 is the Go rewrite of the Python/aiohttp WebQuiz 1.19 (<https://githu
 - `web/` - five pages: `index.html` (quiz), `admin.html`, `files.html`, `live-stats.html`, `csv-table.html`; sources in `web/src/{quiz,admin,files,livestats,csvtable,shared}`
 - `e2e/` - Playwright tests; `e2e/fixtures/server.ts` starts the built binary in a temp folder
 - `scripts/screenshots.ts` - takes the screenshots of `docs/imgs` from the real binary
-- `migration/` - `python-tests.txt` (911 ids of the 1.19 tests) and the check that every id is ported
+- `migration/` - `python-tests.txt` (911 ids of the 1.19 tests) and the check that every id is ported (a normal Go test)
+- `harness/` - classroom test harness in TypeScript: a real server, real browsers, a scripted teacher, scripted and AI agent students (`npx tsx harness/run.ts <scenario>`, ports 8199 and 8198). Only `harness/checks.test.ts` runs as a test (`npm --prefix harness test`). See `harness/README.md`
 - `installer/webquiz.iss` - Inno Setup script for the Windows installer
 - `docs/uk/`, `docs/en/`, `docs/imgs/` - user guide (compiled to PDF with the version)
 - `gh-pages/index.html` - download page template (version placeholder: `{{VERSION}}`); `gh-pages/docs/` - Docsify config (en/, uk/)
@@ -84,7 +85,7 @@ make test-web     # tsc --noEmit + Vitest
 make e2e          # Playwright against the built binary (e2e/.bin/webquiz)
 make dist         # all release binaries and zips in dist/
 make release-check
-WEBQUIZ_REQUIRE_ALL_PORTED=1 go test ./migration/
+go test ./migration/   # only the check that every Python test id is ported (make test runs it too)
 gofmt -l .        # must print nothing (CI checks it)
 
 ./bin/webquiz --master-key secret123    # run

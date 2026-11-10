@@ -48,7 +48,8 @@ The Go program embeds the built web pages, so `make web` must run before any Go 
 make test         # go vet and go test -race ./...
 make test-web     # TypeScript check and Vitest unit tests of web/
 make e2e          # Playwright tests of the real pages against the real program
-WEBQUIZ_REQUIRE_ALL_PORTED=1 go test ./migration/   # every Python test id is ported
+go test ./migration/   # only the check that every Python test id is ported (make test runs it too)
+npm --prefix harness ci && npm --prefix harness test   # unit tests of the classroom harness checks
 ```
 
 Go tests start servers in the same process on a free port. Playwright tests start the built program on a free port in a new temporary folder. No test uses a fixed port.
@@ -72,6 +73,7 @@ To retake the screenshots of the docs: `make build`, then `npm --prefix scripts 
 | `internal/testutil/` | Helpers that start servers for tests |
 | `web/` | React and Tailwind pages (quiz, admin, files, live stats, CSV table) |
 | `e2e/` | Playwright tests |
+| `harness/` | Classroom test harness: a real server, real browsers, scripted and AI agent students (see `harness/README.md`) |
 | `scripts/` | Screenshot script for the docs |
 | `migration/` | List of the 911 Python tests and the check that all are ported |
 | `installer/` | Inno Setup script of the Windows installer |

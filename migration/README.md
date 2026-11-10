@@ -16,8 +16,8 @@ func TestAdminAuthEndpointWithValidKey(t *testing.T) { ... }
 In table tests the tag can be a field: `{py: "tests/test_decimal_points.py::TestDecimalPointsValidation::test_valid_points_accepted[0.5]", ...}`.
 Playwright and harness tests use the same comment: `// py: tests/test_selenium_multiple_choice.py::test_...`.
 
-`ported_test.go` fails when an id has no tag. Run it with:
+`ported_test.go` fails when an id has no tag, and when a tag names an id that is not in `python-tests.txt`. It is a normal Go test, so `go test ./...` (and `make test`) runs it. To run only this check:
 
 ```bash
-WEBQUIZ_REQUIRE_ALL_PORTED=1 go test ./migration/
+go test ./migration/
 ```

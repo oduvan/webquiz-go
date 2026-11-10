@@ -109,11 +109,6 @@ func missingIDs(ids []string, tags map[string][]string) []string {
 }
 
 func TestEveryPythonTestIsPorted(t *testing.T) {
-	// While the migration is in progress the check only runs on request.
-	// Task 20 of docs/superpowers/plans/2026-11-09-go-migration.md removes this skip.
-	if os.Getenv("WEBQUIZ_REQUIRE_ALL_PORTED") != "1" {
-		t.Skip("set WEBQUIZ_REQUIRE_ALL_PORTED=1 to check that every Python test is ported")
-	}
 	ids, err := readIDs("python-tests.txt")
 	if err != nil {
 		t.Fatal(err)

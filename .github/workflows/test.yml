@@ -40,12 +40,9 @@ jobs:
           exit 1
         fi
 
-    # The migration check test is skipped here: it has its own step below.
+    # This also runs the migration check (./migration/): every Python test id is ported.
     - name: go test -race
       run: go test -race ./...
-
-    - name: Migration check (every Python test id is ported)
-      run: WEBQUIZ_REQUIRE_ALL_PORTED=1 go test ./migration/
 
   web:
     runs-on: ubuntu-latest
@@ -112,13 +109,7 @@ jobs:
       with:
         node-version: 22
 
-    # The harness is added in a later task. Until harness/package.json exists
-    # there is nothing to test.
     - name: Harness check tests
       run: |
-        if [ -f harness/package.json ]; then
-          npm --prefix harness ci
-          npm --prefix harness test
-        else
-          echo "No harness/package.json yet, skipping."
-        fi
+        npm --prefix harness ci
+        npm --prefix harness test
