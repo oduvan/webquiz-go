@@ -277,17 +277,12 @@ func extractZip(archive []byte, dir string) (int, error) {
 		return 0, fmt.Errorf("%w: %v", errBadZip, err)
 	}
 	for _, entry := range reader.File {
-		var parts []string
-		for _, part := range strings.Split(entry.Name, "/") {
-			if part != "" && part != "." && part != ".." {
-				parts = append(parts, part)
-			}
-		}
+		parts := zipNameParts(entry.Name)
 		if len(parts) == 0 {
 			continue
 		}
 		target := filepath.Join(append([]string{dir}, parts...)...)
-		if strings.HasSuffix(entry.Name, "/") {
+		if strings.HasSuffix(entry.Name, "/") || strings.HasSuffix(entry.Name, "\\") {
 			if err := os.MkdirAll(target, 0o755); err != nil {
 				return 0, err
 			}
@@ -301,6 +296,26 @@ func extractZip(archive []byte, dir string) (int, error) {
 		}
 	}
 	return len(reader.File), nil
+}
+
+// zipNameParts cuts an archive entry name into safe path parts, like
+// ZipFile.extractall does on Windows, and on every system (so the result does
+// not depend on where the server runs): both / and \ separate parts, a drive
+// letter at the start is dropped, empty, "." and ".." parts are dropped, and
+// a colon or NUL inside a part becomes "_".
+func zipNameParts(name string) []string {
+	name = strings.ReplaceAll(name, "\\", "/")
+	if len(name) >= 2 && name[1] == ':' {
+		name = name[2:]
+	}
+	var parts []string
+	for _, part := range strings.Split(name, "/") {
+		if part == "" || part == "." || part == ".." {
+			continue
+		}
+		parts = append(parts, strings.NewReplacer(":", "_", "\x00", "_").Replace(part))
+	}
+	return parts
 }
 
 func extractEntry(entry *zip.File, target string) error {

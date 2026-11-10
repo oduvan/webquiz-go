@@ -487,3 +487,33 @@ func TestAttachDirectoryCreatedOnStartup(t *testing.T) {
 		t.Errorf("attach folder: %v", err)
 	}
 }
+
+// Entry names with backslashes, drive letters or colons cannot leave the
+// extraction folder, on any system (ZipFile.extractall on Windows drops them).
+func TestDownloadQuizBackslashNamesStayInside(t *testing.T) {
+	t.Parallel()
+	ts := testutil.StartServer(t, testutil.Options{})
+	archive := newArchiveServer(t, zipBytes(t, map[string]string{
+		`..\..\evil1.yaml`:   privateQuiz,
+		`x\..\..\evil2.yaml`: privateQuiz,
+		`C:\evil3.yaml`:      privateQuiz,
+		`/abs/evil4.yaml`:    privateQuiz,
+		`ok/fine.yaml`:       privateQuiz,
+	}), "")
+	if res := downloadQuiz(t, ts, "Q", archive.url(), ""); res.Status != 200 {
+		t.Fatalf("%d %s", res.Status, res.Text())
+	}
+	for _, name := range []string{"evil1.yaml", "evil2.yaml", "evil3.yaml"} {
+		for _, dir := range []string{filepath.Dir(ts.Dir), ts.Dir, filepath.Dir(ts.QuizzesDir), os.TempDir()} {
+			if fileExists(filepath.Join(dir, name)) && dir != ts.QuizzesDir {
+				t.Errorf("%s escaped to %s", name, dir)
+			}
+		}
+	}
+	// They are inside the quizzes folder under their cleaned names.
+	for _, name := range []string{"evil1.yaml", "x/evil2.yaml", "evil3.yaml", "abs/evil4.yaml", "ok/fine.yaml"} {
+		if !fileExists(filepath.Join(ts.QuizzesDir, name)) {
+			t.Errorf("missing %s in the quizzes folder", name)
+		}
+	}
+}
