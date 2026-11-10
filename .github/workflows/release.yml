@@ -7,9 +7,15 @@ on:
         description: 'Version to release (e.g., 1, 1.0, or 1.0.6)'
         required: true
         type: string
+      prerelease:
+        description: 'Mark it as a pre-release (a test build, not shown as the latest release)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   VERSION: ${{ github.event.inputs.version }}
+  PRERELEASE: ${{ github.event.inputs.prerelease }}
 
 jobs:
   update-version:
@@ -43,7 +49,12 @@ jobs:
     - name: Commit version change
       run: |
         git add VERSION
-        git commit -m "Bump version to $VERSION"
+        # VERSION may already hold this version (for example the first release)
+        if git diff --cached --quiet; then
+          echo "VERSION already says $VERSION, nothing to commit"
+        else
+          git commit -m "Bump version to $VERSION"
+        fi
 
     - name: Create and push tag
       run: |
@@ -306,7 +317,12 @@ jobs:
           echo "Added $NOTES_FILE to the release notes"
         fi
 
-        gh release create "v$VERSION" \
+        PRERELEASE_FLAG=""
+        if [ "$PRERELEASE" = "true" ]; then
+          PRERELEASE_FLAG="--prerelease"
+        fi
+
+        gh release create "v$VERSION" $PRERELEASE_FLAG \
           --title "Release v$VERSION" \
           --notes-file release_notes.md \
           --target ${{ github.ref_name }} \

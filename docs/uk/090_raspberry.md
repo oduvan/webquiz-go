@@ -90,7 +90,7 @@
 
 ### Програма WebQuiz на Raspberry Pi
 
-WebQuiz 2.0 — це один готовий файл програми для Raspberry Pi. Йому не потрібні Python чи `pip`. На сторінці [Releases](https://github.com/oduvan/webquiz-go/releases) є два файли:
+Версія WebQuiz на Go (0.1 і новіші) — це один готовий файл програми для Raspberry Pi. Йому не потрібні Python чи `pip`. На сторінці [Releases](https://github.com/oduvan/webquiz-go/releases) є два файли:
 
 - `webquiz-linux-arm64.zip` — для 64-бітної системи на Raspberry Pi 3, 4 і 5;
 - `webquiz-linux-arm.zip` — для 32-бітної системи та для старих або менших плат (Zero, 1, 2).

@@ -2,7 +2,7 @@
 
 WebQuiz is a quiz system for a local network. A teacher runs one program on a computer. Students open a web page in their browsers and answer the questions. Nothing goes to the internet, so all results stay in your own network.
 
-This is version 2.0, written in Go. It is one program file with no other parts to install. The older Python version (1.19) is at [oduvan/webquiz](https://github.com/oduvan/webquiz).
+This is the Go version (versions start again at 0.1). It is one program file with no other parts to install. The older Python version (1.19) is at [oduvan/webquiz](https://github.com/oduvan/webquiz).
 
 ## What it can do
 
