@@ -214,6 +214,7 @@ export async function runStudentCase(env: MatrixEnv, matrixCase: MatrixCase, scr
     // The version the page shows under the quiz (server.py:2968-2986, get_package_version)
     const running = await admin.call('GET', '/api/admin/version-check');
     const version = typeof running.json?.running_version === 'string' ? running.json.running_version : env.version;
+    record.serverVersion = version;
     const switched = await admin.call('POST', '/api/admin/switch-quiz', {
       quiz_filename: QUIZ_FILE,
       ...(matrixCase.settingsFrom === 'start' ? { settings: startSettings(matrixCase.settings) } : {}),

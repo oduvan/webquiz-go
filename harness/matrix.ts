@@ -155,7 +155,7 @@ async function main(): Promise<void> {
     {
       title: `WebQuiz settings matrix, ${path.basename(runDir)}`,
       binary,
-      version: `webquiz ${version}`,
+      version: `the server reports ${records.find((record) => record.serverVersion)?.serverVersion ?? 'no version'}; --version prints ${version}`,
       started: new Date(started).toISOString(),
       seconds: (Date.now() - started) / 1000,
       caseLines: [

@@ -254,7 +254,7 @@ const READ_JS = String.raw`() => {
       ? {
           src: img.getAttribute('src') || '',
           loaded: img.complete && img.naturalWidth > 0,
-          width: Math.round(img.getBoundingClientRect().width),
+          width: img.offsetWidth, // the layout width: a hover zoom (transform) does not count
           natural: img.naturalWidth,
         }
       : null;
@@ -536,6 +536,8 @@ export async function until(page: Page, test: (state: PageState) => boolean, tim
 
 /** Wait for animations and images to finish, so a screenshot shows a still page. */
 export async function settle(page: Page, timeoutMs = 4000): Promise<void> {
+  // The mouse stays where the last click was: move it away, so nothing on the page is hovered
+  await page.mouse.move(0, 0);
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const state = await pageState(page);
@@ -569,6 +571,8 @@ export async function shoot(
   try {
     // A full-page shot draws fixed elements where they are on the screen: start from the top
     if (options.fullPage ?? true) await page.evaluate('window.scrollTo(0, 0)');
+    // The mouse stays where the last click was: move it away, so no option looks hovered
+    await page.mouse.move(0, 0);
     await page.screenshot({ path: file, type: 'jpeg', quality: 75, fullPage: options.fullPage ?? true, animations: 'disabled' });
   } catch (error) {
     record.notes.push(`screenshot ${screen} failed: ${error instanceof Error ? error.message.split('\n')[0] : error}`);
