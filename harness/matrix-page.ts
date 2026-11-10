@@ -83,7 +83,8 @@ export async function startServer(
   };
   const configPath = path.join(dir, 'webquiz.yaml');
   writeFileSync(configPath, stringify(config), 'utf-8');
-  const env: NodeJS.ProcessEnv = { ...process.env, WEBQUIZ_BINARY_DIR: dir, WEBQUIZ_IS_BINARY: '0' };
+  // PYTHONDONTWRITEBYTECODE: a Python 1.19 server (to check the checks) writes nothing into its source folder
+  const env: NodeJS.ProcessEnv = { ...process.env, WEBQUIZ_BINARY_DIR: dir, WEBQUIZ_IS_BINARY: '0', PYTHONDONTWRITEBYTECODE: '1' };
   for (const name of ['WEBQUIZ_MASTER_KEY', 'WEBQUIZ_TIME_LIMIT_GRACE_SECONDS', 'WEBQUIZ_TIME_LIMIT_CHECK_INTERVAL']) delete env[name];
   const log = openSync(path.join(dir, 'server.log'), 'w');
   const child: ChildProcess = spawn(binary, ['--config', configPath, '--port', String(port)], {
