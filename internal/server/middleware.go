@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/oduvan/webquiz-go/internal/netinfo"
 	"net"
 	"net/http"
 	"net/netip"
@@ -178,13 +179,7 @@ func getClientIP(r *http.Request) string {
 // isLoopbackAddress is is_loopback_address: 127.0.0.0/8, ::1 and their
 // IPv4-mapped forms. Text that is not an address counts as loopback (Python
 // did this to be safe).
-func isLoopbackAddress(ip string) bool {
-	addr, err := netip.ParseAddr(ip)
-	if err != nil {
-		return true
-	}
-	return addr.WithZone("").Unmap().IsLoopback()
-}
+func isLoopbackAddress(ip string) bool { return netinfo.IsLoopbackAddress(ip) }
 
 // The ranges of Python 3.13's ipaddress is_private: addresses that are not
 // globally reachable (the IANA special registries), minus the exceptions.

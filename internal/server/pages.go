@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/oduvan/webquiz-go/internal/netinfo"
 	"io/fs"
 	"net/http"
 	"os"
@@ -399,7 +400,7 @@ func (s *Server) serveAdminPage(w http.ResponseWriter, r *http.Request) error {
 
 	boot := AdminBoot{
 		IsTrustedIP:         trusted,
-		NetworkInfo:         NetworkInfo{URLs: networkURLs(serverConfig)},
+		NetworkInfo:         NetworkInfo{URLs: s.networkURLs(serverConfig)},
 		DownloadableQuizzes: make([]DownloadableQuizInfo, 0, len(quizzes)),
 		Version:             version.Version,
 		TunnelPublicKey:     s.tunnelPublicKey(publicKeyPath),
@@ -414,12 +415,10 @@ func (s *Server) serveAdminPage(w http.ResponseWriter, r *http.Request) error {
 
 // networkURLs are the addresses for other devices: server.url_format with
 // {IP} and {PORT} filled in for every network interface, ":80/" removed.
-func networkURLs(serverConfig config.ServerConfig) []NetworkURL {
+func (s *Server) networkURLs(serverConfig config.ServerConfig) []NetworkURL {
 	urls := []NetworkURL{}
-	for _, ip := range networkInterfaces(serverConfig.IncludeIPv6) {
-		url := strings.ReplaceAll(serverConfig.URLFormat, "{IP}", ip)
-		url = strings.ReplaceAll(url, "{PORT}", fmt.Sprint(serverConfig.Port))
-		url = strings.ReplaceAll(url, ":80/", "/") // normalize_url
+	for _, ip := range s.interfaces(serverConfig.IncludeIPv6) {
+		url := netinfo.FormatURL(serverConfig.URLFormat, ip, serverConfig.Port)
 		urls = append(urls, NetworkURL{Label: fmt.Sprintf("Network Access (%s)", ip), QuizURL: url})
 	}
 	return urls

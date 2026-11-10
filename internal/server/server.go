@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/oduvan/webquiz-go/internal/netinfo"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -67,6 +68,10 @@ type Options struct {
 	// Pages are the built web pages (web/dist). Nil means the pages built
 	// into the program (package web).
 	Pages fs.FS
+	// NetworkInterfaces finds the addresses shown as "URL for other
+	// devices" on the admin page (get_network_interfaces). Nil means the
+	// machine's own addresses (netinfo.Interfaces); tests give fixed ones.
+	NetworkInterfaces func(includeIPv6 bool) []string
 }
 
 // User is a registered student: an entry of Python's users dict.
@@ -108,6 +113,7 @@ type Server struct {
 	flushInterval time.Duration
 	now           func() time.Time
 	pages         fs.FS
+	interfaces    func(includeIPv6 bool) []string
 	log           *slog.Logger
 	logOut        *lockedWriter
 	quizzesDir    string // paths.quizzes_dir
@@ -205,6 +211,7 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 		flushInterval: opts.FlushInterval,
 		now:           opts.Now,
 		pages:         opts.Pages,
+		interfaces:    opts.NetworkInterfaces,
 		quizzesDir:    own.Paths.QuizzesDir,
 		logsDir:       own.Paths.LogsDir,
 		csvDir:        own.Paths.CSVDir,
@@ -232,6 +239,9 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 	}
 	if s.now == nil {
 		s.now = time.Now
+	}
+	if s.interfaces == nil {
+		s.interfaces = netinfo.Interfaces
 	}
 	if s.pages == nil {
 		dist, err := fs.Sub(web.Dist, "dist")
