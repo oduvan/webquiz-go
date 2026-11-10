@@ -1,0 +1,331 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1, 1.0, or 1.0.6)'
+        required: true
+        type: string
+
+env:
+  VERSION: ${{ github.event.inputs.version }}
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Validate version format
+      run: |
+        if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+)?(\.[0-9]+)?$ ]]; then
+          echo "Invalid version format. Expected: X, X.Y, or X.Y.Z (e.g., 1, 1.0, or 1.0.6)"
+          exit 1
+        fi
+        echo "Version format is valid: $VERSION"
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Configure git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Write VERSION file
+      run: echo "$VERSION" > VERSION
+
+    - name: Commit version change
+      run: |
+        git add VERSION
+        git commit -m "Bump version to $VERSION"
+
+    - name: Create and push tag
+      run: |
+        git tag "v$VERSION"
+        git push origin "v$VERSION"
+
+    - name: Push version commit
+      run: git push origin HEAD:${{ github.ref_name }}
+
+  build-binaries:
+    needs: update-version
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code with updated version
+      uses: actions/checkout@v4
+      with:
+        ref: v${{ github.event.inputs.version }}
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+
+    # The pages are built once. Every binary embeds the same web/dist.
+    - name: Build web app
+      run: |
+        npm --prefix web ci
+        npm --prefix web run build
+
+    - name: Cross-compile and zip all binaries
+      run: make dist-binaries VERSION="$VERSION"
+
+    - name: Check the Linux binary
+      run: |
+        out="$(dist/webquiz-linux --version)"
+        echo "$out"
+        test "$out" = "webquiz $VERSION"
+
+    - name: Upload binary zips
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries
+        path: dist/*.zip
+        retention-days: 1
+
+    - name: Upload Windows exe for the installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-exe
+        path: dist/webquiz-windows.exe
+        retention-days: 1
+
+  build-installer:
+    needs: build-binaries
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code with updated version
+      uses: actions/checkout@v4
+      with:
+        ref: v${{ github.event.inputs.version }}
+
+    - name: Download Windows exe
+      uses: actions/download-artifact@v4
+      with:
+        name: windows-exe
+        path: exe/
+
+    - name: Build Windows installer
+      run: |
+        choco install innosetup --yes
+        Copy-Item "exe\webquiz-windows.exe" "installer\webquiz.exe"
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="$env:VERSION" installer\webquiz.iss
+
+    - name: Upload installer artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: webquiz-windows-setup
+        path: installer/webquiz-windows-setup.exe
+        retention-days: 1
+
+  release:
+    needs: [build-binaries, build-installer]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code with updated version
+      uses: actions/checkout@v4
+      with:
+        ref: v${{ github.event.inputs.version }}
+
+    - name: Install Pandoc and LaTeX
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cyrillic fonts-dejavu
+
+    - name: Generate Ukrainian PDF Documentation
+      run: |
+        cd docs/uk
+        cat $(ls *.md | sort) > ../combined_uk.md
+        cd ..
+        pandoc combined_uk.md \
+          -o webquiz-documentation-uk.pdf \
+          --pdf-engine=xelatex \
+          --toc \
+          --toc-depth=2 \
+          --number-sections \
+          -V geometry:margin=1in \
+          -V mainfont="DejaVu Sans" \
+          -V monofont="DejaVu Sans Mono" \
+          -V documentclass=report \
+          -V header-includes='\usepackage{float} \floatplacement{figure}{H}' \
+          --resource-path=.:imgs \
+          --metadata title="WebQuiz Documentation (Ukrainian)" \
+          --metadata subtitle="Version $VERSION" \
+          --metadata author="WebQuiz Team" \
+          --metadata date="$(date +%Y-%m-%d)"
+
+    - name: Generate English PDF Documentation
+      run: |
+        cd docs/en
+        cat $(ls *.md | sort) > ../combined_en.md
+        cd ..
+        pandoc combined_en.md \
+          -o webquiz-documentation-en.pdf \
+          --pdf-engine=xelatex \
+          --toc \
+          --toc-depth=2 \
+          --number-sections \
+          -V geometry:margin=1in \
+          -V mainfont="DejaVu Sans" \
+          -V monofont="DejaVu Sans Mono" \
+          -V documentclass=report \
+          -V header-includes='\usepackage{float} \floatplacement{figure}{H}' \
+          --resource-path=.:imgs \
+          --metadata title="WebQuiz Documentation (English)" \
+          --metadata subtitle="Version $VERSION" \
+          --metadata author="WebQuiz Team" \
+          --metadata date="$(date +%Y-%m-%d)"
+
+    - name: Download binary zips
+      uses: actions/download-artifact@v4
+      with:
+        name: binaries
+        path: release-files/
+
+    - name: Download Windows installer
+      uses: actions/download-artifact@v4
+      with:
+        name: webquiz-windows-setup
+        path: release-files/
+
+    - name: List release files
+      run: ls -lah release-files/
+
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Create release notes
+        cat > release_notes.md << 'EOF'
+        **WebQuiz v__VERSION__**
+
+        This release includes:
+
+        ### Pre-built binaries (zipped)
+        No Python or other software is needed. The web pages are inside the binary.
+        - **Linux**: `webquiz-linux.zip` (x86_64)
+        - **Linux ARM64**: `webquiz-linux-arm64.zip` (Raspberry Pi 3/4/5 with a 64-bit system)
+        - **Linux ARM**: `webquiz-linux-arm.zip` (32-bit ARM: Raspberry Pi Zero, 1, 2 and older systems)
+        - **macOS Intel**: `webquiz-macos-intel.zip` (x86_64, macOS 12 or newer)
+        - **macOS Apple Silicon**: `webquiz-macos-apple-silicon.zip` (ARM64/M1-M5, macOS 12 or newer)
+        - **Windows Portable**: `webquiz-windows.exe.zip` (x86_64, Windows 10 or newer)
+        - **Windows Installer**: `webquiz-windows-setup.exe` (x86_64, Windows 10 or newer; adds a Start Menu shortcut and an uninstaller)
+
+        ### Documentation
+        - Ukrainian: `webquiz-documentation-uk.pdf`
+        - English: `webquiz-documentation-en.pdf`
+
+        ## Installation
+
+        Download the zipped binary for your platform from the assets below.
+
+        **Windows Defender warning**: Windows may flag the executable as a threat (a false positive). The executable is safe: it is open source and built by GitHub Actions. You can:
+        - Add an exclusion in Windows Security for the webquiz executable
+        - Check the executable on [VirusTotal](https://www.virustotal.com/)
+
+        **Linux (x86_64):**
+        ```bash
+        wget https://github.com/oduvan/webquiz-go/releases/download/v__VERSION__/webquiz-linux.zip
+        unzip webquiz-linux.zip
+        chmod +x webquiz-linux
+        ./webquiz-linux --help
+        ```
+
+        **Linux ARM64 (Raspberry Pi 3/4/5, 64-bit system):**
+        ```bash
+        wget https://github.com/oduvan/webquiz-go/releases/download/v__VERSION__/webquiz-linux-arm64.zip
+        unzip webquiz-linux-arm64.zip
+        chmod +x webquiz-linux-arm64
+        ./webquiz-linux-arm64 --help
+        ```
+
+        **Linux ARM, 32-bit (Raspberry Pi Zero, 1, 2):**
+        ```bash
+        wget https://github.com/oduvan/webquiz-go/releases/download/v__VERSION__/webquiz-linux-arm.zip
+        unzip webquiz-linux-arm.zip
+        chmod +x webquiz-linux-arm
+        ./webquiz-linux-arm --help
+        ```
+
+        **macOS Intel (x86_64, macOS 12+):**
+        ```bash
+        wget https://github.com/oduvan/webquiz-go/releases/download/v__VERSION__/webquiz-macos-intel.zip
+        unzip webquiz-macos-intel.zip
+        chmod +x webquiz-macos-intel
+        ./webquiz-macos-intel --help
+        ```
+
+        **macOS Apple Silicon (ARM64/M1-M5, macOS 12+):**
+        ```bash
+        wget https://github.com/oduvan/webquiz-go/releases/download/v__VERSION__/webquiz-macos-apple-silicon.zip
+        unzip webquiz-macos-apple-silicon.zip
+        chmod +x webquiz-macos-apple-silicon
+        ./webquiz-macos-apple-silicon --help
+        ```
+
+        **Windows 10+ (Installer, recommended):**
+        Download `webquiz-windows-setup.exe` and run the installer.
+        WebQuiz will be available from the Start Menu.
+
+        **Windows 10+ (Portable):**
+        ```powershell
+        # Download webquiz-windows.exe.zip from assets, extract, then run:
+        webquiz-windows.exe --help
+        ```
+
+        ## What's Changed
+        See the [commit history](https://github.com/oduvan/webquiz-go/commits/v__VERSION__) for detailed changes.
+
+        ---
+        *This release was automatically created by the release workflow.*
+        EOF
+        sed -i "s/__VERSION__/$VERSION/g" release_notes.md
+
+        # Put the hand-written notes for this version (if there are any) right after the title
+        NOTES_FILE=".github/release-notes/v$VERSION.md"
+        if [ -f "$NOTES_FILE" ]; then
+          { head -n 2 release_notes.md; cat "$NOTES_FILE"; echo; tail -n +3 release_notes.md; } > release_notes_full.md
+          mv release_notes_full.md release_notes.md
+          echo "Added $NOTES_FILE to the release notes"
+        fi
+
+        gh release create "v$VERSION" \
+          --title "Release v$VERSION" \
+          --notes-file release_notes.md \
+          --target ${{ github.ref_name }} \
+          docs/webquiz-documentation-uk.pdf \
+          docs/webquiz-documentation-en.pdf \
+          release-files/webquiz-linux.zip \
+          release-files/webquiz-linux-arm64.zip \
+          release-files/webquiz-linux-arm.zip \
+          release-files/webquiz-macos-intel.zip \
+          release-files/webquiz-macos-apple-silicon.zip \
+          release-files/webquiz-windows.exe.zip \
+          release-files/webquiz-windows-setup.exe
+
+  deploy-pages:
+    needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-pages.yml
+    with:
+      version: ${{ github.event.inputs.version }}

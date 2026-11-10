@@ -164,20 +164,6 @@
             text-decoration: underline;
         }
 
-        .pip-install {
-            background: #1e293b;
-            color: #e2e8f0;
-            padding: 16px 20px;
-            border-radius: 8px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.95rem;
-            overflow-x: auto;
-        }
-
-        .pip-install code {
-            color: #a5f3fc;
-        }
-
         footer {
             text-align: center;
             margin-top: 40px;
@@ -245,7 +231,7 @@
         <header>
             <h1>WebQuiz</h1>
             <span class="version-badge">v{{VERSION}}</span>
-            <p class="description">Python/aiohttp quiz system with real-time stats and admin panel</p>
+            <p class="description">Quiz system with real-time stats and admin panel</p>
         </header>
 
         <section class="section">
@@ -254,31 +240,45 @@
                 <div class="download-item">
                     <span class="platform">Linux</span>
                     <span class="arch">x86_64</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-linux.zip">
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-linux.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Linux ARM64</span>
+                    <span class="arch">Raspberry Pi 3/4/5 (64-bit OS)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-linux-arm64.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Linux ARM</span>
+                    <span class="arch">32-bit (Raspberry Pi Zero, 1, 2, older OS)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-linux-arm.zip">
                         Download .zip
                     </a>
                 </div>
                 <div class="download-item">
                     <span class="platform">macOS Intel</span>
-                    <span class="arch">x86_64</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-macos-intel.zip">
+                    <span class="arch">x86_64 (macOS 12+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-macos-intel.zip">
                         Download .zip
                     </a>
                 </div>
                 <div class="download-item">
                     <span class="platform">macOS Apple Silicon</span>
-                    <span class="arch">ARM64 (M1-M5)</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-macos-apple-silicon.zip">
+                    <span class="arch">ARM64 (M1-M5, macOS 12+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-macos-apple-silicon.zip">
                         Download .zip
                     </a>
                 </div>
                 <div class="download-item">
                     <span class="platform">Windows</span>
-                    <span class="arch">x86_64</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-windows-setup.exe">
+                    <span class="arch">x86_64 (Windows 10+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows-setup.exe">
                         Download Installer
                     </a>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-windows.exe.zip" style="margin-top: 4px; font-size: 0.8rem;">
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows.exe.zip" style="margin-top: 4px; font-size: 0.8rem;">
                         Portable .zip
                     </a>
                 </div>
@@ -302,38 +302,20 @@
             <div class="doc-list" style="margin-top: 16px;">
                 <div class="doc-item">
                     <span class="doc-name">PDF (English)</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-documentation-en.pdf">Download</a>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-documentation-en.pdf">Download</a>
                 </div>
                 <div class="doc-item">
                     <span class="doc-name">PDF (Ukrainian)</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-documentation-uk.pdf">Download</a>
-                </div>
-            </div>
-        </section>
-
-        <section class="section">
-            <h2>Python Package</h2>
-            <div class="pip-install">
-                $ pip install <code>webquiz=={{VERSION}}</code>
-            </div>
-            <div class="doc-list" style="margin-top: 16px;">
-                <div class="doc-item">
-                    <span class="doc-name">Wheel Package</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-{{VERSION}}-py3-none-any.whl">Download .whl</a>
-                </div>
-                <div class="doc-item">
-                    <span class="doc-name">Source Distribution</span>
-                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-{{VERSION}}.tar.gz">Download .tar.gz</a>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-documentation-uk.pdf">Download</a>
                 </div>
             </div>
         </section>
 
         <footer>
             <p>
-                <a href="https://github.com/oduvan/webquiz">GitHub Repository</a> |
-                <a href="https://github.com/oduvan/webquiz/releases">All Releases</a> |
-                <a href="https://pypi.org/project/webquiz/">PyPI</a> |
-                <a href="https://github.com/oduvan/webquiz/issues/new/choose">Report Issue</a>
+                <a href="https://github.com/oduvan/webquiz-go">GitHub Repository</a> |
+                <a href="https://github.com/oduvan/webquiz-go/releases">All Releases</a> |
+                <a href="https://github.com/oduvan/webquiz-go/issues/new/choose">Report Issue</a>
             </p>
         </footer>
     </div>
