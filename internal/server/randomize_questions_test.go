@@ -67,14 +67,6 @@ func paOrderOf(t *testing.T, data map[string]any) []int {
 	return out
 }
 
-// paSkipIfStub skips the test while a route is still the 501 stub of another task.
-func paSkipIfStub(t *testing.T, res *testutil.Response, what string) {
-	t.Helper()
-	if res.Status == 501 {
-		t.Skip(what + " is not built yet")
-	}
-}
-
 // py: tests/test_randomize_questions.py::test_randomization_disabled_by_default
 func TestRandomizationDisabledByDefault(t *testing.T) {
 	t.Parallel()
@@ -156,7 +148,6 @@ func paValidateQuizContent(t *testing.T, ts *testutil.TestServer, quiz map[strin
 	}
 	res := ts.PostJSON(t, "/api/admin/validate-quiz", map[string]any{"content": string(content)},
 		testutil.WithCookies(ts.AdminCookies(t, "test123")...))
-	paSkipIfStub(t, res, "POST /api/admin/validate-quiz (Task 8)")
 	return res, res.JSON(t)
 }
 

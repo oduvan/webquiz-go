@@ -70,7 +70,6 @@ func TestShowFinalListFalseStillShowsScore(t *testing.T) {
 
 // py: tests/test_show_final_list.py::test_show_final_list_validation
 func TestShowFinalListValidation(t *testing.T) {
-	t.Skip("needs validate-quiz from Task 8")
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{})
 	admin := ts.AdminClient(t, "test123")

@@ -180,7 +180,6 @@ func TestTextInputQuizValidation(t *testing.T) {
 
 	// py: tests/test_text_input_questions.py::TestTextInputQuizValidation::test_invalid_checker_python_syntax
 	t.Run("invalid_checker_python_syntax", func(t *testing.T) {
-		t.Skip("needs create-quiz from Task 8")
 		t.Parallel()
 		ts := quizServer(t, map[string]any{"title": "Invalid Checker Quiz", "questions": []any{map[string]any{
 			"question": "Enter answer:", "correct_value": "test", "checker": "if True\n    print('missing colon')",
@@ -205,7 +204,6 @@ func TestCheckerTemplates(t *testing.T) {
 
 	// py: tests/test_text_input_questions.py::TestCheckerTemplates::test_list_checker_templates_empty
 	t.Run("empty", func(t *testing.T) {
-		t.Skip("needs list-checker-templates from Task 8")
 		t.Parallel()
 		ts := quizServer(t, quiz)
 		admin := ts.AdminClient(t, "test123")
@@ -222,7 +220,6 @@ func TestCheckerTemplates(t *testing.T) {
 
 	// py: tests/test_text_input_questions.py::TestCheckerTemplates::test_list_checker_templates_with_config
 	t.Run("with_config", func(t *testing.T) {
-		t.Skip("needs list-checker-templates from Task 8")
 		t.Parallel()
 		ts := quizServer(t, quiz, func(o *testutil.Options) {
 			o.Config = map[string]any{"checker_templates": []any{

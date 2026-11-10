@@ -126,7 +126,6 @@ func TestAnswersWithUsersCSVConfigValidationRejectsNonBool(t *testing.T) {
 	ts := testutil.StartServer(t, testutil.Options{Quizzes: paAnswersWithUsersQuiz()})
 	res := ts.Put(t, "/api/admin/config", map[string]any{"content": "extra_answers_with_users_csv: \"yes\"\n"},
 		testutil.WithCookies(ts.AdminCookies(t, "test123")...))
-	paSkipWithoutConfigSave(t, res)
 	found := false
 	if errors, ok := res.JSON(t)["errors"].([]any); ok {
 		for _, item := range errors {

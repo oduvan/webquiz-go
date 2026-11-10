@@ -116,7 +116,6 @@ func TestShowRightAnswerMultipleQuestions(t *testing.T) {
 
 // py: tests/test_show_right_answer.py::test_show_right_answer_admin_quiz_update
 func TestShowRightAnswerAdminQuizUpdate(t *testing.T) {
-	t.Skip("needs the quiz PUT endpoint from Task 8")
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{Quizzes: map[string]any{"update_test.yaml": map[string]any{
 		"title": "Original Quiz", "show_right_answer": true,

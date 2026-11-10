@@ -322,23 +322,11 @@ func TestDownloadQuizTokenNotSentAfterRedirectToOtherOrigin(t *testing.T) {
 
 // Tests of the file attachments (test_quiz_file_download.py).
 
-// listFilesOrSkip calls GET /api/admin/list-files. That handler belongs to
-// the quiz admin API (Task 8); until it is merged it answers 501 and the
-// test is skipped.
-func listFilesOrSkip(t *testing.T, client *testutil.Client) *testutil.Response {
-	t.Helper()
-	res := client.GetJSON(t, "/api/admin/list-files")
-	if res.Status == http.StatusNotImplemented {
-		t.Skip("GET /api/admin/list-files is built in Task 8")
-	}
-	return res
-}
-
 // py: tests/test_quiz_file_download.py::test_admin_list_files_empty_directory
 func TestAdminListFilesEmptyDirectory(t *testing.T) {
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{})
-	res := listFilesOrSkip(t, ts.AdminClient(t, "test123"))
+	res := ts.AdminClient(t, "test123").GetJSON(t, "/api/admin/list-files")
 	files, ok := res.JSON(t)["files"].([]any)
 	if res.Status != 200 || !ok || len(files) != 0 {
 		t.Errorf("%d %s", res.Status, res.Text())
@@ -358,7 +346,7 @@ func TestAdminListFilesWithFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	res := listFilesOrSkip(t, admin)
+	res := admin.GetJSON(t, "/api/admin/list-files")
 	files, _ := res.JSON(t)["files"].([]any)
 	if res.Status != 200 || len(files) != 3 {
 		t.Fatalf("%d %s", res.Status, res.Text())

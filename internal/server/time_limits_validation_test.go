@@ -38,7 +38,6 @@ func anyErrorContains(data map[string]any, parts ...string) bool {
 
 // py: tests/test_time_limits_validation.py::test_validate_quiz_rejects_both_time_limit_modes
 func TestValidateQuizRejectsBothTimeLimitModes(t *testing.T) {
-	t.Skip("needs validate-quiz from Task 8")
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{})
 	data := validateQuizText(t, ts.AdminClient(t, "test123"), `title: Both modes
@@ -56,7 +55,6 @@ questions:
 
 // py: tests/test_time_limits_validation.py::test_validate_quiz_rejects_negative_question_time_limit
 func TestValidateQuizRejectsNegativeQuestionTimeLimit(t *testing.T) {
-	t.Skip("needs validate-quiz from Task 8")
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{})
 	data := validateQuizText(t, ts.AdminClient(t, "test123"), `title: Negative
@@ -74,7 +72,6 @@ questions:
 
 // py: tests/test_time_limits_validation.py::test_validate_quiz_accepts_question_time_limit_without_quiz_time_limit
 func TestValidateQuizAcceptsQuestionTimeLimitWithoutQuizTimeLimit(t *testing.T) {
-	t.Skip("needs validate-quiz from Task 8")
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{})
 	data := validateQuizText(t, ts.AdminClient(t, "test123"), `title: Question only
@@ -90,7 +87,6 @@ questions:
 
 // py: tests/test_time_limits_validation.py::test_unite_copies_time_limit_from_first_quiz
 func TestUniteCopiesTimeLimitFromFirstQuiz(t *testing.T) {
-	t.Skip("needs unite-quizzes from Task 8")
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{Quizzes: map[string]any{
 		"quiz1.yaml": map[string]any{"title": "Quiz 1", "time_limit": map[string]any{"per_question": 30},

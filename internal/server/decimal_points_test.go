@@ -147,7 +147,6 @@ func TestDecimalPointsValidation(t *testing.T) {
 	t.Parallel()
 	base := map[string]any{"title": "Test Quiz", "questions": []any{map[string]any{"question": "Test?", "options": []any{"A", "B"}, "correct_answer": 0}}}
 	check := func(t *testing.T, points any, status int) {
-		t.Skip("needs create-quiz from Task 8")
 		t.Parallel()
 		ts := quizServer(t, base)
 		admin := ts.AdminClient(t, "test123")
@@ -187,7 +186,6 @@ func TestDecimalPointsValidation(t *testing.T) {
 
 	// py: tests/test_decimal_points.py::TestDecimalPointsValidation::test_points_validated_on_text_questions_too
 	t.Run("text_questions_too", func(t *testing.T) {
-		t.Skip("needs create-quiz from Task 8")
 		t.Parallel()
 		ts := quizServer(t, base)
 		admin := ts.AdminClient(t, "test123")
@@ -207,7 +205,6 @@ func TestDecimalPointsValidation(t *testing.T) {
 
 // py: tests/test_decimal_points.py::TestDecimalPointsRoundTrip::test_decimal_points_preserved_in_saved_quiz
 func TestDecimalPointsPreservedInSavedQuiz(t *testing.T) {
-	t.Skip("needs create-quiz from Task 8")
 	t.Parallel()
 	ts := quizServer(t, map[string]any{"title": "Test Quiz", "questions": []any{map[string]any{"question": "Test?", "options": []any{"A", "B"}, "correct_answer": 0}}})
 	admin := ts.AdminClient(t, "test123")
