@@ -79,6 +79,32 @@ func TestQuizNamesStayInsideTheQuizzesFolder(t *testing.T) {
 	}
 }
 
+// switch-quiz never reads a quiz file outside quizzes_dir. Python joined
+// quiz_filename as it was, so "../x.yaml" started a quiz from the folder
+// above. A name with a folder part now gets Python's answer for a missing
+// file, and the running quiz stays.
+func TestSwitchQuizNameStaysInsideTheQuizzesFolder(t *testing.T) {
+	t.Parallel()
+	ts, admin := withAdmin(t, testutil.Options{Quizzes: map[string]any{"a.yaml": oneQuestionQuiz("Inside", "Q")}})
+	outside := filepath.Join(filepath.Dir(ts.QuizzesDir), "x.yaml")
+	content, err := testutil.YAML(oneQuestionQuiz("Outside", "Q"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outside, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"../x.yaml", outside} {
+		res := admin.PostJSON(t, "/api/admin/switch-quiz", map[string]any{"quiz_filename": name})
+		if res.Status != 500 || res.JSON(t)["error"] != "Quiz file not found: "+name {
+			t.Errorf("switch to %q: %d %s", name, res.Status, res.Body)
+		}
+	}
+	if title := quizPageBoot(t, ts)["title"]; title != "Inside" {
+		t.Errorf("the running quiz changed: title %v", title)
+	}
+}
+
 // The admin pages hear about "Show answers", with the Ukrainian text.
 func TestForceShowAnswersTellsTheAdminSocket(t *testing.T) {
 	t.Parallel()

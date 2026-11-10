@@ -161,7 +161,12 @@ type switchResult struct {
 // chooses its CSV number (the new run never takes the old run's number).
 // The folder work runs without mu.
 func (s *Server) switchQuiz(filename string, settings map[string]any) (switchResult, error) {
-	path := filepath.Join(s.quizzesDir, filename)
+	// A name with a folder part ("../x.yaml") is not found: the quiz file
+	// must be in quizzes_dir (Python joined it as it was).
+	path, inside := s.quizPath(filename)
+	if !inside {
+		return switchResult{}, fmt.Errorf("Quiz file not found: %s", filename)
+	}
 	if _, err := os.Stat(path); err != nil {
 		return switchResult{}, fmt.Errorf("Quiz file not found: %s", filename)
 	}
