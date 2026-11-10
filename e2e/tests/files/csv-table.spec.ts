@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { expect, test, type Page } from '../../fixtures/helpers';
+import type { Page } from '@playwright/test';
+import { expect, test } from '../../fixtures/helpers';
 
 // Requests from the browser come from 127.0.0.1, so a trusted IP skips the login
 const TRUSTED = { admin: { master_key: 'test123', trusted_ips: ['127.0.0.1'] } };
