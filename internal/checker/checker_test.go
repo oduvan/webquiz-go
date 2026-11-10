@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"go.starlark.net/starlark"
 )
 
 func TestCheckEmptyCodeIsCorrect(t *testing.T) {
@@ -116,6 +118,7 @@ func TestCheckComparisons(t *testing.T) {
 		{"nan against text", "x = float('nan') < 'a'", "", false, "float < string not implemented"},
 		{"nan against None", "x = None > float('nan')", "", false, "NoneType > float not implemented"},
 		{"nan equality with other types", "assert not (float('nan') == 'a') and float('nan') != None", "", true, ""},
+		{"nan against a bool", "assert not (float('nan') <= True) and not (False > float('nan'))", "", true, ""},
 	})
 }
 
@@ -169,6 +172,8 @@ func TestCheckBuiltins(t *testing.T) {
 		{"str and repr like Python", "assert str(1e15) == '1000000000000000.0' and repr('a') == \"'a'\" and str([1, 'a']) == \"[1, 'a']\"", "", true, ""},
 		{"min and max of text", "assert max(user_answer) == 'c' and min(user_answer) == 'a'", "bca", true, ""},
 		{"enumerate and zip text", "assert list(enumerate('ab')) == [(0, 'a'), (1, 'b')] and list(zip('ab', 'cd')) == [('a', 'c'), ('b', 'd')]", "", true, ""},
+		{"set and dict methods", "s = {1, 2}\ns.update([3])\nassert s == {1, 2, 3} and s.union([4]) == {1, 2, 3, 4} and s.intersection([1, 5]) == {1} and s.symmetric_difference([1, 5]) == {2, 3, 5}\nd = dict([('a', 1)], b=2)\nd.update({'c': 3})\nd.update([('e', 5)], f=6)\nassert d == {'a': 1, 'b': 2, 'c': 3, 'e': 5, 'f': 6}", "", true, ""},
+		{"a set of many items", "assert len(set(range(50000))) == 50000 and len(dict(zip(range(50000), range(50000)))) == 50000", "", true, ""},
 		{"reversed text", "assert ''.join(reversed(user_answer)) == user_answer", "abba", true, ""},
 		{"math", "assert math.sqrt(16) == 4 and math.floor(math.pi) == 3 and math.isclose(0.1 + 0.2, 0.3)", "", true, ""},
 		{"math extras", "assert math.log10(1000) == 3 and math.factorial(5) == 120 and math.gcd(12, 18) == 6 and math.trunc(-2.5) == -2", "", true, ""},
@@ -184,6 +189,9 @@ func TestCheckRuntimeErrors(t *testing.T) {
 		// when it runs, as in Python, but the code still compiles.
 		{"undefined name", "result = float(user_answer)\nassert abs(result - sqrt(16)) < 0.01", "4", false, "name 'sqrt' is not defined"},
 		{"undefined name not reached", "if user_answer == 'never':\n    oops()\nassert True", "x", true, ""},
+		// The 1.19 sandbox had no bytes(); b'...' literals still work.
+		{"bytes is not defined", "x = bytes(range(10 ** 12))", "", false, "name 'bytes' is not defined"},
+		{"bytes literal", "assert b'ab' + b'c' == b'abc'", "", true, ""},
 		{"used before assignment", "y = x\nx = 1", "", false, "name 'x' is not defined"},
 		{"missing method", "x = [1].nosuch()", "", false, "list has no .nosuch field or method"},
 		{"syntax error", "if True\n    pass", "", false, "expected ':' (line 1)"},
@@ -331,6 +339,25 @@ func TestHugeStringFails(t *testing.T) {
 		{"x = []\nx.extend(('a' * 60000000).elems())", []string{tooMuchMemory}},
 		{"def f(*args):\n    return len(args)\nx = f(*range(10 ** 9))", []string{tooMuchMemory}},
 		{"def f(*args):\n    return len(args)\nx = f(*('a' * 60000000))", []string{tooMuchMemory}},
+		{"x = set(range(4000000))", []string{tooMuchMemory}},
+		{"b = b'x' * 60000000\ndef f(*a):\n    return len(a)\nx = f(*b.elems())", []string{tooMuchMemory}},
+		{"b = b'x' * 60000000\nx = '{}'.format(*b.elems())", []string{tooMuchMemory}},
+		{"def f(*a):\n    return len(a)\nx = f(*('x' * 60000000).codepoints())", []string{tooMuchMemory}},
+		// Sets and dicts take much more memory than lists for each item.
+		{"x = frozenset(range(10 ** 6))", []string{tooMuchMemory}},
+		{"x = list(enumerate(range(10 ** 6)))", []string{tooMuchMemory}},
+		{"x = dict(range(600000))", []string{tooMuchMemory}},
+		{"d = {}\nd.update(range(600000))", []string{tooMuchMemory}},
+		{"x = set().union(range(600000))", []string{tooMuchMemory}},
+		{"s = set()\ns.update(range(600000))", []string{tooMuchMemory}},
+		{"x = {1}.symmetric_difference(range(600000))", []string{tooMuchMemory}},
+		// An error text larger than 4 MB is replaced.
+		{"d = {}\nx = d['\\x00' * 1100000]", []string{tooMuchMemory}},
+		{"assert False, 'x' * 5000000", []string{tooMuchMemory}},
+		{"x = float('\\x00' * 1100000)", []string{tooMuchMemory}},
+		{"x = repr(b'\\x00' * 60000000)", []string{tooMuchMemory}},
+		{"x = str((b'\\x00' * 60000000).elems())", []string{tooMuchMemory}},
+		{"x = repr('\\x00' * 1100000)", []string{tooMuchMemory}},
 		{"s = 'ab'\nwhile True:\n    s = s + s", []string{tooMuchMemory, timeoutTextFor(Timeout), tooManySteps}},
 		{"x = list(range(10 ** 12))", []string{tooMuchMemory}},
 	}
@@ -384,6 +411,95 @@ func TestHugeNumberFails(t *testing.T) {
 		if elapsed := time.Since(start); elapsed > time.Second {
 			t.Errorf("Check(%q) took %v", code, elapsed)
 		}
+	}
+}
+
+// TestAugmentedAssignment checks x += y and the like: the value is a whole
+// expression, also a tuple without brackets, as in Python.
+func TestAugmentedAssignment(t *testing.T) {
+	runCheckCases(t, []checkCase{
+		{"tuple with a trailing comma", "x = []\nw = 'AB'\nx += w.lower(),\nassert x == ['ab']", "", true, ""},
+		{"tuple without brackets", "x = [0]\nx += 2, 3\nassert x == [0, 2, 3]", "", true, ""},
+		{"tuple added to a tuple", "t = (0,)\nt += 1, 2\nassert t == (0, 1, 2)", "", true, ""},
+		{"percent with a tuple", "s = '%s-%s'\ns %= 'a', 'b'\nassert s == 'a-b'", "", true, ""},
+		{"index and attribute targets", "d = {'k': [1]}\nd['k'] += [2]\n(n) = 1\n(n) += 1\nassert d['k'] == [1, 2] and n == 2", "", true, ""},
+	})
+	// x **= 2, 5 is x ** (2, 5), an error in Python too, not pow(x, 2, 5).
+	for _, code := range []string{"y = 3\ny **= 2, 5", "x = [1]\nx *= 2, 5"} {
+		if got := Check(code, ""); got.Correct {
+			t.Errorf("Check(%q) = %+v, want an error", code, got)
+		}
+	}
+	// Python refuses these targets when the code is compiled.
+	illegal := map[string]string{
+		"a, b += 1":              "tuple",
+		"(a, b) += 1":            "tuple",
+		"[a] += 1":               "list",
+		"*a += 1":                "starred",
+		"f() += 1":               "function call",
+		"a.b() += 1":             "function call",
+		"1 += 1":                 "literal",
+		"'x' += 1":               "literal",
+		"True += 1":              "True",
+		"None += 1":              "None",
+		"a + b += 1":             "expression",
+		"-a += 1":                "expression",
+		"{a} += 1":               "set display",
+		"{} += 1":                "dict literal",
+		"(a if b else c) += 1":   "conditional expression",
+		"(lambda: 1) += 1":       "lambda",
+		"a < b += 1":             "comparison",
+		"f'{a}' += 1":            "f-string expression",
+		"a, b -= 1":              "tuple",
+		"[x for x in y] += 1":    "list comprehension",
+		"(x for x in y) += 1":    "generator expression",
+		"{x: 1 for x in y} += 1": "dict comprehension",
+		"{x for x in y} += 1":    "set comprehension",
+		"{lambda: 1} += 1":       "set display",
+		"(a)(b) += 1":            "function call",
+		"(f()) += 1":             "function call",
+		"((a, b)) += 1":          "tuple",
+		"'a' 'b' += 1":           "literal",
+		"a not in b += 1":        "comparison",
+		"lambda: 1 += 1":         "lambda",
+	}
+	for code, kind := range illegal {
+		want := "'" + kind + "' is an illegal expression for augmented assignment"
+		if err := Validate(code); err == nil || err.Msg != want || err.Line != 1 {
+			t.Errorf("Validate(%q) = %v, want %q on line 1", code, err, want)
+		}
+	}
+	for _, code := range []string{"(a) += 1", "a.b.c += 1", "f()[0] += 1", "f().x += 1", "[a][0] += 1", "((a)) += 1", "(a) **= 2"} {
+		if err := Validate(code); err != nil {
+			t.Errorf("Validate(%q) = %v, want nil", code, err)
+		}
+	}
+	// Starlark cannot assign to a slice, with or without +=.
+	for _, code := range []string{"x[1:2] += [1]", "x[1:2] = [1]"} {
+		if err := Validate(code); err == nil || err.Msg != "can't assign to sliceexpr" {
+			t.Errorf("Validate(%q) = %v, want the slice error", code, err)
+		}
+	}
+}
+
+// TestIterateReportsStop: when the check is stopped while a builtin goes
+// through a metered value, the builtin must fail, not use the items it has.
+func TestIterateReportsStop(t *testing.T) {
+	thread := &starlark.Thread{}
+	state := &runState{stopped: make(chan struct{})}
+	thread.SetLocal(stateKey, state)
+	r, err := rangeBuiltin(thread, nil, starlark.Tuple{starlark.MakeInt(10)}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.stop(thread, tooMuchMemory)
+	if got, err := items(thread, r); err == nil || err.Error() != tooMuchMemory {
+		t.Errorf("items = %v, %v; want the stop error", got, err)
+	}
+	// A Starlark method that goes through the range itself.
+	union := starlark.NewBuiltin("union", hashMethod).BindReceiver(starlark.NewSet(0))
+	if got, err := hashMethod(thread, union, starlark.Tuple{r}, nil); err == nil || err.Error() != tooMuchMemory {
+		t.Errorf("union = %v, %v; want the stop error", got, err)
 	}
 }
 

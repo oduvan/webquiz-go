@@ -64,11 +64,13 @@ func TestRewrite(t *testing.T) {
 		{"unary minus in exponent", "y = 2 ** -1", "y = _pow_(2, -1)"},
 		{"power of a call and subscript", "y = a.b(c)[d] ** 2", "y = _pow_(a.b(c)[d], 2)"},
 		{"power binds tighter than times", "y = 2 * x ** 2 + 1", "y = _add_(_mul_(2, _pow_(x, 2)), 1)"},
-		{"power assignment", "x **= 2", "x = _pow_(x, 2)"},
+		{"power assignment", "x **= 2", "x = _pow_(x, (2))"},
 
 		// * goes through _mul_, which refuses results that are too large
 		{"times", "y = a * b * c / d", "y = _mul_(_mul_(a, b), c) / d"},
-		{"times assignment", "x *= 3", "x = _mul_(x, 3)"},
+		{"times assignment", "x *= 3", "x = _mul_(x, (3))"},
+		{"plus assignment with a tuple", "x += a, b", "x = _iadd_(x, (a, b))"},
+		{"percent assignment", "s %= a,", "s = _mod_(s, (a,))"},
 
 		// comparisons go through _cmp_, which compares NaN like Python
 		{"single comparison", "ok = a < b", `ok = _cmp_("<", a, b)`},
@@ -97,7 +99,7 @@ func TestRewrite(t *testing.T) {
 
 		// statements
 		{"strip the answer", "user_answer = user_answer.strip()", "user_answer = user_answer.strip()"},
-		{"for loop", "for c in user_answer:\n    n += 1", "for c in _iter_(user_answer):\n    n = _iadd_(n, 1)"},
+		{"for loop", "for c in user_answer:\n    n += 1", "for c in _iter_(user_answer):\n    n = _iadd_(n, (1))"},
 		{"for loop over a tuple", "for v in 1, 2:\n    pass", "for v in _iter_((1, 2)):\n    pass"},
 		{"chained assignment", "a = b = 0", "_chained_value_ = 0; a = _chained_value_; b = _chained_value_"},
 		{"annotated assignment", "x: int = 5\ny: str", "x = 5\npass"},

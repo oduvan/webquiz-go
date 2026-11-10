@@ -102,7 +102,11 @@ func bigToInt(n *big.Int, s string) (int, error) {
 	if v, ok := fitsInt(n); ok {
 		return v, nil
 	}
-	return 0, fmt.Errorf("number is too large: %s", pyReprString(s))
+	text, err := pyReprString(s)
+	if err != nil {
+		return 0, err
+	}
+	return 0, fmt.Errorf("number is too large: %s", text)
 }
 
 func fitsInt(n *big.Int) (int, bool) {
@@ -205,9 +209,12 @@ func pyIntBase(s string, base int) (*big.Int, error) {
 	return n, nil
 }
 
-// shortRepr is Python's "%.200R": repr() cut after 200 characters.
+// shortRepr is Python's "%.200R": repr() cut after 200 characters. Only
+// the start of the text is made: 200 characters take at most 800 bytes.
 func shortRepr(s string) string {
-	r := pyReprString(s)
+	var b strings.Builder
+	_ = writeReprString(&b, s, 1000)
+	r := b.String()
 	n := 0
 	for i := range r {
 		if n == 200 {

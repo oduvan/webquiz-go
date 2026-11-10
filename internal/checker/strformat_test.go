@@ -52,6 +52,20 @@ func TestPythonStrFormat(t *testing.T) {
 		{"}", nil, nil, "", "Single '}' encountered in format string"},
 		{"{!x}", starlark.Tuple{i(1)}, nil, "", "Unknown conversion specifier x"},
 		{"{:d}", starlark.Tuple{s("a")}, nil, "", "Unknown format code 'd' for object of type 'str'"},
+		// A field number is digits only, as in Python; a sign makes it a name.
+		{"{-1}", starlark.Tuple{i(1), i(2)}, nil, "", "'-1'"},
+		{"{+0}", starlark.Tuple{i(1)}, nil, "", "'+0'"},
+		{"{0[-1]}", starlark.Tuple{pyList(i(1), i(2))}, nil, "", "list indices must be integers or slices, not str"},
+		{"{0[-1]}", starlark.Tuple{pyDict(t, s("-1"), s("m"), i(-1), s("i"))}, nil, "m", ""},
+		{"{\uff10}", starlark.Tuple{s("a")}, nil, "a", ""},
+		{"{0[\uff11]}", starlark.Tuple{pyList(i(5), i(6))}, nil, "6", ""},
+		{"{0[]}", starlark.Tuple{pyList(i(1))}, nil, "", "Empty attribute in format string"},
+		{"{0.}", starlark.Tuple{pyList(i(1))}, nil, "", "Empty attribute in format string"},
+		{"{99999999999999999999}", starlark.Tuple{s("a")}, nil, "", "Too many decimal digits in format string"},
+		{"{0[x]}", starlark.Tuple{s("abc")}, nil, "", "string indices must be integers, not 'str'"},
+		{"{0[5]}", starlark.Tuple{s("abc")}, nil, "", "string index out of range"},
+		{"{0[x]}", starlark.Tuple{starlark.Tuple{i(1)}}, nil, "", "tuple indices must be integers or slices, not str"},
+		{"{0[0]}", starlark.Tuple{i(5)}, nil, "", "'int' object is not subscriptable"},
 	}
 	for _, c := range cases {
 		got, err := pyFormatString(c.template, c.args, c.kwargs)

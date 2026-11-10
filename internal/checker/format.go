@@ -109,13 +109,17 @@ func (w *reprWriter) write(v starlark.Value) error {
 	w.depth++
 	defer func() { w.depth-- }()
 	switch v := v.(type) {
+	// A repr is at least as long as the text, so a long text fails at once.
 	case starlark.String:
 		if b.Len()+len(v) > maxReprBytes {
 			return errors.New(tooMuchMemory)
 		}
-		b.WriteString(pyReprString(string(v)))
+		return writeReprString(b, string(v), maxReprBytes)
 	case starlark.Bytes:
-		b.WriteString(pyReprBytes(string(v)))
+		if b.Len()+len(v) > maxReprBytes {
+			return errors.New(tooMuchMemory)
+		}
+		return writeReprBytes(b, string(v), maxReprBytes)
 	case starlark.Float:
 		b.WriteString(pyFloatRepr(float64(v)))
 	case starlark.Int:
@@ -195,21 +199,42 @@ func (w *reprWriter) write(v starlark.Value) error {
 		}
 		b.WriteByte('}')
 	default:
+		// The text of text.elems() and the like holds the whole text.
+		if b.Len()+sourceSize(v) > maxReprBytes {
+			return errors.New(tooMuchMemory)
+		}
 		b.WriteString(v.String())
+	}
+	if b.Len() > maxReprBytes {
+		return errors.New(tooMuchMemory)
 	}
 	return nil
 }
 
-// pyReprString returns Python's repr() of a string: single quotes, or double
-// quotes when the text has a single quote and no double quote.
-func pyReprString(s string) string {
+// pyReprString returns Python's repr() of a string. It fails when the text
+// would be larger than maxReprBytes.
+func pyReprString(s string) (string, error) {
+	var b strings.Builder
+	if err := writeReprString(&b, s, maxReprBytes); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+// writeReprString writes Python's repr() of a string to b: single quotes,
+// or double quotes when the text has a single quote and no double quote.
+// It stops with an error as soon as b is longer than limit; b then holds
+// the start of the text.
+func writeReprString(b *strings.Builder, s string, limit int) error {
 	quote := '\''
 	if strings.ContainsRune(s, '\'') && !strings.ContainsRune(s, '"') {
 		quote = '"'
 	}
-	var b strings.Builder
 	b.WriteRune(quote)
 	for _, r := range s {
+		if b.Len() > limit {
+			return errors.New(tooMuchMemory)
+		}
 		switch {
 		case r == quote || r == '\\':
 			b.WriteByte('\\')
@@ -221,31 +246,37 @@ func pyReprString(s string) string {
 		case r == '\r':
 			b.WriteString(`\r`)
 		case r < ' ' || r == 0x7f:
-			fmt.Fprintf(&b, `\x%02x`, r)
+			writeEscape(b, 'x', r, 2)
 		case r < 0x80 || unicode.IsPrint(r):
 			b.WriteRune(r)
 		case r <= 0xff:
-			fmt.Fprintf(&b, `\x%02x`, r)
+			writeEscape(b, 'x', r, 2)
 		case r <= 0xffff:
-			fmt.Fprintf(&b, `\u%04x`, r)
+			writeEscape(b, 'u', r, 4)
 		default:
-			fmt.Fprintf(&b, `\U%08x`, r)
+			writeEscape(b, 'U', r, 8)
 		}
 	}
 	b.WriteRune(quote)
-	return b.String()
+	if b.Len() > limit {
+		return errors.New(tooMuchMemory)
+	}
+	return nil
 }
 
-// pyReprBytes returns Python's repr() of a bytes value.
-func pyReprBytes(s string) string {
+// writeReprBytes writes Python's repr() of a bytes value to b, like
+// writeReprString.
+func writeReprBytes(b *strings.Builder, s string, limit int) error {
 	quote := byte('\'')
 	if strings.IndexByte(s, '\'') >= 0 && strings.IndexByte(s, '"') < 0 {
 		quote = '"'
 	}
-	var b strings.Builder
 	b.WriteString("b")
 	b.WriteByte(quote)
 	for i := 0; i < len(s); i++ {
+		if b.Len() > limit {
+			return errors.New(tooMuchMemory)
+		}
 		c := s[i]
 		switch {
 		case c == quote || c == '\\':
@@ -258,13 +289,27 @@ func pyReprBytes(s string) string {
 		case c == '\r':
 			b.WriteString(`\r`)
 		case c < ' ' || c >= 0x7f:
-			fmt.Fprintf(&b, `\x%02x`, c)
+			writeEscape(b, 'x', rune(c), 2)
 		default:
 			b.WriteByte(c)
 		}
 	}
 	b.WriteByte(quote)
-	return b.String()
+	if b.Len() > limit {
+		return errors.New(tooMuchMemory)
+	}
+	return nil
+}
+
+// writeEscape writes r as an escape like \x00, \u00ff or \U0001f600, with
+// the given number of hex digits.
+func writeEscape(b *strings.Builder, kind byte, r rune, digits int) {
+	const hexDigits = "0123456789abcdef"
+	b.WriteByte('\\')
+	b.WriteByte(kind)
+	for shift := (digits - 1) * 4; shift >= 0; shift -= 4 {
+		b.WriteByte(hexDigits[(r>>shift)&0xf])
+	}
 }
 
 // pyASCII returns Python's ascii(v): repr() with non-ASCII letters escaped.

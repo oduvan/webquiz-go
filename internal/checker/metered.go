@@ -6,6 +6,8 @@ package checker
 // loop stops with the check.
 
 import (
+	"unicode/utf8"
+
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
@@ -14,6 +16,12 @@ import (
 type meteredIterable struct {
 	inner  starlark.Iterable
 	thread *starlark.Thread
+	// source is the text or bytes value of text.elems() and the like, or
+	// nil. The text of the iterable holds it in full.
+	source starlark.Value
+	// length is the number of items, or -1 when it is not known. Size
+	// checks use it; len() does not.
+	length int
 }
 
 func (m meteredIterable) String() string        { return m.inner.String() }
@@ -44,10 +52,11 @@ type meteredRange struct {
 }
 
 func newMeteredRange(r starlark.Value, thread *starlark.Thread) meteredRange {
+	indexable := r.(starlark.Indexable)
 	return meteredRange{
 		meteredIndexable: meteredIndexable{
-			meteredIterable: meteredIterable{inner: r.(starlark.Iterable), thread: thread},
-			indexable:       r.(starlark.Indexable),
+			meteredIterable: meteredIterable{inner: r.(starlark.Iterable), thread: thread, length: indexable.Len()},
+			indexable:       indexable,
 		},
 		r: r,
 	}
@@ -66,7 +75,9 @@ func (m meteredRange) CompareSameType(op syntax.Token, y starlark.Value, depth i
 }
 
 // meteredIterator counts a step for every item and ends early when the
-// check must stop. The check then fails at its next step.
+// check must stop. The check then fails at its next step; Go code that
+// goes through the items must check for the stop after the loop (see
+// iterate).
 type meteredIterator struct {
 	inner starlark.Iterator
 	meter meter
@@ -90,10 +101,11 @@ func rangeBuiltin(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tu
 	return newMeteredRange(r, thread), nil
 }
 
-// meteredMethod calls the Starlark text method of the same name, like
-// elems() or codepoints(), and meters the result.
+// meteredMethod calls the Starlark text or bytes method of the same name,
+// like elems() or codepoints(), and meters the result.
 func meteredMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	native, err := b.Receiver().(starlark.String).Attr(b.Name())
+	receiver := b.Receiver()
+	native, err := receiver.(starlark.HasAttrs).Attr(b.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +117,37 @@ func meteredMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.T
 	if !ok {
 		return v, nil
 	}
-	metered := meteredIterable{inner: iterable, thread: thread}
+	metered := meteredIterable{inner: iterable, thread: thread, source: receiver, length: -1}
 	if indexable, ok := v.(starlark.Indexable); ok {
+		metered.length = indexable.Len()
 		return meteredIndexable{meteredIterable: metered, indexable: indexable}, nil
 	}
+	// The rest give one item per letter (text.codepoints()) or per byte
+	// (bytes.elems()).
+	switch r := receiver.(type) {
+	case starlark.String:
+		metered.length = utf8.RuneCountInString(string(r))
+	case starlark.Bytes:
+		metered.length = len(r)
+	}
 	return metered, nil
+}
+
+// sourceSize returns the size of the text or bytes value that the text of
+// v holds in full, like the text of text.elems(), or 0.
+func sourceSize(v starlark.Value) int {
+	var source starlark.Value
+	switch v := v.(type) {
+	case meteredIterable:
+		source = v.source
+	case meteredIndexable:
+		source = v.source
+	}
+	switch s := source.(type) {
+	case starlark.String:
+		return len(s)
+	case starlark.Bytes:
+		return len(s)
+	}
+	return 0
 }

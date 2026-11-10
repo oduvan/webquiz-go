@@ -73,6 +73,7 @@ func newPredeclared() starlark.StringDict {
 		"float":           builtin("float", floatBuiltin),
 		"type":            builtin("type", typeBuiltin),
 		"print":           builtin("print", printBuiltin),
+		"dict":            builtin("dict", dictBuiltin),
 	}
 	// These accept text like Python does: list("ab") is ["a", "b"].
 	for name, textArgs := range map[string]func(int) bool{
@@ -109,12 +110,17 @@ func builtin(name string, fn func(*starlark.Thread, *starlark.Builtin, starlark.
 // Names that are not defined anywhere count too: Python reports them only
 // when the line runs ("name 'x' is not defined"), and so does the checker.
 func isPredeclared(name string) bool {
-	if _, ok := predeclared[name]; ok || name == "_answer_" {
+	if _, ok := predeclared[name]; ok || name == "_answer_" || hidden[name] {
 		return true
 	}
 	_, universal := starlark.Universe[name]
 	return !universal
 }
+
+// hidden holds Starlark builtins that a checker cannot use: the name is not
+// defined, as in 1.19. bytes(n) makes n bytes in one step, before any limit
+// can stop it. Text like b'abc' still works.
+var hidden = map[string]bool{"bytes": true}
 
 const stateKey = "webquiz.checker"
 
@@ -137,14 +143,19 @@ func newMeter(thread *starlark.Thread) meter {
 // step counts one item and tells when the check must stop.
 func (m meter) step() error {
 	m.thread.Steps++
-	if m.thread.Steps >= MaxSteps {
-		if m.state != nil {
-			m.state.stop(m.thread, tooManySteps)
-		}
-		return errors.New(tooManySteps)
+	if m.thread.Steps >= MaxSteps && m.state != nil {
+		m.state.stop(m.thread, tooManySteps)
 	}
+	return m.err()
+}
+
+// err tells whether the check must stop, without counting a step.
+func (m meter) err() error {
 	if m.state != nil && m.state.isStopped.Load() {
 		return errors.New(m.state.reason)
+	}
+	if m.thread.Steps >= MaxSteps {
+		return errors.New(tooManySteps)
 	}
 	return nil
 }
@@ -175,20 +186,25 @@ func iterate(thread *starlark.Thread, v starlark.Value, fn func(starlark.Value) 
 				return err
 			}
 		}
-		return nil
+		// A metered value, like range(), ends the loop early when the
+		// check must stop: then these are not all the items.
+		return m.err()
 	}
 	return fmt.Errorf("'%s' object is not iterable", pyTypeName(v))
 }
 
 // knownLength returns how many items v gives, when that is known without
-// going through it: the characters of a text, or the length of a sequence
-// like a list, a range or text.elems().
+// going through it: the characters of a text, the length of a sequence
+// like a list, a range or text.elems(), or the size of text.codepoints()
+// and bytes.elems().
 func knownLength(v starlark.Value) (int, bool) {
 	switch v := v.(type) {
 	case starlark.String:
 		return utf8.RuneCountInString(string(v)), true
 	case starlark.Sequence:
 		return v.Len(), true
+	case meteredIterable:
+		return v.length, v.length >= 0
 	}
 	return 0, false
 }
@@ -200,7 +216,8 @@ func tooManyItems(n int) bool {
 }
 
 // items collects the items of v. Lists and tuples are used as they are. It
-// refuses at once when the length is known and too large.
+// refuses at once when the length is known and too large, else as soon as
+// there are too many items.
 func items(thread *starlark.Thread, v starlark.Value) (starlark.Tuple, error) {
 	if n, ok := knownLength(v); ok && tooManyItems(n) {
 		return nil, errors.New(tooMuchMemory)
@@ -217,10 +234,74 @@ func items(thread *starlark.Thread, v starlark.Value) (starlark.Tuple, error) {
 	}
 	var out starlark.Tuple
 	err := iterate(thread, v, func(x starlark.Value) error {
+		if tooManyItems(len(out) + 1) {
+			return errors.New(tooMuchMemory)
+		}
 		out = append(out, x)
 		return nil
 	})
 	return out, err
+}
+
+// resultItemBytes is about how much memory these builtins take for each
+// item of their result: a set keeps a hash table entry for every item,
+// enumerate and zip make a tuple for every item. The builtin makes the
+// whole result in one step, so the size is checked before.
+var resultItemBytes = map[string]uint64{
+	"set":       hashItemBytes,
+	"frozenset": hashItemBytes,
+	"enumerate": 72,
+}
+
+// hashItemBytes is about how much memory one item of a set or a dict
+// takes, with the room that the hash table keeps free.
+const hashItemBytes = 128
+
+// checkHashItems refuses arguments that would put too many items into a
+// set or a dict in one step.
+func checkHashItems(args starlark.Tuple) error {
+	for _, arg := range args {
+		if n, ok := knownLength(arg); ok && uint64(n)*hashItemBytes > maxRepeatBytes {
+			return errors.New(tooMuchMemory)
+		}
+	}
+	return nil
+}
+
+// dictBuiltin is dict(), after checkHashItems.
+func dictBuiltin(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := checkHashItems(args); err != nil {
+		return nil, err
+	}
+	v, err := starlark.Universe["dict"].(*starlark.Builtin).CallInternal(thread, args, kwargs)
+	return unlessStopped(thread, v, err)
+}
+
+// hashMethod calls the Starlark dict or set method of the same name, like
+// update() or union(), after checkHashItems.
+func hashMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := checkHashItems(args); err != nil {
+		return nil, err
+	}
+	native, err := b.Receiver().(starlark.HasAttrs).Attr(b.Name())
+	if err != nil {
+		return nil, err
+	}
+	v, err := starlark.Call(thread, native, args, kwargs)
+	return unlessStopped(thread, v, err)
+}
+
+// unlessStopped passes on the result of a Starlark builtin, unless the
+// check was stopped while the builtin ran: a metered value, like range(),
+// then gave the builtin only some of its items.
+func unlessStopped(thread *starlark.Thread, v starlark.Value, err error) (starlark.Value, error) {
+	if err != nil {
+		return nil, err
+	}
+	if err := newMeter(thread).err(); err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 // textBuiltin wraps the Starlark builtin original so that its iterable
@@ -230,12 +311,22 @@ func items(thread *starlark.Thread, v starlark.Value) (starlark.Tuple, error) {
 func textBuiltin(name, original string, textArg func(int) bool) *starlark.Builtin {
 	starlarkBuiltin := starlark.Universe[original].(*starlark.Builtin)
 	return builtin(name, func(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		itemBytes := resultItemBytes[name]
+		if name == "zip" {
+			itemBytes = 40 + 16*uint64(len(args))
+		}
 		converted := make(starlark.Tuple, len(args))
+		shortest := -1
 		for i, arg := range args {
 			converted[i] = arg
 			isIterable := textArg != nil && textArg(i) || textArg == nil && len(args) == 1
 			if !isIterable {
 				continue
+			}
+			// zip() is as long as its shortest argument, so it can only
+			// check after it has them all.
+			if n, ok := knownLength(arg); ok && name != "zip" && uint64(n)*itemBytes > maxRepeatBytes {
+				return nil, errors.New(tooMuchMemory)
 			}
 			switch arg.(type) {
 			case starlark.String, starlark.Iterable:
@@ -244,7 +335,13 @@ func textBuiltin(name, original string, textArg func(int) bool) *starlark.Builti
 					return nil, err
 				}
 				converted[i] = collected
+				if shortest < 0 || len(collected) < shortest {
+					shortest = len(collected)
+				}
 			}
+		}
+		if shortest > 0 && uint64(shortest)*itemBytes > maxRepeatBytes {
+			return nil, errors.New(tooMuchMemory)
 		}
 		if name == "enumerate" && len(kwargs) == 1 && kwargs[0][0] == starlark.String("start") && len(converted) == 1 {
 			// Python allows enumerate(x, start=1); Starlark only enumerate(x, 1).
@@ -340,11 +437,12 @@ func isNaN(v starlark.Value) bool {
 	return ok && math.IsNaN(float64(f))
 }
 
-// isNumber tells whether v is an int or a float. Python compares NaN with
-// these; with other values, like text or None, it raises an error.
+// isNumber tells whether v is an int, a float or a bool, which Python
+// counts as a number. Python compares NaN with these; with other values,
+// like text or None, it raises an error.
 func isNumber(v starlark.Value) bool {
 	switch v.(type) {
-	case starlark.Int, starlark.Float:
+	case starlark.Int, starlark.Float, starlark.Bool:
 		return true
 	}
 	return false
@@ -480,7 +578,14 @@ func starBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tup
 	if n, ok := knownLength(v); ok && tooManyItems(n) {
 		return nil, errors.New(tooMuchMemory)
 	}
-	if _, ok := v.(starlark.String); ok {
+	switch v.(type) {
+	case starlark.String:
+		return items(thread, v)
+	case starlark.Sequence:
+		return v, nil
+	case starlark.Iterable:
+		// A lazy value of unknown length: collect it here, with the
+		// size check, instead of in Starlark's call, which has none.
 		return items(thread, v)
 	}
 	return v, nil
@@ -582,9 +687,9 @@ func getattrBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple
 
 type builtinFunc = func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error)
 
-// guardedMethods replace Starlark text methods that can make a large
-// result: they check the size before they make it. elems() and the like
-// are metered.
+// guardedMethods replace Starlark methods that can make a large result:
+// they check the size before they make it. elems() and the like of text
+// and bytes are metered.
 var guardedMethods map[string]map[string]builtinFunc
 
 func init() {
@@ -601,6 +706,14 @@ func init() {
 			"codepoints":     meteredMethod,
 			"elem_ords":      meteredMethod,
 			"codepoint_ords": meteredMethod,
+		},
+		"bytes": {"elems": meteredMethod},
+		"dict":  {"update": hashMethod},
+		"set": {
+			"union":                hashMethod,
+			"update":               hashMethod,
+			"intersection":         hashMethod,
+			"symmetric_difference": hashMethod,
 		},
 	}
 }
@@ -1034,7 +1147,11 @@ func floatBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tu
 	case starlark.String:
 		f, ok := parsePyFloat(string(x))
 		if !ok {
-			return nil, fmt.Errorf("could not convert string to float: %s", pyReprString(string(x)))
+			text, err := pyReprString(string(x))
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("could not convert string to float: %s", text)
 		}
 		return starlark.Float(f), nil
 	case starlark.Float, starlark.Int, starlark.Bool:
@@ -1094,7 +1211,7 @@ func isinstanceBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tu
 			if x.Type() == "string" {
 				return starlark.True, nil
 			}
-		case "float", "bool", "list", "tuple", "dict", "set", "bytes", "range":
+		case "float", "bool", "list", "tuple", "dict", "set", "range":
 			if x.Type() == name {
 				return starlark.True, nil
 			}

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -75,7 +74,7 @@ func (fa *formatArgs) lowerBound(template string) uint64 {
 		}
 		var value starlark.Value
 		field := template[i+1 : end]
-		if index, err := strconv.Atoi(field); err == nil && index >= 0 && index < len(fa.args) {
+		if index, ok, _ := fieldNumber(field); ok && index < len(fa.args) {
 			value = fa.args[index]
 		} else if field == "" && next < len(fa.args) {
 			value = fa.args[next]
@@ -231,7 +230,11 @@ func (fa *formatArgs) value(name string) (starlark.Value, error) {
 	}
 	argName, accessors := name[:first], name[first:]
 	var value starlark.Value
-	switch index, err := strconv.Atoi(argName); {
+	argIndex, isNumber, err := fieldNumber(argName)
+	if err != nil {
+		return nil, err
+	}
+	switch {
 	case argName == "":
 		if fa.manual {
 			return nil, errors.New("cannot switch from manual field specification to automatic field numbering")
@@ -242,15 +245,15 @@ func (fa *formatArgs) value(name string) (starlark.Value, error) {
 		}
 		value = fa.args[fa.next]
 		fa.next++
-	case err == nil:
+	case isNumber:
 		if fa.auto {
 			return nil, errors.New("cannot switch from automatic field numbering to manual field specification")
 		}
 		fa.manual = true
-		if index >= len(fa.args) {
-			return nil, fmt.Errorf("Replacement index %d out of range for positional args tuple", index)
+		if argIndex >= len(fa.args) {
+			return nil, fmt.Errorf("Replacement index %d out of range for positional args tuple", argIndex)
 		}
-		value = fa.args[index]
+		value = fa.args[argIndex]
 	default:
 		for _, kv := range fa.kwargs {
 			if string(kv[0].(starlark.String)) == argName {
@@ -258,7 +261,11 @@ func (fa *formatArgs) value(name string) (starlark.Value, error) {
 			}
 		}
 		if value == nil {
-			return nil, errors.New(pyReprString(argName))
+			text, err := pyReprString(argName)
+			if err != nil {
+				return nil, err
+			}
+			return nil, errors.New(text)
 		}
 	}
 	for accessors != "" {
@@ -267,6 +274,9 @@ func (fa *formatArgs) value(name string) (starlark.Value, error) {
 			end := strings.IndexAny(accessors[1:], ".[")
 			if end < 0 {
 				end = len(accessors) - 1
+			}
+			if end == 0 {
+				return nil, errors.New("Empty attribute in format string")
 			}
 			if value, err = attr(value, accessors[1:1+end]); err != nil {
 				return nil, err
@@ -287,22 +297,75 @@ func (fa *formatArgs) value(name string) (starlark.Value, error) {
 	return value, nil
 }
 
-// index is value[key] in a format field: a key of digits is a number.
+// fieldNumber reads the number of a field, like the 0 of {0}, or of an
+// index, like the 1 of {0[1]}. As in Python, it is decimal digits only:
+// "-1" and "+0" are names, not numbers. ok is false for a name.
+func fieldNumber(s string) (n int, ok bool, err error) {
+	if s == "" {
+		return 0, false, nil
+	}
+	for _, r := range s {
+		d, isDigit := decimalValue(r)
+		if !isDigit {
+			return 0, false, nil
+		}
+		if n > (math.MaxInt-d)/10 {
+			return 0, false, errors.New("Too many decimal digits in format string")
+		}
+		n = n*10 + d
+	}
+	return n, true, nil
+}
+
+// index is value[key] in a format field: a key of digits is a number,
+// any other key is text.
 func index(value starlark.Value, key string) (starlark.Value, error) {
-	if n, err := strconv.Atoi(key); err == nil {
-		if seq, ok := value.(starlark.Indexable); ok {
-			if n >= seq.Len() {
-				return nil, fmt.Errorf("%s index out of range", pyTypeName(value))
-			}
-			return seq.Index(n), nil
+	if key == "" {
+		return nil, errors.New("Empty attribute in format string")
+	}
+	n, isNumber, err := fieldNumber(key)
+	if err != nil {
+		return nil, err
+	}
+	m, isMapping := value.(starlark.Mapping)
+	seq, isIndexable := value.(starlark.Indexable)
+	switch {
+	case isNumber && isIndexable:
+		if n >= seq.Len() {
+			return nil, indexRangeError(value)
 		}
-		if m, ok := value.(starlark.Mapping); ok {
-			return mappingGet(m, starlark.MakeInt(n))
-		}
-	} else if m, ok := value.(starlark.Mapping); ok {
+		return seq.Index(n), nil
+	case isNumber && isMapping:
+		return mappingGet(m, starlark.MakeInt(n))
+	case isMapping:
 		return mappingGet(m, starlark.String(key))
+	case isIndexable:
+		return nil, indexTypeError(value)
 	}
 	return nil, fmt.Errorf("'%s' object is not subscriptable", pyTypeName(value))
+}
+
+// indexRangeError and indexTypeError are Python's errors for a wrong index.
+func indexRangeError(value starlark.Value) error {
+	switch value.(type) {
+	case starlark.String:
+		return errors.New("string index out of range")
+	case starlark.Bytes:
+		return errors.New("index out of range")
+	case meteredRange:
+		return errors.New("range object index out of range")
+	}
+	return fmt.Errorf("%s index out of range", pyTypeName(value))
+}
+
+func indexTypeError(value starlark.Value) error {
+	switch value.(type) {
+	case starlark.String:
+		return errors.New("string indices must be integers, not 'str'")
+	case starlark.Bytes:
+		return errors.New("byte indices must be integers or slices, not str")
+	}
+	return fmt.Errorf("%s indices must be integers or slices, not str", pyTypeName(value))
 }
 
 func mappingGet(m starlark.Mapping, key starlark.Value) (starlark.Value, error) {

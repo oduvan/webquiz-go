@@ -234,11 +234,16 @@ var (
 
 // errorText returns the error message of a failed check without Starlark's
 // file, line and traceback. Errors about unknown names read like Python's.
+// A message larger than maxReprBytes, like a Starlark error that holds a
+// whole long text, is replaced: it is no use to a student.
 func errorText(err error) string {
 	msg := err.Error()
 	var evalErr *starlark.EvalError
 	if errors.As(err, &evalErr) {
 		msg = evalErr.Msg
+	}
+	if len(msg) > maxReprBytes {
+		return tooMuchMemory
 	}
 	msg = strings.TrimPrefix(msg, "Starlark computation cancelled: ")
 	for _, pattern := range []*regexp.Regexp{undefinedName, unassignedName} {

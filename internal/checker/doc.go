@@ -74,7 +74,8 @@
 //   - A tuple with a trailing comma and no brackets, like x = 1, is
 //     refused when the quiz is saved. Write x = (1,).
 //   - \N{...} escapes in text are refused when the quiz is saved.
-//   - slice() does not exist; use a[1:5:2].
+//   - slice() does not exist; use a[1:5:2]. A slice cannot be assigned to:
+//     a[1:3] = [5] and a[1:3] += [5] are refused when the quiz is saved.
 //   - In a chained comparison like a < f() < b the middle value is computed
 //     twice.
 //   - Some other Python methods are missing, for example text translate and
@@ -86,10 +87,15 @@
 //     1000. Text and lists made in one step (with "*", "+", "+=", "%",
 //     format(), replace(), join(), split(), extend(), f(*x), list() and the
 //     like, a format width, zfill, ljust, rjust or center) may not be larger
-//     than half of
-//     MaxMemory, the text of repr() and str() not larger than 4 MB, and
-//     numbers made with "*" or "**" not longer than about a million bits.
-//     The answer then counts as wrong. Python 1.19 had no such limits.
+//     than half of MaxMemory. For sets and dicts made in one step (set(),
+//     frozenset(), dict(), update(), union(), intersection() and
+//     symmetric_difference()) every item counts as 128 bytes, for
+//     enumerate() and zip() as about 72 bytes. The text of repr() and str()
+//     may not be larger than 4 MB, a precision in a format not larger than
+//     1,000,000 digits, and numbers made with "*" or "**" not longer than
+//     about a million bits. The answer then counts as wrong. An error message
+//     larger than 4 MB, like the message of a long assert, is replaced by
+//     the "too much memory" error. Python 1.19 had no such limits.
 //   - The memory watch measures the memory of the whole program. A checker
 //     that uses much memory can make another check that runs at the same
 //     time fail too.
@@ -100,5 +106,6 @@
 // generator expression could not read variables of the checker: all of these
 // failed with NameError. Here they work. print() did not exist in 1.19 and
 // now does nothing. Starlark builtins such as getattr, hasattr, dir and hash
-// are available too.
+// are available too, but not bytes(): its name is not defined, as in 1.19.
+// Text like b'abc' works.
 package checker

@@ -50,14 +50,16 @@ const (
 )
 
 // methodFallbacks are methods that go through _attr_, which finds them at
-// run time: Python methods that Starlark values lack (x.sort()), and text
-// methods that need a size check or Python's rules (replace, join, format).
+// run time: Python methods that Starlark values lack (x.sort()), and
+// methods that need a size check or Python's rules (replace, join, format,
+// update).
 var methodFallbacks = map[string]bool{
 	"sort": true, "reverse": true, "count": true, "copy": true,
 	"isnumeric": true, "isdecimal": true, "isascii": true, "casefold": true, "swapcase": true,
 	"zfill": true, "ljust": true, "rjust": true, "center": true, "is_integer": true,
 	"replace": true, "join": true, "format": true, "split": true, "rsplit": true, "splitlines": true,
 	"elems": true, "codepoints": true, "elem_ords": true, "codepoint_ords": true, "extend": true,
+	"update": true, "union": true, "intersection": true, "symmetric_difference": true,
 }
 
 // notSupported are Python statements and expressions that Starlark has no
@@ -633,7 +635,19 @@ var augmentedOps = map[string]bool{
 	"&=": true, "|=": true, "^=": true, ">>=": true, "<<=": true, "**=": true, "@=": true,
 }
 
+// augmentedCalls holds the operators that the rewrite turns into calls:
+// x += y becomes x = _iadd_(x, (y)). Starlark has no **; the others go
+// through functions that check the size of the result. Starlark runs
+// x *= y as x = x * y too, also for lists.
+var augmentedCalls = map[string]string{
+	"**=": "_pow_",
+	"*=":  "_mul_",
+	"+=":  "_iadd_",
+	"%=":  "_mod_",
+}
+
 func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
+	start := p.pos
 	first, _, err := p.exprList(true)
 	if err != nil {
 		return nil, err
@@ -665,27 +679,24 @@ func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
 		}
 		return out, nil
 	case p.peek().kind == tokOp && augmentedOps[p.peek().text]:
+		target := p.toks[start:p.pos]
 		op := p.take()
 		value, _, err := p.exprList(false)
 		if err != nil {
 			return nil, err
 		}
-		switch op.text {
-		case "@=":
+		// Python checks the target only when the whole line can be read.
+		if msg := augTargetError(target); msg != "" {
+			return nil, &SyntaxError{Msg: msg, Line: target[0].line}
+		}
+		if op.text == "@=" {
 			return nil, &SyntaxError{Msg: "'@=' is not supported in checker code", Line: op.line}
-		case "**=":
-			out := append(first, added("="), added("_pow_"), added("("))
-			out = append(out, copyAdded(first)...)
-			out = append(out, added(","))
-			out = append(out, value...)
-			return append(out, added(")")), nil
-		case "*=":
-			// Starlark runs x *= y as x = x * y too, also for lists.
-			return append(first, append([]piece{added("=")}, call("_mul_", copyAdded(first), value)...)...), nil
-		case "+=":
-			return append(first, append([]piece{added("=")}, call("_iadd_", copyAdded(first), value)...)...), nil
-		case "%=":
-			return append(first, append([]piece{added("=")}, call("_mod_", copyAdded(first), value)...)...), nil
+		}
+		// These become x = f(x, (value)). The brackets keep a value like
+		// "a, b" in one piece: x += a, b adds the tuple (a, b).
+		if name, ok := augmentedCalls[op.text]; ok {
+			value = append(append([]piece{added("(")}, value...), added(")"))
+			return append(first, append([]piece{added("=")}, call(name, copyAdded(first), value)...)...), nil
 		}
 		out := append(first, op)
 		return append(out, value...), nil
@@ -709,6 +720,177 @@ func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
 		return nil, p.fail()
 	}
 	return first, nil
+}
+
+// augTargetError returns Python's error for the target of x += y, or "" for
+// a good target: a name, an attribute or an index, also in brackets.
+// Without this check the rewrite would let a, b += 1 through, as the
+// assignment a, b = _iadd_(a, b, (1)).
+func augTargetError(target []token) string {
+	inBrackets := false
+	// Brackets around the whole target do not count: (a) += 1 is fine.
+	for isOpToken(target[0], "(") && closingBracket(target, 0) == len(target)-1 {
+		target = target[1 : len(target)-1]
+		inBrackets = true
+		switch {
+		case len(target) == 0:
+			return illegalTarget("tuple")
+		case containsName(topLevel(target), "for"):
+			return illegalTarget("generator expression")
+		}
+	}
+	top := topLevel(target)
+	first := target[0]
+	switch {
+	case containsOp(top, ","):
+		return illegalTarget("tuple")
+	case isOpToken(first, "*") && inBrackets:
+		return "cannot use starred expression here"
+	case isOpToken(first, "*"):
+		return illegalTarget("starred")
+	case isNameToken(first, "lambda"):
+		return illegalTarget("lambda")
+	case containsName(top, "if"):
+		return illegalTarget("conditional expression")
+	case isNameToken(first, "not") || containsName(top, "and") || containsName(top, "or"):
+		return illegalTarget("expression")
+	case containsName(top, "in") || containsName(top, "is") || containsName(top, "not") ||
+		containsOp(top, "<", ">", "==", ">=", "<=", "!="):
+		return illegalTarget("comparison")
+	case containsOp(top, "+", "-", "*", "/", "//", "%", "**", "@", "|", "^", "&", "<<", ">>", "~"):
+		return illegalTarget("expression")
+	}
+	// What is left is one value, maybe with calls, indexes and attributes
+	// after it. The last of these decides.
+	end := 1
+	switch {
+	case isOpToken(first, "(", "[", "{"):
+		end = closingBracket(target, 0) + 1
+	case first.kind == tokString:
+		for end < len(target) && target[end].kind == tokString {
+			end++
+		}
+	}
+	if end < len(target) {
+		if isOpToken(target[len(target)-1], ")") {
+			return illegalTarget("function call")
+		}
+		return ""
+	}
+	switch first.kind {
+	case tokName:
+		if first.text == "True" || first.text == "False" || first.text == "None" {
+			return illegalTarget(first.text)
+		}
+		return ""
+	case tokNumber:
+		return illegalTarget("literal")
+	case tokString:
+		for _, t := range target {
+			if t.lit != nil && t.lit.isF {
+				return illegalTarget("f-string expression")
+			}
+		}
+		return illegalTarget("literal")
+	}
+	if !isOpToken(first, "[", "{") || len(target) < 2 {
+		return ""
+	}
+	inner := target[1 : len(target)-1]
+	comprehension := containsName(topLevel(inner), "for")
+	switch {
+	case first.text == "[" && comprehension:
+		return illegalTarget("list comprehension")
+	case first.text == "[":
+		return illegalTarget("list")
+	case len(inner) == 0 || isOpToken(inner[0], "**") || hasDictColon(inner):
+		if comprehension {
+			return illegalTarget("dict comprehension")
+		}
+		return illegalTarget("dict literal")
+	case comprehension:
+		return illegalTarget("set comprehension")
+	}
+	return illegalTarget("set display")
+}
+
+func illegalTarget(kind string) string {
+	return fmt.Sprintf("'%s' is an illegal expression for augmented assignment", kind)
+}
+
+func isOpToken(t token, texts ...string) bool {
+	return t.kind == tokOp && contains(texts, t.text)
+}
+
+func isNameToken(t token, text string) bool { return t.kind == tokName && t.text == text }
+
+// closingBracket returns the index of the bracket that closes toks[open].
+func closingBracket(toks []token, open int) int {
+	depth := 0
+	for i := open; i < len(toks); i++ {
+		switch {
+		case isOpToken(toks[i], "(", "[", "{"):
+			depth++
+		case isOpToken(toks[i], ")", "]", "}"):
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return len(toks)
+}
+
+// topLevel returns the tokens that are not inside brackets.
+func topLevel(toks []token) []token {
+	var out []token
+	depth := 0
+	for _, t := range toks {
+		switch {
+		case isOpToken(t, "(", "[", "{"):
+			depth++
+		case isOpToken(t, ")", "]", "}"):
+			depth--
+		case depth == 0:
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func containsOp(toks []token, texts ...string) bool {
+	for _, t := range toks {
+		if isOpToken(t, texts...) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsName(toks []token, text string) bool {
+	for _, t := range toks {
+		if isNameToken(t, text) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasDictColon tells whether the inside of {...} has the ":" of a dict.
+// A lambda has its own ":": {lambda: 1} is a set.
+func hasDictColon(inner []token) bool {
+	lambdas := 0
+	for _, t := range topLevel(inner) {
+		switch {
+		case isNameToken(t, "lambda"):
+			lambdas++
+		case isOpToken(t, ":") && lambdas > 0:
+			lambdas--
+		case isOpToken(t, ":"):
+			return true
+		}
+	}
+	return false
 }
 
 // canStartExpression tells whether the current token can begin an expression.
