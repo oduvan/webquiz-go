@@ -321,16 +321,15 @@ func TestMultipleSessions(t *testing.T) {
 }
 
 // py: tests/test_admin_session_auth.py::test_session_cookie_for_files_endpoint
-//
-// /api/files/list is built in Task 10 and answers 501 until then. This test
-// checks that the session cookie opens the admin guard of that route (not
-// 401 or 403). Task 10 should check the 200 and the "quizzes" key too.
 func TestSessionCookieForFilesEndpoint(t *testing.T) {
 	t.Parallel()
 	ts := testutil.StartServer(t, testutil.Options{})
 	res := ts.GetJSON(t, "/api/files/list", testutil.WithCookies(login(t, ts)...))
-	if res.Status == 401 || res.Status == 403 {
-		t.Errorf("%d %s", res.Status, res.Body)
+	if res.Status != 200 {
+		t.Fatalf("%d %s", res.Status, res.Body)
+	}
+	if _, ok := res.JSON(t)["quizzes"]; !ok {
+		t.Errorf("no quizzes key: %s", res.Body)
 	}
 	if res := ts.GetJSON(t, "/api/files/list"); res.Status != 401 {
 		t.Errorf("without a cookie: %d", res.Status)

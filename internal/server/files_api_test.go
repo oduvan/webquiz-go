@@ -253,18 +253,23 @@ func TestSaveSameNameAsRunningSubfolderQuiz(t *testing.T) {
 	ts := twoQuizServer(t)
 	writeTestFile(t, filepath.Join(ts.QuizzesDir, "sub", "a.yaml"), "title: Sub\nquestions:\n- question: Q?\n  options: [a, b]\n  correct_answer: 0\n")
 	admin := ts.AdminClient(t, "test123")
-	if res := admin.PostJSON(t, "/api/admin/switch-quiz", map[string]any{"quiz_filename": "sub/a.yaml"}); res.Status != 200 {
-		t.Fatalf("switch: %d %s", res.Status, res.Body)
+	// Switch-quiz refuses a name with a folder part (see
+	// TestSwitchQuizNameStaysInsideTheQuizzesFolder), so a quiz in a subfolder
+	// can no longer run. The refusal must keep the running quiz.
+	if res := admin.PostJSON(t, "/api/admin/switch-quiz", map[string]any{"quiz_filename": "sub/a.yaml"}); res.Status == 200 {
+		t.Fatalf("switch to sub/a.yaml should be refused: %s", res.Body)
 	}
 	userID := ts.RegisterStudent(t, "Ann")
 
+	// Saving the top-level a.yaml must not restart the running quiz
+	// (default.yaml): the save compares full paths, not only file names.
 	if res := admin.Put(t, "/api/files/quizzes/save/a.yaml", map[string]any{"content": savedQuiz}); res.Status != 200 {
 		t.Fatalf("save a.yaml: %d %s", res.Status, res.Body)
 	}
 	if res := ts.GetJSON(t, "/api/verify-user/"+userID); res.JSON(t)["valid"] != true {
-		t.Errorf("saving the top-level a.yaml restarted sub/a.yaml: %s", res.Body)
+		t.Errorf("saving a.yaml restarted the running quiz: %s", res.Body)
 	}
-	if boot := pageBoot(t, readIndex(t, ts)); boot["title"] != "Sub" {
+	if boot := pageBoot(t, readIndex(t, ts)); boot["title"] != "Default" {
 		t.Errorf("title %v", boot["title"])
 	}
 }

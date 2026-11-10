@@ -25,11 +25,9 @@ func TestSpoofedLocalhostThroughTunnelIsBlocked(t *testing.T) {
 	if res := ts.PostJSON(t, "/api/admin/auth", nil, headers...); res.Status != 403 {
 		t.Errorf("auth with spoofed header: %d", res.Status)
 	}
-	// The real localhost (no proxy headers) is still trusted. Python checked
-	// for 200; the file list handler is written in another task (it answers
-	// 501 until then), so this checks that the guard lets the request in.
-	if res := ts.GetJSON(t, "/api/files/list"); res.Status == 403 {
-		t.Errorf("files list from localhost: %d", res.Status)
+	// The real localhost (no proxy headers) is still trusted.
+	if res := ts.GetJSON(t, "/api/files/list"); res.Status != 200 {
+		t.Errorf("files list from localhost: %d %s", res.Status, res.Body)
 	}
 }
 
