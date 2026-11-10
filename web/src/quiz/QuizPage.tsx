@@ -76,7 +76,6 @@ function Registration({ state, controller }: { state: ViewState; controller: Qui
 
 function Waiting({ state, controller }: { state: ViewState; controller: QuizController }) {
   const T = controller.T;
-  const boot = controller.boot;
   const waiting = state.waiting;
   return (
     <section id="waiting-approval" className={hiddenUnless(waiting.visible, 'section px-3 md:px-0')}>
@@ -87,35 +86,9 @@ function Waiting({ state, controller }: { state: ViewState; controller: QuizCont
         {T.waiting_hint}
       </p>
       <Message id="waiting-error" message={waiting.message} />
-      <div id="waiting-registration-fields" className="registration-table mx-auto w-full max-w-md">
-        <div className="registration-row mb-3">
-          <label htmlFor="waiting-username" className="registration-label mb-1 block font-semibold">
-            {boot.username_label}:
-          </label>
-          <input
-            id="waiting-username"
-            type="text"
-            className="text-input"
-            value={waiting.username}
-            onChange={(event) => controller.setWaitingUsername(event.target.value)}
-          />
-        </div>
-        {boot.registration_fields.map((field, index) => (
-          <div className="registration-row mb-3" key={index}>
-            <label htmlFor={'waiting-field-' + index} className="registration-label mb-1 block font-semibold">
-              {field.label}:
-            </label>
-            <input
-              id={'waiting-field-' + index}
-              data-field-name={field.name}
-              type="text"
-              className="waiting-field text-input"
-              value={waiting.fields[field.name] || ''}
-              onChange={(event) => controller.setWaitingField(field.name, event.target.value)}
-            />
-          </div>
-        ))}
-      </div>
+      {/* Drawn only while waiting, like the old page: before that, [data-field-name]
+          finds only the registration form's fields */}
+      {waiting.visible ? <WaitingFields state={state} controller={controller} /> : null}
       <div className="mt-5 flex flex-wrap justify-center">
         <Button className="save-registration-btn m-1" onClick={() => void controller.updateRegistrationData()}>
           {T.save_changes}
@@ -125,6 +98,42 @@ function Waiting({ state, controller }: { state: ViewState; controller: QuizCont
         </Button>
       </div>
     </section>
+  );
+}
+
+function WaitingFields({ state, controller }: { state: ViewState; controller: QuizController }) {
+  const boot = controller.boot;
+  const waiting = state.waiting;
+  return (
+    <div id="waiting-registration-fields" className="registration-table mx-auto w-full max-w-md">
+      <div className="registration-row mb-3">
+        <label htmlFor="waiting-username" className="registration-label mb-1 block font-semibold">
+          {boot.username_label}:
+        </label>
+        <input
+          id="waiting-username"
+          type="text"
+          className="text-input"
+          value={waiting.username}
+          onChange={(event) => controller.setWaitingUsername(event.target.value)}
+        />
+      </div>
+      {boot.registration_fields.map((field, index) => (
+        <div className="registration-row mb-3" key={index}>
+          <label htmlFor={'waiting-field-' + index} className="registration-label mb-1 block font-semibold">
+            {field.label}:
+          </label>
+          <input
+            id={'waiting-field-' + index}
+            data-field-name={field.name}
+            type="text"
+            className="waiting-field text-input"
+            value={waiting.fields[field.name] || ''}
+            onChange={(event) => controller.setWaitingField(field.name, event.target.value)}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 
