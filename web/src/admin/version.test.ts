@@ -5,11 +5,11 @@ import { documentationURL, isNewer, latestReleaseURL, releasePageURL, versionFro
 
 describe('new version check', () => {
   it('asks the GitHub releases of the repository from the boot data', () => {
-    expect(latestReleaseURL('https://github.com/oduvan/webquiz-go')).toBe(
-      'https://api.github.com/repos/oduvan/webquiz-go/releases/latest',
+    expect(latestReleaseURL('https://github.com/owner/repo')).toBe(
+      'https://api.github.com/repos/owner/repo/releases/latest',
     );
-    expect(latestReleaseURL('https://github.com/oduvan/webquiz-go/')).toBe(
-      'https://api.github.com/repos/oduvan/webquiz-go/releases/latest',
+    expect(latestReleaseURL('https://github.com/owner/repo/')).toBe(
+      'https://api.github.com/repos/owner/repo/releases/latest',
     );
     expect(latestReleaseURL('')).toBeNull();
     expect(latestReleaseURL('https://example.com/x/y')).toBeNull();
@@ -27,11 +27,11 @@ describe('new version check', () => {
   it('builds the release and documentation addresses', () => {
     expect(versionFromTag('v2.1')).toBe('2.1');
     expect(versionFromTag('2.1')).toBe('2.1');
-    expect(releasePageURL('https://github.com/oduvan/webquiz-go', 'v2.1')).toBe(
-      'https://github.com/oduvan/webquiz-go/releases/tag/v2.1',
+    expect(releasePageURL('https://github.com/owner/repo', 'v2.1')).toBe(
+      'https://github.com/owner/repo/releases/tag/v2.1',
     );
-    expect(documentationURL('https://github.com/oduvan/webquiz-go', '2.0')).toBe(
-      'https://github.com/oduvan/webquiz-go/releases/download/v2.0/webquiz-documentation-uk.pdf',
+    expect(documentationURL('https://github.com/owner/repo', '2.0')).toBe(
+      'https://github.com/owner/repo/releases/download/v2.0/webquiz-documentation-uk.pdf',
     );
   });
 });
