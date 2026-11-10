@@ -797,9 +797,9 @@ question: "What is 2:1?"
 
 #### Downloading Tests Through Admin Interface
 
-If the `config.yaml` configuration file has the **`quizzes`** section filled in, the administrator can download tests directly from the web interface.
+If the `webquiz.yaml` configuration file has the **`quizzes`** section filled in, the administrator can download tests directly from the web interface.
 
-Example section in `config.yaml`:
+Example section in `webquiz.yaml`:
 
 ```
 quizzes:

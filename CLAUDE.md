@@ -55,8 +55,8 @@ Same paths, methods, JSON fields, status codes and error texts as 1.19.
 - `POST /api/admin/auth` - Authenticate with master key in request body (`{"master_key": "..."}`)
 - `GET /api/admin/check-session`, `GET /api/admin/version-check`, `PUT /api/admin/approve-user`, `POST /api/admin/force-show-answers`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz` (optional `settings`: start settings for this run; 400 with `errors` and no switch when invalid; response has the running `settings`), `PUT /api/admin/config` (accepts `{content: yaml}` or `{data: {section: {...}}}` for JSON partial update; response includes `config_content` and `config_data`)
 - `POST /api/admin/preview-explanation` - Render explanation Markdown for the editor preview (`{"markdown": "..."}` -> `{"html": "..."}`)
-- Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`, `POST /api/admin/unite-quizzes`. A name with a folder part is refused
-- Quiz file attachments: `GET /api/admin/list-files` (list files in quizzes/attach/)
+- Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`, `POST /api/admin/unite-quizzes`, `POST /api/admin/validate-quiz` (checks quiz data without saving). A name with a folder part is refused
+- Editor pickers: `GET /api/admin/list-images` (images in quizzes/imgs/), `GET /api/admin/list-files` (list files in quizzes/attach/)
 - Checker templates: `GET /api/admin/list-checker-templates`
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
 - Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`
@@ -72,7 +72,7 @@ Same paths, methods, JSON fields, status codes and error texts as 1.19.
 - `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only: admin approval, tunnel status, `transfer_request`, `transfer_request_removed`, `transfer_result`)
 
 ## Boot Data Contract
-Every HTML entry in `web/` has `<title>__WEBQUIZ_TITLE__</title>` and `<script id="webquiz-boot" type="application/json">__WEBQUIZ_BOOT__</script>`. The server replaces the title with HTML-escaped text and the marker with JSON where `<`, `>` and `&` are written as `<`, `>`, `&` (so `</script>` in quiz text cannot end the script). Page data lives in `QuizBoot`, `AdminBoot`, `FilesBoot`, `LiveStatsBoot`, `CSVTableBoot` (`internal/server/pages.go`) and is read in `web/src/shared/boot.ts`. Asset URLs are relative on the quiz page (`./assets/`, `api/...`, `imgs/...`) because it is also served under `{base_url}/{socket_name}/`; admin pages may use absolute `/api/...` and the server rewrites their `./assets/` to `/assets/`.
+Every HTML entry in `web/` has `<title>__WEBQUIZ_TITLE__</title>` and `<script id="webquiz-boot" type="application/json">__WEBQUIZ_BOOT__</script>`. The server replaces the title with HTML-escaped text and the marker with JSON where `<`, `>` and `&` are written as `\u003c`, `\u003e` and `\u0026` (so `</script>` in quiz text cannot end the script). Page data lives in `QuizBoot`, `AdminBoot`, `FilesBoot`, `LiveStatsBoot`, `CSVTableBoot` (`internal/server/pages.go`) and is read in `web/src/shared/boot.ts`. Asset URLs are relative on the quiz page (`./assets/`, `api/...`, `imgs/...`) because it is also served under `{base_url}/{socket_name}/`; admin pages may use absolute `/api/...` and the server rewrites their `./assets/` to `/assets/`.
 
 ## Dev Commands
 
