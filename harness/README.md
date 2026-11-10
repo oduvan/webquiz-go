@@ -53,14 +53,14 @@ npx tsx harness/run.ts big-class --class-size 100 --no-agents
 With AI agent students:
 
 1. `npx tsx harness/run.ts normal-lesson` and wait for `READY <run_dir>`.
-2. Start one agent per name in the scenario's `agents` (see `harness/scenarios.ts`), each with `harness/AGENT_PROMPT.md`, `{name}`, `{persona}` and `<repository folder>` filled in. Agents only run `npx tsx harness/student.ts <name> <command>`.
+2. Start one agent per name in the scenario's `agents` (see `harness/scenarios.ts`), each with its prompt: `<run_dir>/prompts/<name>.md` is `harness/AGENT_PROMPT.md` with `{name}`, `{persona}` and `<repository folder>` filled in. Agents only run `npx tsx harness/student.ts <name> <command>`.
 3. Save each agent's final message as `<run_dir>/agents/<name>.md`, then create the file `<run_dir>/agents_done`.
 4. The run waits for the server's own time checks, stops, and writes `<run_dir>/report.md` and `<run_dir>/timelines/<name>.md`.
 
 With an AI agent teacher:
 
 1. `npx tsx harness/run.ts teacher-first-lesson` and wait for `READY <run_dir>`. The server starts with the scenario's config and quiz files; no quiz has been started yet, and no address is trusted, so the teacher logs in with the master key (`harness`).
-2. Start one agent with `harness/AGENT_TEACHER_PROMPT.md`, with `{name}` (the name in the scenario's `teacher_agents`), `{master_key}` (`harness`), `{task}` (the scenario's task list) and `<repository folder>` filled in. The agent only runs `npx tsx harness/teacher.ts <name> <command>`.
+2. Start one agent with its prompt `<run_dir>/prompts/<name>.md`: `harness/AGENT_TEACHER_PROMPT.md` with `{name}` (the name in the scenario's `teacher_agents`), `{master_key}` (`harness`), `{task}` (the scenario's task list) and `<repository folder>` filled in. The agent only runs `npx tsx harness/teacher.ts <name> <command>`.
 3. Save the agent's final message as `<run_dir>/agents/<name>.md`, then create `<run_dir>/agents_done`.
 4. The run gives the automatic students up to 150 s more to finish, waits for the server's time checks, stops, and writes `report.md` and the timelines (one per teacher and per student).
 

@@ -960,10 +960,21 @@ class RunRecord {
     return run.text[String(questionId)] ?? `#${questionId}`;
   }
 
-  /** The steps a student took while this user was theirs. */
+  /**
+   * The steps a student took on the quiz page while this user was theirs. (A teacher may
+   * register on the quiz page too; their steps on the admin pages are left out.)
+   */
   stepsOfUser(registration: Registration): Json[] {
+    const onQuizPage = (step: Json) => {
+      if (!step.url) return true;
+      try {
+        return new URL(step.url).pathname === '/';
+      } catch {
+        return false;
+      }
+    };
     return (this.stepsOf.get(registration.student) ?? []).filter(
-      (step) => (step.t_start ?? step.t) >= registration.t - 1 && step.t < registration.until,
+      (step) => (step.t_start ?? step.t) >= registration.t - 1 && step.t < registration.until && onQuizPage(step),
     );
   }
 

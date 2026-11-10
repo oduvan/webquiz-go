@@ -17,7 +17,7 @@
 // server's own time checks, stops everything and writes <run_dir>/report.md.
 
 import { ChildProcess, spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
@@ -248,6 +248,21 @@ function effectiveLimits(scenario: Scenario, settings: Record<string, any> | und
   return limits;
 }
 
+/**
+ * Write each agent's prompt, with everything filled in, to <run_dir>/prompts/<name>.md
+ * (not in agents/, which holds the agents' reports).
+ */
+function writePrompts(runDir: string, template: string, agents: Record<string, Record<string, string>>): void {
+  const dir = path.join(runDir, 'prompts');
+  mkdirSync(dir, { recursive: true });
+  const text = readFileSync(path.join(ROOT, 'harness', template), 'utf-8');
+  for (const [name, values] of Object.entries(agents)) {
+    let prompt = text.replaceAll('{name}', name).replaceAll('<repository folder>', ROOT);
+    for (const [key, value] of Object.entries(values)) prompt = prompt.replaceAll(`{${key}}`, value);
+    writeFileSync(path.join(dir, `${name}.md`), prompt, 'utf-8');
+  }
+}
+
 /** A wrong answer for every choice question that the scenario does not give one for. */
 function wrongAnswers(scenario: Scenario): Record<number, AnswerSpec> {
   const wrong: Record<number, AnswerSpec> = { ...(scenario.wrong_answers ?? {}) };
@@ -298,6 +313,11 @@ async function runStudents(scenario: Scenario, withAgents: boolean): Promise<str
       expectations: scenario.expectations,
     };
     writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+    writePrompts(
+      runDir,
+      'AGENT_PROMPT.md',
+      Object.fromEntries(Object.entries(agents).map(([name, agent]) => [name, { persona: agent.persona }])),
+    );
     writeFileSync(path.join(runDir, 'READY'), 'ready\n');
     console.log(`READY ${runDir}`);
 
@@ -376,6 +396,13 @@ async function runTeacher(scenario: TeacherScenario): Promise<string> {
       quiz_files: Object.keys(scenario.quizzes),
     };
     writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+    writePrompts(
+      runDir,
+      'AGENT_TEACHER_PROMPT.md',
+      Object.fromEntries(
+        Object.entries(scenario.teacher_agents).map(([name, agent]) => [name, { task: agent.task, master_key: MASTER_KEY }]),
+      ),
+    );
     writeFileSync(path.join(runDir, 'READY'), 'ready\n');
     console.log(`READY ${runDir}`);
 

@@ -39,11 +39,15 @@ export const TEACHER_COMMANDS = [
 
 const PAGES: Record<string, string> = {
   admin: '/admin/',
+  'admin-panel': '/admin/',
   files: '/files/',
+  'file-manager': '/files/',
   'live-stats': '/live-stats/',
   livestats: '/live-stats/',
   stats: '/live-stats/',
   quiz: '/',
+  'quiz-page': '/',
+  student: '/',
 };
 
 const MAX_STUDENTS = 30;
@@ -306,7 +310,7 @@ export class TeacherDesk {
   }
 
   private async element(arg: string | undefined, command: string, kinds?: ElementKind[]): Promise<{ locator: Locator; item: ElementInfo }> {
-    const n = Number(arg);
+    const n = Number(String(arg ?? '').replace(/^\[(\d+)\]$/, '$1')); // "[5]" works like "5"
     if (arg === undefined || !Number.isInteger(n)) throw new Error(`write the element number, for example: ${command} 5`);
     const mark = this.marks.get(n);
     if (!mark) {
@@ -349,7 +353,8 @@ export class TeacherDesk {
   private async run(cmd: string, args: string[]): Promise<string> {
     switch (cmd) {
       case 'open': {
-        const where = (args[0] ?? '').toLowerCase();
+        // "open live stats" and "open live-stats" are the same
+        const where = args.join('-').toLowerCase().replace(/_/g, '-');
         const target = PAGES[where];
         if (!target) throw new Error('open what? Use: open admin, open files, open live-stats or open quiz');
         const page = this.page ?? (await this.newPage());
