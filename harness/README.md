@@ -109,7 +109,7 @@ The driver records a teacher step like a student step (a `step` event with the c
 
 `students N` starts N students named `auto-01`, `auto-02`, ... (numbering goes on with the next call). Odd numbers use a desktop browser, even numbers a phone; the timeline shows the device. With no AI they:
 
-- open the quiz page (and look again every few seconds while no quiz runs), fill every registration field with a value that fits its label, and register;
+- open the quiz page (and look again every few seconds while no quiz runs, for up to 3 minutes), fill every registration field with a value that fits its label, and register (again, when the teacher restarts the quiz);
 - wait for approval, pressing "Check" every 5-7 s, for up to 3 minutes;
 - find each question in the quiz files on disk (`<run_dir>/quizzes`) by its text (or its picture), and answer right about 70% of the time (one answer, several answers, or the text answer's `correct_value`);
 - think a random 2-8 s per question, less when a time limit is close;
