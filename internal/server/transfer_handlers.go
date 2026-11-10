@@ -42,3 +42,11 @@ func (s *Server) transferDownload(w http.ResponseWriter, r *http.Request) error 
 func (s *Server) transferResult(w http.ResponseWriter, r *http.Request) error {
 	return notImplemented(w, r)
 }
+
+// incomingTransfersLocked is transfer.list_incoming(): the transfer requests
+// from other servers that wait for the admin, for the initial_state message
+// of the admin WebSocket. Until Task 10 builds the transfers there are none.
+// The caller holds mu.
+func (s *Server) incomingTransfersLocked() []any {
+	return []any{}
+}

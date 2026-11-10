@@ -40,7 +40,7 @@ func TestLogFile(t *testing.T) {
 		"Using single quiz file as default: test_quiz.yaml",
 		"SSH tunnel not configured, skipping initialization",
 		` - webquiz.access - INFO - 127.0.0.1 [`,
-		`] "GET /api/verify-user/123456?x=1 HTTP/1.1" 501 `,
+		`] "GET /api/verify-user/123456?x=1 HTTP/1.1" 200 `,
 		` "-" "probe/1.0"`,
 	} {
 		if !strings.Contains(log, want) {

@@ -13,18 +13,8 @@ import (
 )
 
 // The WebSocket routes. Each handler builds its initial state under s.mu and
-// calls serveWebSocket. Task 7 builds the live stats socket
-// (websocket_live_stats), Task 8 the admin socket (websocket_admin).
-
-// websocketLiveStats is /ws/live-stats (local network only).
-func (s *Server) websocketLiveStats(w http.ResponseWriter, r *http.Request) error {
-	return notImplemented(w, r)
-}
-
-// websocketAdmin is /ws/admin (local network only).
-func (s *Server) websocketAdmin(w http.ResponseWriter, r *http.Request) error {
-	return notImplemented(w, r)
-}
+// calls serveWebSocket: websocketLiveStats (livestats.go) and websocketAdmin
+// (admin_socket.go).
 
 // broadcastLiveStats sends a message to every live stats page
 // (broadcast_to_websockets). Call it while holding s.mu, right after the

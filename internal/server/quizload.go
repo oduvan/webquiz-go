@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/oduvan/webquiz-go/internal/checker"
+	"github.com/oduvan/webquiz-go/internal/config"
 	"github.com/oduvan/webquiz-go/internal/pyval"
 	"github.com/oduvan/webquiz-go/internal/quiz"
 	"github.com/oduvan/webquiz-go/internal/timelimits"
@@ -134,19 +136,69 @@ func (s *Server) loadQuestions() error {
 // another file runs with its own values.
 //
 // Unlike the Python version, a quiz file that cannot be loaded changes
-// nothing: the old quiz keeps running and the error is returned.
+// nothing: the old quiz keeps running and the error is returned. Also unlike
+// Python, which dropped them, the answers of the old run that still wait
+// for the CSV flush are written to the old run's files first.
+//
+// SwitchQuiz takes csvMu and mu itself: never call it while holding mu.
 func (s *Server) SwitchQuiz(filename string, settings map[string]any) error {
+	_, err := s.switchQuiz(filename, settings)
+	return err
+}
+
+// switchResult is what the admin hears about a new run.
+type switchResult struct {
+	csvFile  string         // the answers CSV of the run
+	settings map[string]any // current_quiz_settings()
+}
+
+// switchQuiz does SwitchQuiz and also returns the new run's CSV file and
+// settings.
+//
+// csvMu is held for the whole switch, so no flush writes files meanwhile.
+// The old run's waiting rows are taken in the same locked step as the
+// reset (no answer of the old run is lost), and written before the new run
+// chooses its CSV number (the new run never takes the old run's number).
+// The folder work runs without mu.
+func (s *Server) switchQuiz(filename string, settings map[string]any) (switchResult, error) {
 	path := filepath.Join(s.quizzesDir, filename)
 	if _, err := os.Stat(path); err != nil {
-		return fmt.Errorf("Quiz file not found: %s", filename)
+		return switchResult{}, fmt.Errorf("Quiz file not found: %s", filename)
 	}
 	loaded, err := quiz.Load(path)
 	if err != nil {
-		return err
+		return switchResult{}, err
 	}
+	checkerWarnings := badCheckers(path, loaded) // compiled before any lock is taken
 
+	s.csvMu.Lock()
+	defer s.csvMu.Unlock()
+	if _, err := config.EnsureDir(s.csvDir); err != nil {
+		return switchResult{}, err // nothing has changed yet
+	}
+	oldRows, pageErr := s.startRun(filename, path, loaded, settings, checkerWarnings)
+	s.writeRunRows(oldRows)
+	number := freeCSVNumber(s.csvDir, csvPrefix(filename), os.Lstat)
+
+	var result switchResult
+	s.withLock(func() {
+		files := csvRunFiles(s.csvDir, filename, number, s.cfg.ExtraAnswersWithUsersCSV)
+		s.csvFile, s.userCSVFile, s.answersWithUsersCSVFile = files.answers, files.users, files.answersWithUsers
+		s.log.Info(fmt.Sprintf("Switched to quiz: %s, CSV: %s", filename, s.csvFile))
+		result = switchResult{csvFile: s.csvFile, settings: s.currentQuizSettingsLocked()}
+	})
+	return result, pageErr
+}
+
+// startRun is the locked step of switchQuiz: it takes the old run's rows
+// that wait for the CSV files, forgets every student, puts in the new quiz
+// with its start settings, writes the quiz page and tells the live stats
+// pages. The new run gets its CSV files right after this step. pageErr is
+// the error of writing the quiz page. The caller holds csvMu.
+func (s *Server) startRun(filename, path string, loaded *quiz.Quiz, settings map[string]any, checkerWarnings []string) (oldRows runCSVRows, pageErr error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	oldRows = s.takeRunRowsLocked()
 	s.resetStateLocked()
 	s.log.Info("Server state reset for new quiz")
 	if settings != nil {
@@ -157,7 +209,7 @@ func (s *Server) SwitchQuiz(filename string, settings map[string]any) error {
 		s.startSettingsQuiz = ""
 	}
 	s.currentQuizFile = path
-	s.startCSVFilesLocked(filename)
+	s.csvFile, s.userCSVFile, s.answersWithUsersCSVFile = "", "", ""
 
 	if loaded.TimeLimitWarning != "" {
 		s.log.Warn(fmt.Sprintf("%s: %s", path, loaded.TimeLimitWarning))
@@ -167,15 +219,16 @@ func (s *Server) SwitchQuiz(filename string, settings map[string]any) error {
 		len(loaded.Questions), path, pyBool(loaded.ShowRightAnswer), pyBool(loaded.RandomizeQuestions),
 		pyBool(loaded.ShowAnswersOnCompletion), pyBool(loaded.ShowFinalList), pyBool(loaded.ShowExplanation),
 		len(loaded.ExplanationsHTML), loaded.TimeLimit.Mode, loaded.TimeLimit.Seconds))
+	for _, warning := range checkerWarnings {
+		s.log.Warn(warning)
+	}
 	applyStartSettings(loaded, s.startSettings)
 	if len(s.startSettings) > 0 {
 		s.log.Info(fmt.Sprintf("Quiz runs with start settings (quiz file not changed): %s", pyval.Str(s.startSettings)))
 	}
 	s.quiz = loaded
 
-	if err := s.writeQuizPageLocked(); err != nil {
-		return err
-	}
+	pageErr = s.writeQuizPageLocked()
 	s.broadcastLiveStats(map[string]any{
 		"type":            "quiz_switched",
 		"current_quiz":    filename,
@@ -183,8 +236,80 @@ func (s *Server) SwitchQuiz(filename string, settings map[string]any) error {
 		"total_questions": len(loaded.Questions),
 		"message":         "Quiz switched to: " + filename,
 	})
-	s.log.Info(fmt.Sprintf("Switched to quiz: %s, CSV: %s", filename, s.csvFile))
-	return nil
+	return oldRows, pageErr
+}
+
+// badCheckers compiles the checker code of every question and returns a
+// log warning for each checker the Starlark checker cannot run. Python
+// checked checker code only when a quiz was saved (and would have run such
+// code); answers to these questions are marked wrong with the compile error.
+func badCheckers(path string, q *quiz.Quiz) []string {
+	var warnings []string
+	for _, question := range q.Questions {
+		code, ok := question["checker"].(string)
+		if !ok || code == "" {
+			continue
+		}
+		if err := checker.Validate(code); err != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: Question %d checker does not compile, its answers will be marked wrong: %s",
+				path, question.ID(), err.Error()))
+		}
+	}
+	return warnings
+}
+
+// startSettingKeys are the quiz settings the admin may change when starting
+// a quiz (START_SETTING_KEYS).
+var startSettingKeys = []string{
+	"show_right_answer",
+	"randomize_questions",
+	"show_answers_on_completion",
+	"show_final_list",
+	"show_explanation",
+	"time_limit",
+}
+
+// validateStartSettings is _validate_start_settings: the problems with the
+// start settings of a switch-quiz request. keys are the keys of settings in
+// the order of the request (Python went through them in that order).
+func validateStartSettings(settings any, keys []string) []string {
+	object, ok := settings.(map[string]any)
+	if !ok {
+		return []string{"'settings' must be an object"}
+	}
+	problems := []string{}
+	for _, key := range keys {
+		value := object[key]
+		switch {
+		case !slices.Contains(startSettingKeys, key):
+			problems = append(problems, fmt.Sprintf("'%s' cannot be changed when starting a quiz", key))
+		case key == "time_limit":
+			if value != nil { // null turns the time limit off
+				problems = append(problems, timelimits.Validate(map[string]any{"time_limit": value})...)
+			}
+		case !pyval.IsBool(value):
+			problems = append(problems, fmt.Sprintf("'%s' must be a boolean (true or false)", key))
+		}
+	}
+	return problems
+}
+
+// currentQuizSettingsLocked is current_quiz_settings: the settings the
+// running quiz uses (quiz file values with the start settings applied). The
+// caller holds mu.
+func (s *Server) currentQuizSettingsLocked() map[string]any {
+	var timeLimit any
+	if s.quiz.TimeLimit.Mode != timelimits.ModeNone {
+		timeLimit = map[string]any{s.quiz.TimeLimit.Mode: s.quiz.TimeLimit.Seconds}
+	}
+	return map[string]any{
+		"show_right_answer":          s.quiz.ShowRightAnswer,
+		"randomize_questions":        s.quiz.RandomizeQuestions,
+		"show_answers_on_completion": s.quiz.ShowAnswersOnCompletion,
+		"show_final_list":            s.quiz.ShowFinalList,
+		"show_explanation":           s.quiz.ShowExplanation,
+		"time_limit":                 timeLimit,
+	}
 }
 
 // applyStartSettings is _apply_start_settings: the admin's start settings

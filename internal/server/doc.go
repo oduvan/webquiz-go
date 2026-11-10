@@ -23,16 +23,31 @@
 //     LiveStatsBoot, CSVTableBoot), renderPage, the quiz page file
 //     static_dir/index.html, the admin pages.
 //   - static.go: "/", /imgs/, /assets/ and the static folder.
-//   - quizload.go: choosing the quiz at start, SwitchQuiz, start settings.
+//   - quizload.go: choosing the quiz at start, SwitchQuiz, start settings
+//     (checked and applied), the log warnings for checkers that do not compile.
+//   - student.go: the student API (register, update-registration,
+//     verify-user, question-start, submit-answer) with _record_answer and
+//     _end_whole_quiz.
+//   - timing.go: the question and whole-quiz clocks, remaining times, and
+//     the Python-exact values: seconds (int 0 or float), points, isoformat.
+//   - stats.go: the stored answers, the final results of a student and
+//     all_students_completed.
+//   - csvlog.go: the CSV files of a run (shared NNNN number, flush, fsync,
+//     rows written like Python's csv module).
+//   - livestats.go: the live stats WebSocket and its messages.
+//   - admin_socket.go: the admin WebSocket's initial state and the
+//     registration fields of its messages.
+//   - watcher.go: the time limit watcher (check_time_limits).
+//   - admin_quiz.go: approve-user and switch-quiz (Task 7); the rest of the
+//     admin quiz API (Task 8).
 //   - websocket.go: the WebSocket hub (serveWebSocket, broadcastLiveStats,
 //     broadcastAdmin).
 //   - tunnel.go: the SSH tunnel manager and its status messages.
 //   - admin_auth.go: the admin login (session cookie) and the session check.
 //   - logging.go: the log file logs_dir/NNNN.log in Python's log format.
-//   - Handlers that later tasks build answer 501 until then: student.go and
-//     csvlog.go (Task 7), admin_quiz.go (Task 8), admin_config.go (Task 9),
-//     files.go and transfer_handlers.go (Task 10), startup_log.go and
-//     network.go (Task 11).
+//   - Handlers that later tasks build answer 501 until then: admin_quiz.go
+//     (Task 8), admin_config.go (Task 9), files.go and transfer_handlers.go
+//     (Task 10), startup_log.go and network.go (Task 11).
 //
 // Rules for handlers:
 //
@@ -52,6 +67,15 @@
 //   - s.text, s.isTrustedIP and s.validSession take mu themselves. A Go
 //     mutex cannot be locked twice by the same caller, so inside a locked
 //     section read s.translations[key] and s.cfg directly instead.
+//   - Lock order: csvMu, then mu. csvMu lets one CSV flush or one quiz
+//     switch write CSV files at a time. SwitchQuiz takes both itself, so
+//     call it without holding mu (a config save that restarts the quiz, a
+//     file save that reloads it).
+//   - Checker code may run for 2 seconds, so it never runs under mu:
+//     submit-answer does its checks in a locked step, runs the checker
+//     without the lock, then does the whole order of checks again in a
+//     second locked step before it stores the answer. Do the same for any
+//     other slow work that a stored state depends on.
 //   - Use s.now() for times, s.grace and s.checkInterval for time limits, and
 //     s.ctx for work that must outlive a request (tunnel.Manager.Connect).
 //   - Texts for students and API errors come from s.translations (or s.text).
