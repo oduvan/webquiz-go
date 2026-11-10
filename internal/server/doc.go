@@ -38,8 +38,10 @@
 //   - admin_socket.go: the admin WebSocket's initial state and the
 //     registration fields of its messages.
 //   - watcher.go: the time limit watcher (check_time_limits).
-//   - admin_quiz.go: approve-user and switch-quiz (Task 7); the rest of the
-//     admin quiz API (Task 8).
+//   - admin_quiz.go: approve-user, switch-quiz and the rest of the admin
+//     quiz API (list, get, create, update, delete, unite, validate, the
+//     editor's lists and the explanation preview). yamldump.go: quiz files
+//     written like PyYAML's yaml.dump.
 //   - websocket.go: the WebSocket hub (serveWebSocket, broadcastLiveStats,
 //     broadcastAdmin).
 //   - tunnel.go: the SSH tunnel manager and its status messages.
@@ -48,9 +50,9 @@
 //     archives (with the token rules) and /attach/ files.
 //   - admin_auth.go: the admin login (session cookie) and the session check.
 //   - logging.go: the log file logs_dir/NNNN.log in Python's log format.
-//   - Handlers that later tasks build answer 501 until then: files.go and
-//     transfer_handlers.go (Task 10), startup_log.go and network.go
-//     (Task 11).
+//     startup_log.go: the environment lines the log starts with.
+//   - Handlers that a later task builds answer 501 until then: files.go
+//     and transfer_handlers.go (Task 10).
 //
 // Rules for handlers:
 //
