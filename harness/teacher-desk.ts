@@ -142,7 +142,7 @@ export class TeacherDesk {
 
   private async onDialog(dialog: Dialog): Promise<void> {
     const type = dialog.type();
-    const message = dialog.message();
+    const message = dialog.message().replace(/\s+/g, ' ').trim();
     try {
       if (type === 'prompt') {
         const value = dialog.defaultValue();
