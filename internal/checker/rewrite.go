@@ -5,9 +5,11 @@ package checker
 // writes it out again with these changes:
 //
 //   - assert X, Y            ->  _assert_(X, lambda: (Y))
-//   - f"..{x!r:>8}.."        ->  (".." + _fmt_((x), "r", ">8") + "..")
+//   - f"..{x!r:>8}.."        ->  _cat_("..", _fmt_((x), "r", ">8"), "..")
 //   - a ** b                 ->  _pow_(a, b)
-//   - a * b                  ->  _mul_(a, b)          (refuses a text or list too large)
+//   - a * b, a + b           ->  _mul_(a, b), _add_(a, b)  (refuse a text or list too large)
+//   - a % b                  ->  _mod_(a, b)          (Python's text formatting for text)
+//   - x += y                 ->  x = _iadd_(x, y)     (a list still grows in place)
 //   - a < b                  ->  _cmp_("<", a, b)      (NaN compares like in Python)
 //   - a < b < c              ->  (_cmp_("<", a, b) and _cmp_("<", b, c))
 //   - a is b, a is not b     ->  _cmp_("==", a, b), _cmp_("!=", a, b)
@@ -47,12 +49,15 @@ const (
 	chainedValue = "_chained_value_"
 )
 
-// methodFallbacks are Python methods that Starlark values lack. A call like
-// x.sort() goes through _attr_, which finds the method at run time.
+// methodFallbacks are methods that go through _attr_, which finds them at
+// run time: Python methods that Starlark values lack (x.sort()), and text
+// methods that need a size check or Python's rules (replace, join, format).
 var methodFallbacks = map[string]bool{
 	"sort": true, "reverse": true, "count": true, "copy": true,
 	"isnumeric": true, "isdecimal": true, "isascii": true, "casefold": true, "swapcase": true,
 	"zfill": true, "ljust": true, "rjust": true, "center": true, "is_integer": true,
+	"replace": true, "join": true, "format": true, "split": true, "rsplit": true, "splitlines": true,
+	"elems": true, "codepoints": true, "elem_ords": true, "codepoint_ords": true, "extend": true,
 }
 
 // notSupported are Python statements and expressions that Starlark has no
@@ -676,7 +681,11 @@ func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
 			return append(out, added(")")), nil
 		case "*=":
 			// Starlark runs x *= y as x = x * y too, also for lists.
-			return append(first, append([]piece{added("=")}, mulCall(copyAdded(first), value)...)...), nil
+			return append(first, append([]piece{added("=")}, call("_mul_", copyAdded(first), value)...)...), nil
+		case "+=":
+			return append(first, append([]piece{added("=")}, call("_iadd_", copyAdded(first), value)...)...), nil
+		case "%=":
+			return append(first, append([]piece{added("=")}, call("_mod_", copyAdded(first), value)...)...), nil
 		}
 		out := append(first, op)
 		return append(out, value...), nil
@@ -987,18 +996,28 @@ func (p *parser) binary(level int) ([]piece, *SyntaxError) {
 		if err != nil {
 			return nil, err
 		}
-		if op.text == "*" {
-			out = mulCall(out, right)
+		if name := operatorCalls[op.text]; name != "" {
+			out = call(name, out, right)
 			continue
 		}
 		out = append(append(out, op), right...)
 	}
 }
 
-// mulCall writes _mul_(left, right): "*" can make a huge text or list in one
-// step, before the memory watch can stop the checker.
-func mulCall(left, right []piece) []piece {
-	out := append([]piece{added("_mul_"), added("(")}, left...)
+// operatorCalls are the operators that become calls. "*" and "+" can make a
+// huge text or list in one step, before the memory watch can stop the
+// checker; "%" formats text the Python way.
+var operatorCalls = map[string]string{"*": "_mul_", "+": "_add_", "%": "_mod_"}
+
+// call1 writes name(arg).
+func call1(name string, arg []piece) []piece {
+	out := append([]piece{added(name), added("(")}, arg...)
+	return append(out, added(")"))
+}
+
+// call writes name(left, right).
+func call(name string, left, right []piece) []piece {
+	out := append([]piece{added(name), added("(")}, left...)
 	out = append(out, added(","))
 	out = append(out, right...)
 	return append(out, added(")"))
@@ -1096,6 +1115,11 @@ func (p *parser) callArgs() ([]piece, *SyntaxError) {
 			star := p.take()
 			star.glue = true
 			arg, err = p.test()
+			if star.text == "*" {
+				// f(*x): _star_ refuses a long x before Starlark makes
+				// the arguments.
+				arg = call1("_star_", arg)
+			}
 			arg = append([]piece{star}, arg...)
 		default:
 			arg, err = p.test()
@@ -1452,8 +1476,8 @@ func appendText(segments []segment, text string) []segment {
 	return append(segments, segment{text: text})
 }
 
-// joinSegments writes ("text" + _fmt_(...) + "text"), or just one part when
-// there is only one.
+// joinSegments writes _cat_("text", _fmt_(...), "text"), or just one part
+// when there is only one.
 func joinSegments(segments []segment) ([]piece, *SyntaxError) {
 	if len(segments) == 0 {
 		return []piece{added(`""`)}, nil
@@ -1461,7 +1485,7 @@ func joinSegments(segments []segment) ([]piece, *SyntaxError) {
 	var out []piece
 	for i, s := range segments {
 		if i > 0 {
-			out = append(out, added("+"))
+			out = append(out, added(","))
 		}
 		if s.field == nil {
 			out = append(out, added(starlarkQuote(s.text, false)))
@@ -1476,7 +1500,7 @@ func joinSegments(segments []segment) ([]piece, *SyntaxError) {
 	if len(segments) == 1 {
 		return out, nil
 	}
-	out = append([]piece{added("(")}, out...)
+	out = append([]piece{added("_cat_"), added("(")}, out...)
 	return append(out, added(")")), nil
 }
 

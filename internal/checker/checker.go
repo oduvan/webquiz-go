@@ -186,6 +186,10 @@ func run(prog *starlark.Program, answer string) (result Result) {
 	if _, err := prog.Init(thread, globals); err != nil {
 		return Result{Error: errorText(err)}
 	}
+	// A builtin cut short by a stop may let the code end without error.
+	if state.isStopped.Load() {
+		return Result{Error: state.reason}
+	}
 	return Result{Correct: true}
 }
 

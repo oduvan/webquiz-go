@@ -21,6 +21,40 @@ import (
 // maxReprDepth stops repr() of very deeply nested lists.
 const maxReprDepth = 200
 
+// maxFloatPrecision limits the digits of a formatted number: making them
+// takes about ten bytes of memory for each digit.
+const maxFloatPrecision = 1_000_000
+
+// intTextLimit is Python 3.11's error for an int with too many digits to
+// turn into text. Making such a text takes long.
+const intTextLimit = "Exceeds the limit (4300 digits) for integer string conversion; use sys.set_int_max_str_digits() to increase the limit"
+
+// intValueText is intText for a Starlark int, quick for small ones.
+func intValueText(v starlark.Int) (string, error) {
+	if small, ok := v.Int64(); ok {
+		return strconv.FormatInt(small, 10), nil
+	}
+	return intText(v.BigInt())
+}
+
+// intText returns the decimal text of n, or Python's error when it has more
+// than maxIntDigits digits.
+func intText(n *big.Int) (string, error) {
+	// A number of more than 14400 bits has more than 4334 digits.
+	if n.BitLen() > 14400 {
+		return "", errors.New(intTextLimit)
+	}
+	text := n.Text(10)
+	digits := len(text)
+	if n.Sign() < 0 {
+		digits--
+	}
+	if digits > maxIntDigits {
+		return "", errors.New(intTextLimit)
+	}
+	return text, nil
+}
+
 // maxReprBytes limits the text of repr() and str(). Text made of many small
 // values is slow to build: 4 MB takes about a fifth of a second, and much
 // more than any checker message needs.
@@ -84,6 +118,12 @@ func (w *reprWriter) write(v starlark.Value) error {
 		b.WriteString(pyReprBytes(string(v)))
 	case starlark.Float:
 		b.WriteString(pyFloatRepr(float64(v)))
+	case starlark.Int:
+		text, err := intValueText(v)
+		if err != nil {
+			return err
+		}
+		b.WriteString(text)
 	case *starlark.List:
 		if w.isOpen(v) {
 			b.WriteString("[...]")
@@ -424,7 +464,7 @@ func formatValue(v starlark.Value, spec string) (string, error) {
 		return formatInt(n, spec, "bool")
 	case starlark.Int:
 		if spec == "" {
-			return v.String(), nil
+			return intValueText(v)
 		}
 		return formatInt(v.BigInt(), spec, "int")
 	case starlark.Float:
@@ -545,7 +585,17 @@ func formatInt(n *big.Int, spec, typeName string) (string, error) {
 	if !fs.alternate {
 		prefix = ""
 	}
-	digits := new(big.Int).Abs(n).Text(base)
+	// Python limits only decimal text: other bases are quick to make.
+	var digits string
+	if base == 10 {
+		text, err := intText(new(big.Int).Abs(n))
+		if err != nil {
+			return "", err
+		}
+		digits = text
+	} else {
+		digits = new(big.Int).Abs(n).Text(base)
+	}
 	if fs.typ == 'X' {
 		digits = strings.ToUpper(digits)
 	}
@@ -575,7 +625,7 @@ func formatFloat(x float64, spec, typeName string) (string, error) {
 
 // formatFloatSpec follows format_float_internal in CPython.
 func formatFloatSpec(x float64, fs formatSpec) (string, error) {
-	if fs.precision > maxRepeatBytes {
+	if fs.precision > maxFloatPrecision {
 		return "", errors.New(tooMuchMemory)
 	}
 	code, precision, addDot0, percent := fs.typ, fs.precision, false, false

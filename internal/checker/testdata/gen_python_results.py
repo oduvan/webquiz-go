@@ -122,6 +122,14 @@ CASES = [
     {"name": "is_integer", "checker": "assert float(user_answer).is_integer(), 'Whole number please'", "answers": ["4.0", "4.5"]},
     {"name": "format method without spec", "checker": "x = float(user_answer)\nassert x == 1, 'got {}'.format(x)", "answers": ["1", "2"]},
     {"name": "percent format without precision", "checker": "x = int(user_answer)\nassert x == 1, 'got %d' % x", "answers": ["1", "2"]},
+    {"name": "format method with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)", "answers": ["1", "2"]},
+    {"name": "percent format with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x", "answers": ["1", "2"]},
+    {"name": "format method with names and specs", "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+     "answers": ["2.5", "3.14159", " 7 "]},
+    {"name": "percent format with flags", "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+     "answers": ["42", "255", "-7"]},
+    {"name": "percent format with a mapping", "checker": "d = {'a': user_answer.strip(), 'n': len(user_answer)}\nassert d['a'] == 'ok', '%(a)s has %(n)d letters' % d",
+     "answers": ["ok", "nope"]},
     # Text read as numbers: like Python's int() and float(), the helpers take
     # any Unicode decimal digit, Unicode spaces and "_" between digits.
     {"name": "to_int with Unicode digits", "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
@@ -144,10 +152,6 @@ CASES = [
     {"name": "import", "checker": "import math\nassert math.sqrt(float(user_answer)) == 3", "answers": ["9"], "go_unsupported": "import is not supported"},
     {"name": "length of a Cyrillic word", "checker": "assert len(user_answer.strip()) == 4, 'Чотири літери'", "answers": ["Київ"],
      "go_unsupported": "len() counts bytes, so non-ASCII text needs .codepoints()"},
-    {"name": "format method with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)", "answers": ["2"],
-     "go_unsupported": ".format() has no width or precision"},
-    {"name": "percent format with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x", "answers": ["2"],
-     "go_unsupported": "% has no width or precision"},
 ]
 
 

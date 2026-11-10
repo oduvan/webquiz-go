@@ -1428,6 +1428,102 @@
    "error_type": "AssertionError"
   },
   {
+   "name": "format method with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)",
+   "answer": "1",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "format method with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)",
+   "answer": "2",
+   "correct": false,
+   "error": "got 2.00",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x",
+   "answer": "1",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "percent format with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x",
+   "answer": "2",
+   "correct": false,
+   "error": "got 2.00",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "format method with names and specs",
+   "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+   "answer": "2.5",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "format method with names and specs",
+   "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+   "answer": "3.14159",
+   "correct": false,
+   "error": "got    3.142 ('3.14159')",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "format method with names and specs",
+   "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+   "answer": " 7 ",
+   "correct": false,
+   "error": "got    7.000 (' 7 ')",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with flags",
+   "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+   "answer": "42",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "percent format with flags",
+   "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+   "answer": "255",
+   "correct": false,
+   "error": "got 00255, +2.6e+02, 255   |, ff",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with flags",
+   "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+   "answer": "-7",
+   "correct": false,
+   "error": "got -0007, -7.0e+00, -7    |, -7",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with a mapping",
+   "checker": "d = {'a': user_answer.strip(), 'n': len(user_answer)}\nassert d['a'] == 'ok', '%(a)s has %(n)d letters' % d",
+   "answer": "ok",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "percent format with a mapping",
+   "checker": "d = {'a': user_answer.strip(), 'n': len(user_answer)}\nassert d['a'] == 'ok', '%(a)s has %(n)d letters' % d",
+   "answer": "nope",
+   "correct": false,
+   "error": "nope has 4 letters",
+   "error_type": "AssertionError"
+  },
+  {
    "name": "to_int with Unicode digits",
    "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
    "answer": "４２",
@@ -1825,24 +1921,6 @@
    "error": null,
    "error_type": null,
    "go_unsupported": "len() counts bytes, so non-ASCII text needs .codepoints()"
-  },
-  {
-   "name": "format method with precision",
-   "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)",
-   "answer": "2",
-   "correct": false,
-   "error": "got 2.00",
-   "error_type": "AssertionError",
-   "go_unsupported": ".format() has no width or precision"
-  },
-  {
-   "name": "percent format with precision",
-   "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x",
-   "answer": "2",
-   "correct": false,
-   "error": "got 2.00",
-   "error_type": "AssertionError",
-   "go_unsupported": "% has no width or precision"
   }
  ]
 }

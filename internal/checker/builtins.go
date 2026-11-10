@@ -48,7 +48,14 @@ func newPredeclared() starlark.StringDict {
 		"_iter_":          builtin("_iter_", iterBuiltin),
 		"_attr_":          builtin("_attr_", attrBuiltin),
 		"_mul_":           builtin("_mul_", mulBuiltin),
+		"_add_":           builtin("_add_", addBuiltin),
+		"_iadd_":          builtin("_iadd_", iaddBuiltin),
+		"_mod_":           builtin("_mod_", modBuiltin),
+		"_cat_":           builtin("_cat_", catBuiltin),
+		"_star_":          builtin("_star_", starBuiltin),
 		"_cmp_":           builtin("_cmp_", cmpBuiltin),
+		"range":           builtin("range", rangeBuiltin),
+		"getattr":         builtin("getattr", getattrBuiltin),
 		"math":            mathModule(),
 		"to_int":          helperBuiltin("to_int", toInt),
 		"distance":        helperBuiltin("distance", distance),
@@ -131,6 +138,9 @@ func newMeter(thread *starlark.Thread) meter {
 func (m meter) step() error {
 	m.thread.Steps++
 	if m.thread.Steps >= MaxSteps {
+		if m.state != nil {
+			m.state.stop(m.thread, tooManySteps)
+		}
 		return errors.New(tooManySteps)
 	}
 	if m.state != nil && m.state.isStopped.Load() {
@@ -170,8 +180,31 @@ func iterate(thread *starlark.Thread, v starlark.Value, fn func(starlark.Value) 
 	return fmt.Errorf("'%s' object is not iterable", pyTypeName(v))
 }
 
-// items collects the items of v. Lists and tuples are used as they are.
+// knownLength returns how many items v gives, when that is known without
+// going through it: the characters of a text, or the length of a sequence
+// like a list, a range or text.elems().
+func knownLength(v starlark.Value) (int, bool) {
+	switch v := v.(type) {
+	case starlark.String:
+		return utf8.RuneCountInString(string(v)), true
+	case starlark.Sequence:
+		return v.Len(), true
+	}
+	return 0, false
+}
+
+// tooManyItems tells whether a list of n items would be larger than
+// maxRepeatBytes. An item takes about 16 bytes.
+func tooManyItems(n int) bool {
+	return uint64(n)*16 > maxRepeatBytes
+}
+
+// items collects the items of v. Lists and tuples are used as they are. It
+// refuses at once when the length is known and too large.
 func items(thread *starlark.Thread, v starlark.Value) (starlark.Tuple, error) {
+	if n, ok := knownLength(v); ok && tooManyItems(n) {
+		return nil, errors.New(tooMuchMemory)
+	}
 	switch v := v.(type) {
 	case starlark.Tuple:
 		return v, nil
@@ -292,7 +325,7 @@ func cmpBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kw
 	if !ok {
 		return nil, fmt.Errorf("%s: unknown operator %s", b.Name(), args[0])
 	}
-	if isNaN(args[1]) || isNaN(args[2]) {
+	if isNaN(args[1]) && isNumber(args[2]) || isNaN(args[2]) && isNumber(args[1]) {
 		return starlark.Bool(op == syntax.NEQ), nil
 	}
 	result, err := starlark.Compare(op, args[1], args[2])
@@ -305,6 +338,16 @@ func cmpBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kw
 func isNaN(v starlark.Value) bool {
 	f, ok := v.(starlark.Float)
 	return ok && math.IsNaN(float64(f))
+}
+
+// isNumber tells whether v is an int or a float. Python compares NaN with
+// these; with other values, like text or None, it raises an error.
+func isNumber(v starlark.Value) bool {
+	switch v.(type) {
+	case starlark.Int, starlark.Float:
+		return true
+	}
+	return false
 }
 
 // mulBuiltin is a * b, but refuses a text or list that would be too large.
@@ -324,28 +367,156 @@ func mulBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kw
 	return starlark.Binary(syntax.STAR, x, y)
 }
 
-// repeatTooLarge tells whether seq * count would be larger than
-// maxRepeatBytes. A list item takes about 16 bytes.
-func repeatTooLarge(seq, count starlark.Value) bool {
-	var size uint64
-	switch s := seq.(type) {
+// sizeOf returns about how much memory a text, bytes, list or tuple takes.
+// A list item takes about 16 bytes.
+func sizeOf(v starlark.Value) (uint64, bool) {
+	switch v := v.(type) {
 	case starlark.String:
-		size = uint64(len(s))
+		return uint64(len(v)), true
 	case starlark.Bytes:
-		size = uint64(len(s))
+		return uint64(len(v)), true
 	case *starlark.List:
-		size = uint64(s.Len()) * 16
+		return uint64(v.Len()) * 16, true
 	case starlark.Tuple:
-		size = uint64(len(s)) * 16
-	default:
-		return false
+		return uint64(len(v)) * 16, true
 	}
-	n, ok := count.(starlark.Int)
-	if !ok || size == 0 || n.Sign() <= 0 {
+	return 0, false
+}
+
+// repeatTooLarge tells whether seq * count would be larger than
+// maxRepeatBytes.
+func repeatTooLarge(seq, count starlark.Value) bool {
+	size, ok := sizeOf(seq)
+	n, isInt := count.(starlark.Int)
+	if !ok || !isInt || size == 0 || n.Sign() <= 0 {
 		return false
 	}
 	times, ok := n.Uint64()
 	return !ok || times > maxRepeatBytes/size
+}
+
+// twoArgs returns the two arguments of an operator builtin.
+func twoArgs(b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, starlark.Value, error) {
+	if len(args) != 2 || len(kwargs) != 0 {
+		return nil, nil, fmt.Errorf("%s: want 2 arguments", b.Name())
+	}
+	return args[0], args[1], nil
+}
+
+// addBuiltin is a + b, but refuses a text or list that would be too large:
+// s + s + s + ... in one line could otherwise use all memory in one step.
+func addBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	x, y, err := twoArgs(b, args, kwargs)
+	if err != nil {
+		return nil, err
+	}
+	if sx, ok := sizeOf(x); ok {
+		if sy, ok := sizeOf(y); ok && sx+sy > maxRepeatBytes {
+			return nil, errors.New(tooMuchMemory)
+		}
+	}
+	return starlark.Binary(syntax.PLUS, x, y)
+}
+
+// iaddBuiltin is x += y. A list grows in place, as in Python, so other
+// names for the same list see the new items; it also takes the characters
+// of a text.
+func iaddBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	x, y, err := twoArgs(b, args, kwargs)
+	if err != nil {
+		return nil, err
+	}
+	list, ok := x.(*starlark.List)
+	if !ok {
+		return addBuiltin(thread, b, args, kwargs)
+	}
+	if err := extendList(thread, list, y); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// extendList adds the items of more to list, in place. It checks the size
+// before it copies anything, and it takes the characters of a text, as
+// Python does.
+func extendList(thread *starlark.Thread, list *starlark.List, more starlark.Value) error {
+	if n, ok := knownLength(more); ok && tooManyItems(list.Len()+n) {
+		return errors.New(tooMuchMemory)
+	}
+	elems, err := items(thread, more)
+	if err != nil {
+		return err
+	}
+	if tooManyItems(list.Len() + len(elems)) {
+		return errors.New(tooMuchMemory)
+	}
+	extend, err := list.Attr("extend")
+	if err != nil {
+		return err
+	}
+	_, err = starlark.Call(thread, extend, starlark.Tuple{elems}, nil)
+	return err
+}
+
+// extendMethod is list.extend(more), through extendList.
+func extendMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var more starlark.Value
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 1, &more); err != nil {
+		return nil, err
+	}
+	if err := extendList(thread, b.Receiver().(*starlark.List), more); err != nil {
+		return nil, err
+	}
+	return starlark.None, nil
+}
+
+// starBuiltin is the x of f(*x). Starlark makes the arguments in one step,
+// so a long x is refused first. Text gives its characters, as in Python.
+func starBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var v starlark.Value
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 1, &v); err != nil {
+		return nil, err
+	}
+	if n, ok := knownLength(v); ok && tooManyItems(n) {
+		return nil, errors.New(tooMuchMemory)
+	}
+	if _, ok := v.(starlark.String); ok {
+		return items(thread, v)
+	}
+	return v, nil
+}
+
+// modBuiltin is a % b: Python's text formatting for text, else the
+// remainder.
+func modBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	x, y, err := twoArgs(b, args, kwargs)
+	if err != nil {
+		return nil, err
+	}
+	if template, ok := x.(starlark.String); ok {
+		text, err := pyPercentFormat(string(template), y)
+		if err != nil {
+			return nil, err
+		}
+		return starlark.String(text), nil
+	}
+	return starlark.Binary(syntax.PERCENT, x, y)
+}
+
+// catBuiltin joins the parts of an f-string, refusing a text that would be
+// too large.
+func catBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var out textBuilder
+	for _, part := range args {
+		text, ok := part.(starlark.String)
+		if !ok {
+			return nil, fmt.Errorf("%s: got %s, want string", b.Name(), part.Type())
+		}
+		if err := out.write(string(text)); err != nil {
+			return nil, err
+		}
+	}
+	return starlark.String(out.b.String()), nil
 }
 
 // iterBuiltin returns what a for loop goes over: the characters of a text,
@@ -367,13 +538,22 @@ func iterBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tup
 	return v, nil
 }
 
-// attrBuiltin returns x.name. When the Starlark value has no such method
-// but Python has one, it returns this file's version of it.
+// attrBuiltin returns x.name, through attr.
 func attrBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var x starlark.Value
 	var name string
 	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 2, &x, &name); err != nil {
 		return nil, err
+	}
+	return attr(x, name)
+}
+
+// attr returns x.name. Text methods that can make a large result use this
+// file's versions, which check the size first. When the Starlark value has
+// no such method but Python has one, attr returns this file's version too.
+func attr(x starlark.Value, name string) (starlark.Value, error) {
+	if method := guardedMethods[x.Type()][name]; method != nil {
+		return starlark.NewBuiltin(name, method).BindReceiver(x), nil
 	}
 	if obj, ok := x.(starlark.HasAttrs); ok {
 		if v, err := obj.Attr(name); err == nil && v != nil {
@@ -386,7 +566,148 @@ func attrBuiltin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tup
 	return nil, fmt.Errorf("%s has no .%s field or method", x.Type(), name)
 }
 
+// getattrBuiltin is getattr(x, name[, default]), through attr.
+func getattrBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var x, fallback starlark.Value
+	var name string
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 2, &x, &name, &fallback); err != nil {
+		return nil, err
+	}
+	v, err := attr(x, name)
+	if err != nil && fallback != nil {
+		return fallback, nil
+	}
+	return v, err
+}
+
 type builtinFunc = func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error)
+
+// guardedMethods replace Starlark text methods that can make a large
+// result: they check the size before they make it. elems() and the like
+// are metered.
+var guardedMethods map[string]map[string]builtinFunc
+
+func init() {
+	guardedMethods = map[string]map[string]builtinFunc{
+		"list": {"extend": extendMethod},
+		"string": {
+			"replace":        replaceMethod,
+			"join":           joinMethod,
+			"format":         formatMethod,
+			"split":          splitMethod,
+			"rsplit":         splitMethod,
+			"splitlines":     splitlinesMethod,
+			"elems":          meteredMethod,
+			"codepoints":     meteredMethod,
+			"elem_ords":      meteredMethod,
+			"codepoint_ords": meteredMethod,
+		},
+	}
+}
+
+func replaceMethod(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var old, replacement string
+	count := -1
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "old", &old, "new", &replacement, "count?", &count); err != nil {
+		return nil, err
+	}
+	s := string(b.Receiver().(starlark.String))
+	n := strings.Count(s, old)
+	if count >= 0 && count < n {
+		n = count
+	}
+	if int64(len(s))+int64(n)*(int64(len(replacement))-int64(len(old))) > maxRepeatBytes {
+		return nil, errors.New(tooMuchMemory)
+	}
+	return starlark.String(strings.Replace(s, old, replacement, count)), nil
+}
+
+func joinMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var iterable starlark.Value
+	if err := starlark.UnpackPositionalArgs(b.Name(), args, kwargs, 1, &iterable); err != nil {
+		return nil, err
+	}
+	sep := string(b.Receiver().(starlark.String))
+	parts, err := items(thread, iterable)
+	if err != nil {
+		return nil, err
+	}
+	texts := make([]string, len(parts))
+	size := 0
+	for i, part := range parts {
+		text, ok := part.(starlark.String)
+		if !ok {
+			return nil, fmt.Errorf("sequence item %d: expected str instance, %s found", i, pyTypeName(part))
+		}
+		texts[i] = string(text)
+		size += len(text)
+		if i > 0 {
+			size += len(sep)
+		}
+		if size > maxRepeatBytes {
+			return nil, errors.New(tooMuchMemory)
+		}
+	}
+	return starlark.String(strings.Join(texts, sep)), nil
+}
+
+func formatMethod(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	text, err := pyFormatString(string(b.Receiver().(starlark.String)), args, kwargs)
+	if err != nil {
+		return nil, err
+	}
+	return starlark.String(text), nil
+}
+
+// splitMethod checks how many parts split() or rsplit() would make (each
+// takes about 32 bytes), then calls Starlark's method.
+func splitMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var sep starlark.Value = starlark.None
+	maxsplit := -1
+	if err := starlark.UnpackArgs(b.Name(), args, kwargs, "sep?", &sep, "maxsplit?", &maxsplit); err != nil {
+		return nil, err
+	}
+	s := string(b.Receiver().(starlark.String))
+	parts := 0
+	if sepText, ok := sep.(starlark.String); ok && sepText != "" {
+		parts = strings.Count(s, string(sepText)) + 1
+	} else {
+		inWord := false
+		for _, r := range s {
+			if unicode.IsSpace(r) {
+				inWord = false
+			} else if !inWord {
+				inWord = true
+				parts++
+			}
+		}
+	}
+	if maxsplit >= 0 && parts > maxsplit+1 {
+		parts = maxsplit + 1
+	}
+	if uint64(parts)*32 > maxRepeatBytes {
+		return nil, errors.New(tooMuchMemory)
+	}
+	return callTextMethod(thread, b, args, kwargs)
+}
+
+func splitlinesMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	s := string(b.Receiver().(starlark.String))
+	parts := strings.Count(s, "\n") + strings.Count(s, "\r") + 1
+	if uint64(parts)*32 > maxRepeatBytes {
+		return nil, errors.New(tooMuchMemory)
+	}
+	return callTextMethod(thread, b, args, kwargs)
+}
+
+// callTextMethod calls Starlark's own text method of the same name.
+func callTextMethod(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	native, err := b.Receiver().(starlark.String).Attr(b.Name())
+	if err != nil {
+		return nil, err
+	}
+	return starlark.Call(thread, native, args, kwargs)
+}
 
 // extraMethods are Python methods that Starlark values do not have.
 var extraMethods = map[string]map[string]builtinFunc{
@@ -955,7 +1276,7 @@ func roundBuiltin(_ *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, 
 		}
 		// 10**k is more than twice |x| when k > bits/3 + 2: then x rounds to 0,
 		// and 10**k itself is never computed.
-		if -digits > x.BigInt().BitLen()/3+2 {
+		if digits < -(x.BigInt().BitLen()/3 + 2) {
 			return starlark.MakeInt(0), nil
 		}
 		return starlark.MakeBigInt(roundRat(new(big.Rat).SetInt(x.BigInt()), digits).Num()), nil

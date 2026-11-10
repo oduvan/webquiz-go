@@ -112,6 +112,10 @@ func TestCheckComparisons(t *testing.T) {
 		{"nan is not equal to itself", "x = float(user_answer)\nassert not (x == x) and x != x and not (x <= 1e308)", "nan", true, ""},
 		{"nan with an int", "x = float(user_answer)\nassert not (x > 1) and not (1 < x) and not (0 <= x <= 2)", "nan", true, ""},
 		{"comparison errors stay", "assert 1 < 'a'", "", false, "int < string not implemented"},
+		// Python raises TypeError for NaN against text or None; == and != work.
+		{"nan against text", "x = float('nan') < 'a'", "", false, "float < string not implemented"},
+		{"nan against None", "x = None > float('nan')", "", false, "NoneType > float not implemented"},
+		{"nan equality with other types", "assert not (float('nan') == 'a') and float('nan') != None", "", true, ""},
 	})
 }
 
@@ -131,6 +135,10 @@ func TestCheckStatements(t *testing.T) {
 		{"string methods Starlark lacks", "assert user_answer.isnumeric() and user_answer.zfill(5) == '00042'", "42", true, ""},
 		{"float is_integer", "assert float(user_answer).is_integer()", "4.0", true, ""},
 		{"print does nothing", "print('checking', user_answer, end='')\nassert True", "", true, ""},
+		// Like Python, *text, += text and extend(text) give the characters.
+		{"text as arguments", "def f(*a):\n    return a\nassert f(*user_answer) == ('o', 'k')", "ok", true, ""},
+		{"text added to a list", "x = [1]\nx += user_answer\nx.extend('cd')\nassert x == [1, 'a', 'b', 'c', 'd']", "ab", true, ""},
+		{"+= keeps the same list", "x = [1]\ny = x\nx += [2]\nassert y == [1, 2]", "", true, ""},
 	})
 }
 
@@ -306,11 +314,25 @@ func TestHugeStringFails(t *testing.T) {
 		{"s = 'a'.zfill(2 ** 31 - 1)", []string{tooMuchMemory}},
 		{"s = 'a'.ljust(10 ** 9)", []string{tooMuchMemory}},
 		{"s = 'a'.center(10 ** 9, '*')", []string{tooMuchMemory}},
-		{"x = list('x' * 60000000)", []string{tooMuchMemory, tooManySteps, timeoutTextFor(Timeout)}},
-		{"for c in 'x' * 60000000:\n    pass", []string{tooManySteps, tooMuchMemory, timeoutTextFor(Timeout)}},
-		{"a = [1]\nfor i in range(40):\n    a = [a, a]\nx = str(a)", []string{tooMuchMemory}},
+		{"x = list('x' * 60000000)", []string{tooMuchMemory}},
+		{"x = str(['a' * 1000] * 5000)", []string{tooMuchMemory}},
+		// Starlark's own text methods and operators, which have no size limit.
+		{"s = 'a' * 1000000\nx = s.replace('a', s)", []string{tooMuchMemory}},
+		{"big = 'a' * 1000000\nx = ''.join([big] * 1000)", []string{tooMuchMemory}},
+		{"x = getattr('a' * 1000000, 'replace')('a', 'a' * 1000000)", []string{tooMuchMemory}},
+		{"x = ('{0}' * 1000).format('a' * 100000)", []string{tooMuchMemory}},
+		{"t = ('a' * 100000,) * 1000\nx = ('%s' * 1000) % t", []string{tooMuchMemory}},
+		{"s = 'a' * 30000000\nx = s + s + s + s", []string{tooMuchMemory}},
+		{"s = 'a' * 30000000\nx = f'{s}{s}{s}{s}'", []string{tooMuchMemory}},
+		{"x = [1] * 3000000\nx += x", []string{tooMuchMemory}},
+		{"x = [1] * 3000000\nx.extend(x)", []string{tooMuchMemory}},
+		{"x = ('a,' * 30000000).split(',')", []string{tooMuchMemory}},
+		{"x = []\nx.extend(range(10 ** 9))", []string{tooMuchMemory}},
+		{"x = []\nx.extend(('a' * 60000000).elems())", []string{tooMuchMemory}},
+		{"def f(*args):\n    return len(args)\nx = f(*range(10 ** 9))", []string{tooMuchMemory}},
+		{"def f(*args):\n    return len(args)\nx = f(*('a' * 60000000))", []string{tooMuchMemory}},
 		{"s = 'ab'\nwhile True:\n    s = s + s", []string{tooMuchMemory, timeoutTextFor(Timeout), tooManySteps}},
-		{"x = list(range(10 ** 12))", []string{tooManySteps, tooMuchMemory, timeoutTextFor(Timeout)}},
+		{"x = list(range(10 ** 12))", []string{tooMuchMemory}},
 	}
 	for _, c := range cases {
 		start := time.Now()
@@ -363,6 +385,62 @@ func TestHugeNumberFails(t *testing.T) {
 			t.Errorf("Check(%q) took %v", code, elapsed)
 		}
 	}
+}
+
+// TestLoopOverLongTextIsLazy: a loop over text goes through the characters
+// one by one, so leaving the loop early is quick even for a long text.
+func TestLoopOverLongTextIsLazy(t *testing.T) {
+	start := time.Now()
+	got := Check("n = 0\nfor c in 'x' * 60000000:\n    n += 1\n    if n == 3:\n        break\nassert n == 3", "")
+	if !got.Correct {
+		t.Errorf("Check = %+v", got)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("Check took %v", elapsed)
+	}
+}
+
+// TestHugeFloatPrecisionFails: every digit of a formatted float takes about
+// ten bytes of work memory, so the precision is limited much lower than
+// widths are.
+func TestHugeFloatPrecisionFails(t *testing.T) {
+	for _, code := range []string{
+		"x = format(1.5, '.60000000e')",
+		"x = format(1.5, '.60000000f')",
+		"x = format(1.5, '#.60000000g')",
+		"x = f'{1.5:.60000000e}'",
+		"x = '%.60000000f' % 1.5",
+		"x = '{:.60000000f}'.format(1.5)",
+	} {
+		start := time.Now()
+		got := Check(code, "")
+		if got.Correct || got.Error != tooMuchMemory {
+			t.Errorf("Check(%q) = %+v, want %q", code, got, tooMuchMemory)
+		}
+		if elapsed := time.Since(start); elapsed > time.Second {
+			t.Errorf("Check(%q) took %v", code, elapsed)
+		}
+	}
+	if got := Check("assert len(format(1.5, '.100000f')) == 100002", ""); !got.Correct {
+		t.Errorf("a precision of 100000 failed: %+v", got)
+	}
+}
+
+// TestIntToTextLimit: like Python 3.11+, an int of more than 4300 decimal
+// digits cannot become text, because that takes long. Other bases can.
+func TestIntToTextLimit(t *testing.T) {
+	const limit = "Exceeds the limit (4300 digits) for integer string conversion; use sys.set_int_max_str_digits() to increase the limit"
+	runCheckCases(t, []checkCase{
+		{"str", "n = int('f' * 4000000, 16)\nx = str(n)", "", false, limit},
+		{"repr", "x = repr(10 ** 4300)", "", false, limit},
+		{"f-string", "x = f'{-10 ** 4300}'", "", false, limit},
+		{"format", "x = format(10 ** 4300, ',')", "", false, limit},
+		{"percent", "x = '%d' % (10 ** 4300)", "", false, limit},
+		{"format method", "x = '{}'.format(10 ** 4300)", "", false, limit},
+		{"in a list", "x = str([10 ** 4300])", "", false, limit},
+		{"4300 digits work", "assert len(str(10 ** 4300 - 1)) == 4300 and len(str(-10 ** 4299)) == 4301", "", true, ""},
+		{"hex has no limit", "assert len(format(16 ** 5000, 'x')) == 5001 and len('%x' % 16 ** 5000) == 5001", "", true, ""},
+	})
 }
 
 // TestLargeButAllowedWidths checks that big widths below the limit work and

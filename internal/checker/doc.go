@@ -22,31 +22,36 @@
 // Expressions: numbers (also 1_000), text with any prefix (r, u, b, f),
 // f-strings with conversions (!r, !s, !a), format specs (fill, align, sign,
 // width, "," and "_", precision, types d f e g % s x o b c n) and nested
-// fields, a ** b, chained comparisons like 0 < x < 10 (also with in, not in,
-// is and is not; any comparison with NaN is false except "!=", as in
-// Python), conditional expressions, lambda, list, dict and set
-// comprehensions, generator expressions, set literals, and text joined by
-// writing two literals side by side. A checker may assign to pow or set: the
-// code that the rewrite adds uses its own names.
+// fields, text % values and text.format() with Python's rules (flags,
+// width, precision, names and indexes), a ** b, chained comparisons like
+// 0 < x < 10 (also with in, not in, is and is not), conditional
+// expressions, lambda, list, dict and set comprehensions, generator
+// expressions, set literals, and text joined by writing two literals side
+// by side. A comparison of a NaN value with a number is false, except "!=",
+// as in Python; NaN inside lists and tuples, and min(), max() and sorted(),
+// follow Starlark's order, which puts NaN above every number. A checker may
+// assign to pow or set: the code that the rewrite adds uses its own names.
 //
 // Names: user_answer; math (Starlark's math module plus isclose, log10,
 // log2, trunc, factorial, gcd, fmod, isfinite, isinf, isnan, inf, nan and
 // tau; domain and range errors fail like in Python); the helpers to_int,
 // distance and direction_angle (the same results and error texts as 1.19);
 // and the builtins abs, all, any, bool, chr, dict, enumerate, filter, float,
-// format, frozenset (it makes a normal set), int, isinstance, len, list, map,
+// format, frozenset, int, isinstance, len, list, map,
 // max, min, ord, pow, print, range, repr, reversed, round, set, sorted, str,
 // sum, tuple, type and zip. int(), float(), str(), repr(), round(), pow() and
 // sum() follow Python's rules: int and float read any Unicode decimal digit
-// ("４２"), spaces around the number and "_" between digits, int reads at
-// most 4300 digits like Python 3.11 and later, str of a float gives
+// ("４２"), spaces around the number and "_" between digits, an int has at
+// most 4300 decimal digits when read from text or written as text, like in
+// Python 3.11 and later, str of a float gives
 // "1000000000000000.0" like Python, round goes to the even neighbour, and
 // sum adds floats like Python 3.12. Text can be looped over and passed to
 // list, sorted, set, min, max and the others, which see its characters.
 // These Python methods work too, although Starlark has no such methods:
 // list sort, reverse, count and copy; dict and set copy; text isnumeric,
 // isdecimal, isascii, casefold, swapcase, zfill, ljust, rjust and center;
-// float is_integer.
+// float is_integer. frozenset makes a normal set: isinstance({1, 2},
+// frozenset) is true, and it cannot be a dict key.
 //
 // # Known differences from Python
 //
@@ -58,9 +63,6 @@
 //     that is not plain ASCII, make a list of its letters first:
 //     len(list(user_answer)) or list(user_answer)[0].
 //     (len(user_answer.codepoints()) does not work: Starlark cannot count it.)
-//   - "%" and .format() have no width or precision: "%.2f" % x fails. Use
-//     an f-string or format(x, ".2f"). They also write values the Starlark
-//     way, for example "%r" % "y" gives "y" in double quotes.
 //   - Generator expressions are computed in full, also inside any() and
 //     all(). map() and filter() return lists.
 //   - "is" compares values like "==".
@@ -77,11 +79,14 @@
 //     twice.
 //   - Some other Python methods are missing, for example text translate and
 //     encode. Errors other than assert messages, unknown names, and the
-//     errors of int(), float(), the helpers and math have Starlark's texts.
+//     errors of int(), float(), the helpers, math, "%", format() and join()
+//     have Starlark's texts.
 //   - A checker stops after Timeout (2 seconds), after MaxSteps steps, when
 //     memory grows by more than MaxMemory, or when calls nest deeper than
-//     1000. Text and lists made in one step (with "*", a format width,
-//     zfill, ljust, rjust or center) may not be larger than half of
+//     1000. Text and lists made in one step (with "*", "+", "+=", "%",
+//     format(), replace(), join(), split(), extend(), f(*x), list() and the
+//     like, a format width, zfill, ljust, rjust or center) may not be larger
+//     than half of
 //     MaxMemory, the text of repr() and str() not larger than 4 MB, and
 //     numbers made with "*" or "**" not longer than about a million bits.
 //     The answer then counts as wrong. Python 1.19 had no such limits.
