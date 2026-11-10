@@ -119,6 +119,21 @@ async function tourShot(
   await shoot(page, record, env.runDir, folder, screen, caption, record.add(screen, checks), options);
 }
 
+/**
+ * Choose the matrix quiz in the admin panel's list. Right after a switch the page reloads
+ * the list and clears the choice (AdminApp.tsx confirmStartQuiz), so choose again until
+ * the buttons that need one chosen quiz are enabled.
+ */
+async function chooseQuiz(page: Page): Promise<void> {
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await page.selectOption('#quiz-select', QUIZ_FILE);
+    await sleep(400);
+    if (await page.locator('#edit-btn').isEnabled()) return;
+  }
+  throw new Error('the quiz could not be chosen in the admin panel list');
+}
+
 /** Two students through the API: one answers every question, one answers three. */
 async function students(server: RunningServer): Promise<void> {
   const register = async (username: string) => {
@@ -187,7 +202,7 @@ export async function runTeacherTour(env: MatrixEnv, tour: TourScreen): Promise<
     // 3. The start pop-up
     record.where = 'start pop-up';
     before = record.problems.length;
-    await page.selectOption('#quiz-select', QUIZ_FILE);
+    await chooseQuiz(page);
     await page.click('#switch-btn');
     await page.locator('#start-quiz-modal').waitFor({ state: 'visible', timeout: 10_000 });
     await settled(page);
@@ -226,11 +241,15 @@ export async function runTeacherTour(env: MatrixEnv, tour: TourScreen): Promise<
     const [switched] = await Promise.all([page.waitForResponse('**/api/admin/switch-quiz'), page.click('#start-quiz-confirm')]);
     record.add('start pop-up', [same('the quiz starts from the pop-up', 'admin.html:1890-1930; server.py:2869-2898', 200, switched.status())]);
     await page.locator('#start-quiz-modal').waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => undefined);
+    // The switch ends when the page has reloaded the list and cleared the choice
+    await page
+      .waitForFunction(`document.getElementById('quiz-select').selectedOptions.length === 0`, null, { timeout: 10_000 })
+      .catch(() => undefined);
 
     // 4. The quiz editor, one screenshot per question type
     record.where = 'quiz editor';
     before = record.problems.length;
-    await page.selectOption('#quiz-select', QUIZ_FILE);
+    await chooseQuiz(page);
     await page.click('#edit-btn');
     await page.locator('#quiz-editor-modal').waitFor({ state: 'visible', timeout: 10_000 });
     await page.locator('#quiz-editor-modal .question-item').first().waitFor({ state: 'visible', timeout: 10_000 });
