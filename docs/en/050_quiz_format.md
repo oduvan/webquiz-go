@@ -520,7 +520,7 @@ These things do **not** work:
 - `True` and `False` are not numbers. Instead of `n += c.isdigit()` write `n += 1 if c.isdigit() else 0`.
 - Text cannot be unpacked: instead of `a, b = user_answer` write `a, b = list(user_answer)`.
 
-A checker is stopped after 2 seconds, or when it uses too much memory. The answer is then marked wrong, and the other students are not affected. If a checker has a mistake that the server can find (for example, it uses `try`), a warning is written to the log when the quiz is loaded, and the quiz editor shows an error when you save it. Test every new checker yourself before the lesson.
+A checker is stopped after 2 seconds, or when it uses too much memory. The answer is then marked wrong. The other students usually do not notice it. But the server watches the memory of the whole program, so a checker that uses a lot of memory can also stop another check that runs at the same moment: that answer is then marked wrong too. A checker written on purpose to use up all the memory can still stop the server. If a checker has a mistake that the server can find (for example, it uses `try`), a warning is written to the log when the quiz is loaded, and the quiz editor shows an error when you save it. Test every new checker yourself before the lesson.
 
 Example with math validation:
 
