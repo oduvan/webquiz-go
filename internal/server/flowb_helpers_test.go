@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/oduvan/webquiz-go/internal/testutil"
 )
@@ -107,4 +109,109 @@ func csvRecords(t *testing.T, text string) []map[string]string {
 		out = append(out, record)
 	}
 	return out
+}
+
+// stepClock is a clock that tests move by hand, so a test need not sleep to
+// pass a time limit. It goes to the server as ServerOptions.Now.
+type stepClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func newStepClock() *stepClock {
+	return &stepClock{now: time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)}
+}
+
+func (c *stepClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+// Advance moves the clock forward.
+func (c *stepClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
+
+// shortGrace is the environment of the Python tests (SHORT_GRACE): answers
+// count until half a second after the limit.
+var shortGrace = map[string]string{"WEBQUIZ_TIME_LIMIT_GRACE_SECONDS": "0.5"}
+
+// timedQuizFile is quiz() of the time limit tests: a quiz "Timed" in the
+// file timed.yaml. A nil timeLimit leaves the quiz without a limit.
+func timedQuizFile(timeLimit any, questions []any, settings map[string]any) map[string]any {
+	if questions == nil {
+		questions = []any{choiceQuestion("Q?", nil)}
+	}
+	data := map[string]any{"title": "Timed", "questions": questions}
+	for key, value := range settings {
+		data[key] = value
+	}
+	if timeLimit != nil {
+		data["time_limit"] = timeLimit
+	}
+	return map[string]any{"timed.yaml": data}
+}
+
+// choiceQuestion is question() of the time limit tests: two options, the
+// first one right.
+func choiceQuestion(text string, extra map[string]any) map[string]any {
+	q := map[string]any{"question": text, "options": []any{"A", "B"}, "correct_answer": 0}
+	for key, value := range extra {
+		q[key] = value
+	}
+	return q
+}
+
+// startTimed starts a server on the test clock with the given quiz files and
+// environment (nil: the default 5 s grace).
+func startTimed(t *testing.T, clock *stepClock, quizzes map[string]any, env map[string]string, configure ...func(*testutil.Options)) *testutil.TestServer {
+	t.Helper()
+	opts := testutil.Options{Quizzes: quizzes, Env: env}
+	opts.ServerOptions.Now = clock.Now
+	for _, apply := range configure {
+		apply(&opts)
+	}
+	return testutil.StartServer(t, opts)
+}
+
+// startQuestion sends question-start and requires status 200.
+func startQuestion(t *testing.T, ts *testutil.TestServer, userID string, questionID int) map[string]any {
+	t.Helper()
+	res := ts.PostJSON(t, "/api/question-start", map[string]any{"user_id": userID, "question_id": questionID})
+	if res.Status != http.StatusOK {
+		t.Fatalf("question-start q%d: %d %s", questionID, res.Status, res.Body)
+	}
+	return res.JSON(t)
+}
+
+// floatOf reads a JSON number.
+func floatOf(t *testing.T, v any) float64 {
+	t.Helper()
+	number, ok := v.(json.Number)
+	if !ok {
+		t.Fatalf("want a number, got %v (%T)", v, v)
+	}
+	f, err := number.Float64()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// csvNames lists the file names in a CSV folder.
+func csvNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	sort.Strings(names)
+	return names
 }
