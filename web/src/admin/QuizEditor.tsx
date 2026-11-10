@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { errorText, get, post, quizURL, request } from './api';
 import { useShowMessage } from './messages';
 import { FilePicker, FullscreenImage, ImagePicker, type FileEntry, type ImageEntry } from './Pickers';
@@ -79,9 +79,11 @@ export function QuizEditor({
   const draggedKey = useRef<number | null>(null);
   // The latest values for the actions below, which are made once
   const draftRef = useRef(draft);
-  draftRef.current = draft;
   const previewsRef = useRef(previews);
-  previewsRef.current = previews;
+  useLayoutEffect(() => {
+    draftRef.current = draft;
+    previewsRef.current = previews;
+  });
 
   useEffect(
     () => () => {

@@ -122,8 +122,7 @@ export function QuestionItem({
       if (textRef.current) textRef.current.focus();
     }, 300);
     return () => clearTimeout(timer);
-    // only when the question first appears
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // only when the question first appears, so no dependencies
   }, []);
 
   // A moved question scrolls to the middle of the editor
