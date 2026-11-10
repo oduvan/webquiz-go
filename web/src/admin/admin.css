@@ -270,6 +270,7 @@ body {
   border-radius: 5px;
   margin: 0 0 8px;
   box-shadow: 0 2px 8px var(--shadow);
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
   pointer-events: none;
 }
@@ -325,6 +326,7 @@ body {
   border-radius: 5px;
   color: var(--success-color);
   font-weight: bold;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -379,6 +381,7 @@ body {
 }
 
 .admin-page .modal-header h2 {
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -428,6 +431,7 @@ body {
 .admin-page .start-quiz-name {
   font-weight: 600;
   margin: 0 0 8px;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -577,6 +581,7 @@ body {
   font-size: 0.9em;
   flex: 1;
   min-width: 0;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -794,6 +799,7 @@ body {
 
 .admin-page .explanation-content {
   line-height: 1.5;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -1012,6 +1018,7 @@ body {
   font-weight: bold;
   font-size: 16px;
   margin-bottom: 5px;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -1019,6 +1026,7 @@ body {
   color: var(--text-muted);
   font-size: 14px;
   margin: 3px 0;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -1241,6 +1249,7 @@ body {
   padding: 10px;
   margin: 5px 0;
   font-family: monospace;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -1273,6 +1282,7 @@ body {
 }
 
 .admin-page .tunnel-info span {
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 
@@ -1305,6 +1315,7 @@ body {
 .admin-page .tunnel-error {
   color: var(--error-color);
   margin: 10px 0;
+  word-break: break-word; /* Safari 13 has no overflow-wrap: anywhere */
   overflow-wrap: anywhere;
 }
 

@@ -106,6 +106,24 @@ test.describe('quiz list', () => {
     await expect(messages(page, 'success').last()).toContainText('Successfully restarted "quiz2.yaml"');
   });
 
+  test('a reloaded list sets the start button text again', async ({ page, launch }) => {
+    const server = await launch({ quizzes: TWO_QUIZZES });
+    await adminLogin(page, server.url);
+    await quizOptions(page).nth(1).click();
+    await page.locator('#switch-btn').click();
+    await page.locator('#start-time-limit-mode').selectOption('whole_quiz');
+    await page.locator('#start-time-limit-seconds').fill('-5');
+    await page.locator('#start-quiz-confirm').click();
+    await expect(page.locator('#start-quiz-error')).toBeVisible();
+    await page.locator('#start-quiz-cancel').click();
+    // The old page's text after a failed start
+    await expect(page.locator('#switch-btn')).toHaveText('Switch to Selected Quiz');
+
+    await page.locator('#single-quiz-actions .refresh-btn').click();
+    await expect(page.locator('#switch-btn')).toHaveText('Переключитися на Вибраний Quiz');
+    await expect(page.locator('#switch-btn')).toBeEnabled();
+  });
+
   test('the refresh button reloads the list', async ({ page, request, launch }) => {
     const server = await launch({ quizzes: TWO_QUIZZES });
     await adminLogin(page, server.url);

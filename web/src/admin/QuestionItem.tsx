@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
+import { memo, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import { T } from './texts';
 import { explanationToggleText, indicatorsOf, type QuestionDraft, type QuestionType, type TimeLimitMode } from './wizard';
 
@@ -57,11 +57,12 @@ function isImagePath(value: string): boolean {
   return value.trim().indexOf('/imgs/') === 0;
 }
 
-// The question picture under its field: shown once it has loaded, like the
-// old page (a missing picture shows nothing).
+// The question picture under its field, for any value of the field (like
+// the old page did for a loaded quiz). It shows once the picture has loaded,
+// so a missing picture shows nothing.
 function ImagePreview({ path, onOpen }: { path: string; onOpen: (src: string) => void }) {
   const [loaded, setLoaded] = useState('');
-  const src = isImagePath(path) ? path.trim() : '';
+  const src = path.trim();
   return (
     <div className={'image-preview-container' + (src && loaded === src ? ' has-image' : '')}>
       {src ? (
@@ -96,7 +97,10 @@ function OptionImagePreview({ path, onOpen }: { path: string; onOpen: (src: stri
   );
 }
 
-export function QuestionItem({
+// One question of the editor. It is memoized: typing in one question redraws
+// only that question, because the editor passes the same actions object and
+// the same question objects for the others.
+export const QuestionItem = memo(function QuestionItem({
   question,
   index,
   count,
@@ -482,4 +486,4 @@ export function QuestionItem({
       </div>
     </div>
   );
-}
+});

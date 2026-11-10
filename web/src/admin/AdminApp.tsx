@@ -86,6 +86,8 @@ export function AdminApp({ boot }: { boot: AdminBoot }) {
         const list: QuizEntry[] = Array.isArray(reply.data.quizzes) ? reply.data.quizzes : [];
         setCurrentQuiz(typeof reply.data.current_quiz === 'string' ? reply.data.current_quiz : null);
         setQuizzes(list);
+        // A new list sets the start button's text again, as the old updateButtonVisibility did
+        setSwitchText(null);
         // A selected quiz that is gone is not selected any more
         setSelected((names) => names.filter((name) => list.some((quiz) => quiz.filename === name)));
         if (reply.data.force_all_completed !== undefined) setAnswersForced(Boolean(reply.data.force_all_completed));

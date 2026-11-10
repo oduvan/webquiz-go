@@ -355,3 +355,20 @@ test('a save keeps the quiz description and the keys the editor does not write',
   expect(questions[0]).toEqual({ question: 'Q1', options: ['A', 'B'], correct_answer: 0, hint: 'Think of water' });
   expect(questions[1]).toEqual({ question: 'T', checker: 'assert True', note: { level: 2 } });
 });
+
+test('a question picture shows for any address, not only /imgs/ paths', async ({ page, launch }) => {
+  const server = await launch({ quizzes: quizWith([choice('Q1')]) });
+  writeQuizFile(server, 'imgs', 'pic.png', PNG);
+  await adminLogin(page, server.url);
+  await selectAndEditQuiz(page);
+  const item = await expandQuestion(page, 0);
+
+  // A full address, as a quiz file may have it
+  await item.locator('.question-image').fill(server.url + '/imgs/pic.png');
+  await expect(item.locator('.image-preview-container')).toHaveClass(/has-image/);
+  await expect(item.locator('.image-preview')).toBeVisible();
+
+  // A picture that does not load shows nothing
+  await item.locator('.question-image').fill('/imgs/missing.png');
+  await expect(item.locator('.image-preview-container')).not.toHaveClass(/has-image/);
+});

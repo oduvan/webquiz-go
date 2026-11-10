@@ -304,3 +304,30 @@ test('registration changes from the socket update the waiting list', async ({ pa
   await socket.send({ type: 'answers_forced', forced: true, message: 'Відповіді тепер доступні для всіх учнів' });
   await expect(messages(page, 'success').last()).toHaveText('Відповіді тепер доступні для всіх учнів');
 });
+
+test('the admin socket connects again after the server closed it', async ({ page, launch }) => {
+  const server = await launch();
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket('**/ws/admin', (socket) => {
+    sockets.push(socket);
+    // Each connection gets its own first message, so the test can tell them apart
+    const username = sockets.length === 1 ? 'Alice' : 'Bob';
+    socket.send(
+      JSON.stringify({
+        type: 'initial_state',
+        requires_approval: true,
+        pending_users: { '100001': { username, registration_fields: {} } },
+        tunnel: null,
+        transfer_requests: [],
+      }),
+    );
+  });
+  await adminLogin(page, server.url);
+  await expect(page.locator('.pending-user-name')).toHaveText(['👤 Alice']);
+
+  await sockets[0].close();
+
+  // 5 seconds later the page connects again and shows the new state
+  await expect.poll(() => sockets.length, { timeout: 15000 }).toBe(2);
+  await expect(page.locator('.pending-user-name')).toHaveText(['👤 Bob']);
+});
