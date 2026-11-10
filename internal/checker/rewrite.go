@@ -5,18 +5,24 @@ package checker
 // writes it out again with these changes:
 //
 //   - assert X, Y            ->  _assert_(X, lambda: (Y))
-//   - f"..{x!r:>8}.."        ->  (".." + _fmt_((x), "r", ">8") + "..")
-//   - a ** b                 ->  pow(a, b)
-//   - a * b                  ->  _mul_(a, b)          (refuses a text or list too large)
-//   - a < b < c              ->  (a < b and b < c)
-//   - a is b, a is not b     ->  a == b, a != b
+//   - f"..{x!r:>8}.."        ->  _cat_("..", _fmt_((x), "r", ">8"), "..")
+//   - a ** b                 ->  _pow_(a, b)
+//   - a * b, a + b           ->  _mul_(a, b), _add_(a, b)  (refuse a text or list too large)
+//   - a % b                  ->  _mod_(a, b)          (Python's text formatting for text)
+//   - x += y                 ->  x = _iadd_(x, y)     (a list still grows in place)
+//   - a < b                  ->  _cmp_("<", a, b)      (NaN compares like in Python)
+//   - a < b < c              ->  (_cmp_("<", a, b) and _cmp_("<", b, c))
+//   - a is b, a is not b     ->  _cmp_("==", a, b), _cmp_("!=", a, b)
 //   - for x in s             ->  for x in _iter_(s)   (Python can loop over text)
 //   - (x for x in s)         ->  [x for x in s]       (Starlark has no generators)
-//   - {a, b}                 ->  set([a, b])
+//   - {a, b}                 ->  _set_([a, b])
 //   - "a" "b"                ->  "ab"
 //   - a = b = 0              ->  _chained_value_ = 0; a = _chained_value_; b = _chained_value_
 //   - x.sort()               ->  _attr_(x, "sort")()  (methods Starlark lacks)
 //   - type hints are dropped, strings get Starlark quotes and escapes.
+//
+// The names that start and end with "_" are builtins that the checker
+// cannot change, so a checker may still assign to pow or set.
 //
 // The code is put inside a function, so that it can assign to user_answer
 // and use if, for and while at the top level:
@@ -43,12 +49,17 @@ const (
 	chainedValue = "_chained_value_"
 )
 
-// methodFallbacks are Python methods that Starlark values lack. A call like
-// x.sort() goes through _attr_, which finds the method at run time.
+// methodFallbacks are methods that go through _attr_, which finds them at
+// run time: Python methods that Starlark values lack (x.sort()), and
+// methods that need a size check or Python's rules (replace, join, format,
+// update).
 var methodFallbacks = map[string]bool{
 	"sort": true, "reverse": true, "count": true, "copy": true,
 	"isnumeric": true, "isdecimal": true, "isascii": true, "casefold": true, "swapcase": true,
 	"zfill": true, "ljust": true, "rjust": true, "center": true, "is_integer": true,
+	"replace": true, "join": true, "format": true, "split": true, "rsplit": true, "splitlines": true,
+	"elems": true, "codepoints": true, "elem_ords": true, "codepoint_ords": true, "extend": true,
+	"update": true, "union": true, "intersection": true, "symmetric_difference": true,
 }
 
 // notSupported are Python statements and expressions that Starlark has no
@@ -624,7 +635,19 @@ var augmentedOps = map[string]bool{
 	"&=": true, "|=": true, "^=": true, ">>=": true, "<<=": true, "**=": true, "@=": true,
 }
 
+// augmentedCalls holds the operators that the rewrite turns into calls:
+// x += y becomes x = _iadd_(x, (y)). Starlark has no **; the others go
+// through functions that check the size of the result. Starlark runs
+// x *= y as x = x * y too, also for lists.
+var augmentedCalls = map[string]string{
+	"**=": "_pow_",
+	"*=":  "_mul_",
+	"+=":  "_iadd_",
+	"%=":  "_mod_",
+}
+
 func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
+	start := p.pos
 	first, _, err := p.exprList(true)
 	if err != nil {
 		return nil, err
@@ -656,23 +679,24 @@ func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
 		}
 		return out, nil
 	case p.peek().kind == tokOp && augmentedOps[p.peek().text]:
+		target := p.toks[start:p.pos]
 		op := p.take()
 		value, _, err := p.exprList(false)
 		if err != nil {
 			return nil, err
 		}
-		switch op.text {
-		case "@=":
+		// Python checks the target only when the whole line can be read.
+		if msg := augTargetError(target); msg != "" {
+			return nil, &SyntaxError{Msg: msg, Line: target[0].line}
+		}
+		if op.text == "@=" {
 			return nil, &SyntaxError{Msg: "'@=' is not supported in checker code", Line: op.line}
-		case "**=":
-			out := append(first, added("="), added("pow"), added("("))
-			out = append(out, copyAdded(first)...)
-			out = append(out, added(","))
-			out = append(out, value...)
-			return append(out, added(")")), nil
-		case "*=":
-			// Starlark runs x *= y as x = x * y too, also for lists.
-			return append(first, append([]piece{added("=")}, mulCall(copyAdded(first), value)...)...), nil
+		}
+		// These become x = f(x, (value)). The brackets keep a value like
+		// "a, b" in one piece: x += a, b adds the tuple (a, b).
+		if name, ok := augmentedCalls[op.text]; ok {
+			value = append(append([]piece{added("(")}, value...), added(")"))
+			return append(first, append([]piece{added("=")}, call(name, copyAdded(first), value)...)...), nil
 		}
 		out := append(first, op)
 		return append(out, value...), nil
@@ -696,6 +720,177 @@ func (p *parser) expressionStatement() ([]piece, *SyntaxError) {
 		return nil, p.fail()
 	}
 	return first, nil
+}
+
+// augTargetError returns Python's error for the target of x += y, or "" for
+// a good target: a name, an attribute or an index, also in brackets.
+// Without this check the rewrite would let a, b += 1 through, as the
+// assignment a, b = _iadd_(a, b, (1)).
+func augTargetError(target []token) string {
+	inBrackets := false
+	// Brackets around the whole target do not count: (a) += 1 is fine.
+	for isOpToken(target[0], "(") && closingBracket(target, 0) == len(target)-1 {
+		target = target[1 : len(target)-1]
+		inBrackets = true
+		switch {
+		case len(target) == 0:
+			return illegalTarget("tuple")
+		case containsName(topLevel(target), "for"):
+			return illegalTarget("generator expression")
+		}
+	}
+	top := topLevel(target)
+	first := target[0]
+	switch {
+	case containsOp(top, ","):
+		return illegalTarget("tuple")
+	case isOpToken(first, "*") && inBrackets:
+		return "cannot use starred expression here"
+	case isOpToken(first, "*"):
+		return illegalTarget("starred")
+	case isNameToken(first, "lambda"):
+		return illegalTarget("lambda")
+	case containsName(top, "if"):
+		return illegalTarget("conditional expression")
+	case isNameToken(first, "not") || containsName(top, "and") || containsName(top, "or"):
+		return illegalTarget("expression")
+	case containsName(top, "in") || containsName(top, "is") || containsName(top, "not") ||
+		containsOp(top, "<", ">", "==", ">=", "<=", "!="):
+		return illegalTarget("comparison")
+	case containsOp(top, "+", "-", "*", "/", "//", "%", "**", "@", "|", "^", "&", "<<", ">>", "~"):
+		return illegalTarget("expression")
+	}
+	// What is left is one value, maybe with calls, indexes and attributes
+	// after it. The last of these decides.
+	end := 1
+	switch {
+	case isOpToken(first, "(", "[", "{"):
+		end = closingBracket(target, 0) + 1
+	case first.kind == tokString:
+		for end < len(target) && target[end].kind == tokString {
+			end++
+		}
+	}
+	if end < len(target) {
+		if isOpToken(target[len(target)-1], ")") {
+			return illegalTarget("function call")
+		}
+		return ""
+	}
+	switch first.kind {
+	case tokName:
+		if first.text == "True" || first.text == "False" || first.text == "None" {
+			return illegalTarget(first.text)
+		}
+		return ""
+	case tokNumber:
+		return illegalTarget("literal")
+	case tokString:
+		for _, t := range target {
+			if t.lit != nil && t.lit.isF {
+				return illegalTarget("f-string expression")
+			}
+		}
+		return illegalTarget("literal")
+	}
+	if !isOpToken(first, "[", "{") || len(target) < 2 {
+		return ""
+	}
+	inner := target[1 : len(target)-1]
+	comprehension := containsName(topLevel(inner), "for")
+	switch {
+	case first.text == "[" && comprehension:
+		return illegalTarget("list comprehension")
+	case first.text == "[":
+		return illegalTarget("list")
+	case len(inner) == 0 || isOpToken(inner[0], "**") || hasDictColon(inner):
+		if comprehension {
+			return illegalTarget("dict comprehension")
+		}
+		return illegalTarget("dict literal")
+	case comprehension:
+		return illegalTarget("set comprehension")
+	}
+	return illegalTarget("set display")
+}
+
+func illegalTarget(kind string) string {
+	return fmt.Sprintf("'%s' is an illegal expression for augmented assignment", kind)
+}
+
+func isOpToken(t token, texts ...string) bool {
+	return t.kind == tokOp && contains(texts, t.text)
+}
+
+func isNameToken(t token, text string) bool { return t.kind == tokName && t.text == text }
+
+// closingBracket returns the index of the bracket that closes toks[open].
+func closingBracket(toks []token, open int) int {
+	depth := 0
+	for i := open; i < len(toks); i++ {
+		switch {
+		case isOpToken(toks[i], "(", "[", "{"):
+			depth++
+		case isOpToken(toks[i], ")", "]", "}"):
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return len(toks)
+}
+
+// topLevel returns the tokens that are not inside brackets.
+func topLevel(toks []token) []token {
+	var out []token
+	depth := 0
+	for _, t := range toks {
+		switch {
+		case isOpToken(t, "(", "[", "{"):
+			depth++
+		case isOpToken(t, ")", "]", "}"):
+			depth--
+		case depth == 0:
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func containsOp(toks []token, texts ...string) bool {
+	for _, t := range toks {
+		if isOpToken(t, texts...) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsName(toks []token, text string) bool {
+	for _, t := range toks {
+		if isNameToken(t, text) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasDictColon tells whether the inside of {...} has the ":" of a dict.
+// A lambda has its own ":": {lambda: 1} is a set.
+func hasDictColon(inner []token) bool {
+	lambdas := 0
+	for _, t := range topLevel(inner) {
+		switch {
+		case isNameToken(t, "lambda"):
+			lambdas++
+		case isOpToken(t, ":") && lambdas > 0:
+			lambdas--
+		case isOpToken(t, ":"):
+			return true
+		}
+	}
+	return false
 }
 
 // canStartExpression tells whether the current token can begin an expression.
@@ -872,30 +1067,48 @@ func (p *parser) notTest() ([]piece, *SyntaxError) {
 	return p.comparison()
 }
 
-// compOp reads a comparison operator. "is" and "is not" become "==" and
-// "!=": Starlark has no "is", and checkers use it for None, True and False.
-func (p *parser) compOp() ([]piece, bool) {
+// compOp reads a comparison operator and returns its Python text, and the
+// pieces of "in" and "not in", which stay in the code. "is" and "is not"
+// become "==" and "!=": Starlark has no "is", and checkers use it for None,
+// True and False.
+func (p *parser) compOp() (string, []piece, bool) {
 	tok := p.peek()
 	switch {
 	case tok.kind == tokOp:
 		switch tok.text {
 		case "<", ">", "==", ">=", "<=", "!=":
-			return []piece{p.take()}, true
+			p.take()
+			return tok.text, nil, true
 		}
 	case tok.kind == tokName && tok.text == "in":
-		return []piece{p.take()}, true
+		return "in", []piece{p.take()}, true
 	case tok.kind == tokName && tok.text == "not" && p.pos+1 < len(p.toks) && p.toks[p.pos+1].kind == tokName && p.toks[p.pos+1].text == "in":
 		not := p.take()
-		return []piece{not, p.take()}, true
+		return "not in", []piece{not, p.take()}, true
 	case tok.kind == tokName && tok.text == "is":
-		is := p.take()
+		p.take()
 		if p.atKeyword("not") {
 			p.take()
-			return []piece{{text: "!=", line: is.line}}, true
+			return "!=", nil, true
 		}
-		return []piece{{text: "==", line: is.line}}, true
+		return "==", nil, true
 	}
-	return nil, false
+	return "", nil, false
+}
+
+// compare writes one comparison. "in" and "not in" stay as they are; the
+// others go through _cmp_, because Starlark puts NaN above every number,
+// while in Python every comparison with NaN is false, except "!=".
+func compare(op string, opPieces, left, right []piece) []piece {
+	if op == "in" || op == "not in" {
+		out := append(append([]piece{}, left...), opPieces...)
+		return append(out, right...)
+	}
+	out := []piece{added("_cmp_"), added("("), added(strconv.Quote(op)), added(",")}
+	out = append(out, left...)
+	out = append(out, added(","))
+	out = append(out, right...)
+	return append(out, added(")"))
 }
 
 func (p *parser) comparison() ([]piece, *SyntaxError) {
@@ -903,10 +1116,14 @@ func (p *parser) comparison() ([]piece, *SyntaxError) {
 	if err != nil {
 		return nil, err
 	}
-	type link struct{ op, right []piece }
+	type link struct {
+		op       string
+		opPieces []piece
+		right    []piece
+	}
 	var links []link
 	for {
-		op, ok := p.compOp()
+		op, opPieces, ok := p.compOp()
 		if !ok {
 			break
 		}
@@ -914,14 +1131,13 @@ func (p *parser) comparison() ([]piece, *SyntaxError) {
 		if err != nil {
 			return nil, err
 		}
-		links = append(links, link{op, right})
+		links = append(links, link{op, opPieces, right})
 	}
 	switch len(links) {
 	case 0:
 		return first, nil
 	case 1:
-		out := append(first, links[0].op...)
-		return append(out, links[0].right...), nil
+		return compare(links[0].op, links[0].opPieces, first, links[0].right), nil
 	}
 	// a < b < c: Starlark does not chain comparisons.
 	out := []piece{added("(")}
@@ -931,9 +1147,7 @@ func (p *parser) comparison() ([]piece, *SyntaxError) {
 			out = append(out, added("and"))
 			left = copyAdded(links[i-1].right)
 		}
-		out = append(out, left...)
-		out = append(out, l.op...)
-		out = append(out, l.right...)
+		out = append(out, compare(l.op, l.opPieces, left, l.right)...)
 	}
 	return append(out, added(")")), nil
 }
@@ -964,18 +1178,28 @@ func (p *parser) binary(level int) ([]piece, *SyntaxError) {
 		if err != nil {
 			return nil, err
 		}
-		if op.text == "*" {
-			out = mulCall(out, right)
+		if name := operatorCalls[op.text]; name != "" {
+			out = call(name, out, right)
 			continue
 		}
 		out = append(append(out, op), right...)
 	}
 }
 
-// mulCall writes _mul_(left, right): "*" can make a huge text or list in one
-// step, before the memory watch can stop the checker.
-func mulCall(left, right []piece) []piece {
-	out := append([]piece{added("_mul_"), added("(")}, left...)
+// operatorCalls are the operators that become calls. "*" and "+" can make a
+// huge text or list in one step, before the memory watch can stop the
+// checker; "%" formats text the Python way.
+var operatorCalls = map[string]string{"*": "_mul_", "+": "_add_", "%": "_mod_"}
+
+// call1 writes name(arg).
+func call1(name string, arg []piece) []piece {
+	out := append([]piece{added(name), added("(")}, arg...)
+	return append(out, added(")"))
+}
+
+// call writes name(left, right).
+func call(name string, left, right []piece) []piece {
+	out := append([]piece{added(name), added("(")}, left...)
 	out = append(out, added(","))
 	out = append(out, right...)
 	return append(out, added(")"))
@@ -1016,7 +1240,7 @@ func (p *parser) power() ([]piece, *SyntaxError) {
 	if err != nil {
 		return nil, err
 	}
-	out := []piece{added("pow"), added("(")}
+	out := []piece{added("_pow_"), added("(")}
 	out = append(out, base...)
 	out = append(out, added(","))
 	out = append(out, exponent...)
@@ -1073,6 +1297,11 @@ func (p *parser) callArgs() ([]piece, *SyntaxError) {
 			star := p.take()
 			star.glue = true
 			arg, err = p.test()
+			if star.text == "*" {
+				// f(*x): _star_ refuses a long x before Starlark makes
+				// the arguments.
+				arg = call1("_star_", arg)
+			}
 			arg = append([]piece{star}, arg...)
 		default:
 			arg, err = p.test()
@@ -1303,8 +1532,8 @@ func (p *parser) braceAtom() ([]piece, *SyntaxError) {
 	if p.at(":") {
 		return p.dictRest(open, first)
 	}
-	// A set: Starlark has no set literal, so {a, b} becomes set([a, b]).
-	out := []piece{{text: "set", line: open.line}, added("("), added("[")}
+	// A set: Starlark has no set literal, so {a, b} becomes _set_([a, b]).
+	out := []piece{{text: "_set_", line: open.line}, added("("), added("[")}
 	out = append(out, first...)
 	if p.atKeyword("for") {
 		comp, err := p.compFor()
@@ -1429,8 +1658,8 @@ func appendText(segments []segment, text string) []segment {
 	return append(segments, segment{text: text})
 }
 
-// joinSegments writes ("text" + _fmt_(...) + "text"), or just one part when
-// there is only one.
+// joinSegments writes _cat_("text", _fmt_(...), "text"), or just one part
+// when there is only one.
 func joinSegments(segments []segment) ([]piece, *SyntaxError) {
 	if len(segments) == 0 {
 		return []piece{added(`""`)}, nil
@@ -1438,7 +1667,7 @@ func joinSegments(segments []segment) ([]piece, *SyntaxError) {
 	var out []piece
 	for i, s := range segments {
 		if i > 0 {
-			out = append(out, added("+"))
+			out = append(out, added(","))
 		}
 		if s.field == nil {
 			out = append(out, added(starlarkQuote(s.text, false)))
@@ -1453,7 +1682,7 @@ func joinSegments(segments []segment) ([]piece, *SyntaxError) {
 	if len(segments) == 1 {
 		return out, nil
 	}
-	out = append([]piece{added("(")}, out...)
+	out = append([]piece{added("_cat_"), added("(")}, out...)
 	return append(out, added(")")), nil
 }
 

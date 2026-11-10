@@ -22,27 +22,36 @@
 // Expressions: numbers (also 1_000), text with any prefix (r, u, b, f),
 // f-strings with conversions (!r, !s, !a), format specs (fill, align, sign,
 // width, "," and "_", precision, types d f e g % s x o b c n) and nested
-// fields, a ** b, chained comparisons like 0 < x < 10 (also with in, not in,
-// is and is not), conditional expressions, lambda, list, dict and set
-// comprehensions, generator expressions, set literals, and text joined by
-// writing two literals side by side.
+// fields, text % values and text.format() with Python's rules (flags,
+// width, precision, names and indexes), a ** b, chained comparisons like
+// 0 < x < 10 (also with in, not in, is and is not), conditional
+// expressions, lambda, list, dict and set comprehensions, generator
+// expressions, set literals, and text joined by writing two literals side
+// by side. A comparison of a NaN value with a number is false, except "!=",
+// as in Python; NaN inside lists and tuples, and min(), max() and sorted(),
+// follow Starlark's order, which puts NaN above every number. A checker may
+// assign to pow or set: the code that the rewrite adds uses its own names.
 //
 // Names: user_answer; math (Starlark's math module plus isclose, log10,
 // log2, trunc, factorial, gcd, fmod, isfinite, isinf, isnan, inf, nan and
 // tau; domain and range errors fail like in Python); the helpers to_int,
 // distance and direction_angle (the same results and error texts as 1.19);
 // and the builtins abs, all, any, bool, chr, dict, enumerate, filter, float,
-// format, int, isinstance, len, list, map, max, min, ord, pow, print, range,
-// repr, reversed, round, set, sorted, str, sum, tuple, type and zip. int(),
-// float(), str(), repr(), round(), pow() and sum() follow Python's rules: int
-// and float accept spaces around a number, str of a float gives
+// format, frozenset, int, isinstance, len, list, map,
+// max, min, ord, pow, print, range, repr, reversed, round, set, sorted, str,
+// sum, tuple, type and zip. int(), float(), str(), repr(), round(), pow() and
+// sum() follow Python's rules: int and float read any Unicode decimal digit
+// ("４２"), spaces around the number and "_" between digits, an int has at
+// most 4300 decimal digits when read from text or written as text, like in
+// Python 3.11 and later, str of a float gives
 // "1000000000000000.0" like Python, round goes to the even neighbour, and
 // sum adds floats like Python 3.12. Text can be looped over and passed to
 // list, sorted, set, min, max and the others, which see its characters.
 // These Python methods work too, although Starlark has no such methods:
 // list sort, reverse, count and copy; dict and set copy; text isnumeric,
 // isdecimal, isascii, casefold, swapcase, zfill, ljust, rjust and center;
-// float is_integer.
+// float is_integer. frozenset makes a normal set: isinstance({1, 2},
+// frozenset) is true, and it cannot be a dict key.
 //
 // # Known differences from Python
 //
@@ -54,23 +63,60 @@
 //     that is not plain ASCII, make a list of its letters first:
 //     len(list(user_answer)) or list(user_answer)[0].
 //     (len(user_answer.codepoints()) does not work: Starlark cannot count it.)
-//   - "%" and .format() have no width or precision: "%.2f" % x fails. Use
-//     an f-string or format(x, ".2f"). They also write values the Starlark
-//     way, for example "%r" % "y" gives "y" in double quotes.
 //   - Generator expressions are computed in full, also inside any() and
 //     all(). map() and filter() return lists.
 //   - "is" compares values like "==".
+//   - Starlark does not count True and False as numbers outside sum():
+//     n += c.isdigit() fails. Write n += 1 if c.isdigit() else 0, or use
+//     sum().
+//   - Text cannot be unpacked: a, b = user_answer fails. Write
+//     a, b = list(user_answer).
+//   - A tuple with a trailing comma and no brackets, like x = 1, is
+//     refused when the quiz is saved. Write x = (1,).
+//   - \N{...} escapes in text are refused when the quiz is saved.
+//   - slice() does not exist; use a[1:5:2]. A slice cannot be assigned to:
+//     a[1:3] = [5] and a[1:3] += [5] are refused when the quiz is saved.
 //   - In a chained comparison like a < f() < b the middle value is computed
 //     twice.
+//   - In x[k] += y, x and k are computed twice: d[f()] += 1 calls f twice.
+//   - x *= 2 on a list makes a new list: other names for the old list keep
+//     it as it was. (x += [2] changes the list itself, as in Python.)
+//   - x += *a, b is not supported (a syntax error when the quiz is saved).
+//     Write x += tuple(a) + (b,).
+//   - Text like b'ab' is a Starlark bytes value: b'ab'[1] is b'b', not 98,
+//     and it cannot be looped over.
 //   - Some other Python methods are missing, for example text translate and
 //     encode. Errors other than assert messages, unknown names, and the
-//     errors of int(), float(), the helpers and math have Starlark's texts.
+//     errors of int(), float(), the helpers, math, "%", format() and join()
+//     have Starlark's texts.
 //   - A checker stops after Timeout (2 seconds), after MaxSteps steps, when
 //     memory grows by more than MaxMemory, or when calls nest deeper than
-//     1000. Text or lists made with "*" may not be larger than half of
-//     MaxMemory, and numbers made with "*" or "**" not longer than about
-//     a million bits. The answer then counts as wrong. Python 1.19 had no
-//     such limits.
+//     1000. Text and lists made in one step (with "*", "+", "+=", "%",
+//     format(), replace(), join(), split(), extend(), f(*x), list() and the
+//     like, a format width, zfill, ljust, rjust or center) may not be larger
+//     than half of MaxMemory. For sets and dicts made in one step (set(),
+//     frozenset(), dict(), update(), union(), intersection() and
+//     symmetric_difference()) every item counts as 128 bytes: the items of
+//     all arguments and the items that the set or dict already has. For
+//     enumerate() every item counts as about 72 bytes, for zip() as 40
+//     bytes and 16 for each argument. map() and zip() stop at the shortest
+//     argument, as in Python, and read only that many items; for map() the
+//     items of all arguments together count as a list. The text of repr()
+//     and str() may not be larger than 4 MB, a precision in a format not
+//     larger than 1,000,000 digits, and numbers made with "*" or "**" not
+//     longer than about a million bits. The answer then counts as wrong. An
+//     error message larger than 4 MB, like the message of a long assert, is
+//     replaced by the "too much memory" error. Python 1.19 had no such
+//     limits.
+//   - A lookup with a very long key that is missing, like d[k] where k is
+//     a 60 MB text, first makes Starlark's "key ... not in dict" text (up
+//     to about 1 GB) before the checker replaces it with the memory error.
+//   - The memory watch measures the memory of the whole program. A checker
+//     that uses much memory can make another check that runs at the same
+//     time fail too.
+//   - Checkers are written by the teacher. The limits above stop mistakes,
+//     but a checker written on purpose to use up memory can still stop the
+//     server. Python 1.19 had no limits at all.
 //
 // Some code that failed in 1.19 works now. 1.19 ran exec() with separate
 // globals and locals, so a function defined in a checker could not call
@@ -78,5 +124,6 @@
 // generator expression could not read variables of the checker: all of these
 // failed with NameError. Here they work. print() did not exist in 1.19 and
 // now does nothing. Starlark builtins such as getattr, hasattr, dir and hash
-// are available too.
+// are available too, but not bytes() and fail(): their names are not
+// defined, as in 1.19. Text like b'abc' works.
 package checker

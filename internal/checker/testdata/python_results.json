@@ -1428,6 +1428,574 @@
    "error_type": "AssertionError"
   },
   {
+   "name": "format method with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)",
+   "answer": "1",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "format method with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)",
+   "answer": "2",
+   "correct": false,
+   "error": "got 2.00",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x",
+   "answer": "1",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "percent format with precision",
+   "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x",
+   "answer": "2",
+   "correct": false,
+   "error": "got 2.00",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "format method with names and specs",
+   "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+   "answer": "2.5",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "format method with names and specs",
+   "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+   "answer": "3.14159",
+   "correct": false,
+   "error": "got    3.142 ('3.14159')",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "format method with names and specs",
+   "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+   "answer": " 7 ",
+   "correct": false,
+   "error": "got    7.000 (' 7 ')",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with flags",
+   "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+   "answer": "42",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "percent format with flags",
+   "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+   "answer": "255",
+   "correct": false,
+   "error": "got 00255, +2.6e+02, 255   |, ff",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with flags",
+   "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+   "answer": "-7",
+   "correct": false,
+   "error": "got -0007, -7.0e+00, -7    |, -7",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "percent format with a mapping",
+   "checker": "d = {'a': user_answer.strip(), 'n': len(user_answer)}\nassert d['a'] == 'ok', '%(a)s has %(n)d letters' % d",
+   "answer": "ok",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "percent format with a mapping",
+   "checker": "d = {'a': user_answer.strip(), 'n': len(user_answer)}\nassert d['a'] == 'ok', '%(a)s has %(n)d letters' % d",
+   "answer": "nope",
+   "correct": false,
+   "error": "nope has 4 letters",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": "４２",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": "٤٢",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": " 42　",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": "\u001c42",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": "+4_2",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": "1_000",
+   "correct": false,
+   "error": "got 1000",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": "4__2",
+   "correct": false,
+   "error": "invalid literal for int() with base 10: '4__2'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "to_int with Unicode digits",
+   "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+   "answer": "42²",
+   "correct": false,
+   "error": "invalid literal for int() with base 10: '42²'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "int() text forms",
+   "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+   "answer": "७",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "int() text forms",
+   "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+   "answer": " +7 ",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "int() text forms",
+   "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+   "answer": "0_7",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "int() text forms",
+   "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+   "answer": "\u001c7",
+   "correct": false,
+   "error": "invalid literal for int() with base 10: '\\x1c7'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "int() text forms",
+   "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+   "answer": "7_",
+   "correct": false,
+   "error": "invalid literal for int() with base 10: '7_'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "int() text forms",
+   "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+   "answer": "Ⅶ",
+   "correct": false,
+   "error": "invalid literal for int() with base 10: 'Ⅶ'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "int() text forms",
+   "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+   "answer": "1٣",
+   "correct": false,
+   "error": "13",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "int() digit limit",
+   "checker": "n = int(user_answer)\nassert n > 0",
+   "answer": "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "int() digit limit",
+   "checker": "n = int(user_answer)\nassert n > 0",
+   "answer": "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+   "correct": false,
+   "error": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "１.５km",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "1_500m",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "1.5E3",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "+1500м",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "１５００",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "2\u001ckm",
+   "correct": false,
+   "error": "got 2000",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "1.5e3km",
+   "correct": false,
+   "error": "got 1500000",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "distance with Unicode digits",
+   "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+   "answer": "inf",
+   "correct": false,
+   "error": "Неверный формат ответа. Ожидается число, например: '2000', '2000м', '2км'.",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "direction_angle with Unicode digits",
+   "checker": "assert direction_angle(user_answer) == 2030, 'wrong angle'",
+   "answer": "２０-３０",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "direction_angle with Unicode digits",
+   "checker": "assert direction_angle(user_answer) == 2030, 'wrong angle'",
+   "answer": "20-3_0",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "direction_angle with Unicode digits",
+   "checker": "assert direction_angle(user_answer) == 2030, 'wrong angle'",
+   "answer": " 20 -　30 ",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "direction_angle with Unicode digits",
+   "checker": "assert direction_angle(user_answer) == 2030, 'wrong angle'",
+   "answer": "20-٣٠",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "direction_angle with Unicode digits",
+   "checker": "assert direction_angle(user_answer) == 2030, 'wrong angle'",
+   "answer": "+20-+30",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "１.５",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "Infinity",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "-inf",
+   "correct": false,
+   "error": "-inf",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "+nan",
+   "correct": false,
+   "error": "nan",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "+1E-3",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "1_0e1_0",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": " 1.5 ",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "\u001c1.5",
+   "correct": false,
+   "error": "could not convert string to float: '\\x1c1.5'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "١٫٥",
+   "correct": false,
+   "error": "could not convert string to float: '١٫٥'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "in_f",
+   "correct": false,
+   "error": "could not convert string to float: 'in_f'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": ".5_0",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "float() text forms",
+   "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+   "answer": "1e5_",
+   "correct": false,
+   "error": "could not convert string to float: '1e5_'",
+   "error_type": "ValueError"
+  },
+  {
+   "name": "bytes() is not in the sandbox",
+   "checker": "b = bytes(user_answer, 'utf-8')\nassert b",
+   "answer": "x",
+   "correct": false,
+   "error": "name 'bytes' is not defined",
+   "error_type": "NameError"
+  },
+  {
+   "name": "fail() is not in the sandbox",
+   "checker": "if user_answer != 'ok':\n    fail('wrong')",
+   "answer": "ok",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "fail() is not in the sandbox",
+   "checker": "if user_answer != 'ok':\n    fail('wrong')",
+   "answer": "no",
+   "correct": false,
+   "error": "name 'fail' is not defined",
+   "error_type": "NameError"
+  },
+  {
+   "name": "bytes literal",
+   "checker": "assert b'ab' + b'c' == b'abc' and user_answer, 'empty'",
+   "answer": "x",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "bytes literal",
+   "checker": "assert b'ab' + b'c' == b'abc' and user_answer, 'empty'",
+   "answer": "",
+   "correct": false,
+   "error": "empty",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "+= with a tuple",
+   "checker": "x = []\nx += user_answer.strip(),\nassert x == ['ok'], f'{x}'",
+   "answer": "ok",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "+= with a tuple",
+   "checker": "x = []\nx += user_answer.strip(),\nassert x == ['ok'], f'{x}'",
+   "answer": "no",
+   "correct": false,
+   "error": "['no']",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "%= with a tuple",
+   "checker": "s = '%s-%s'\ns %= user_answer.strip(), 'x'\nassert s == 'a-x', s",
+   "answer": "a",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "%= with a tuple",
+   "checker": "s = '%s-%s'\ns %= user_answer.strip(), 'x'\nassert s == 'a-x', s",
+   "answer": "b",
+   "correct": false,
+   "error": "b-x",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "NaN compared with a bool",
+   "checker": "x = float(user_answer)\nassert not (x <= True) and not (False > x) and x != True, f'{x}'",
+   "answer": "nan",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "NaN compared with a bool",
+   "checker": "x = float(user_answer)\nassert not (x <= True) and not (False > x) and x != True, f'{x}'",
+   "answer": "-nan",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "zip and map stop at the shortest",
+   "checker": "w = user_answer.split()\nr = list(zip(w, range(10 ** 9), 'abc'))\nm = list(map(lambda a, b: a + b, w, 'xyz'))\nassert len(r) == 2 and m == ['ax', 'by'], f'{r} {m}'",
+   "answer": "a b",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "zip and map stop at the shortest",
+   "checker": "w = user_answer.split()\nr = list(zip(w, range(10 ** 9), 'abc'))\nm = list(map(lambda a, b: a + b, w, 'xyz'))\nassert len(r) == 2 and m == ['ax', 'by'], f'{r} {m}'",
+   "answer": "a b c d",
+   "correct": false,
+   "error": "[('a', 0, 'a'), ('b', 1, 'b'), ('c', 2, 'c')] ['ax', 'by', 'cz']",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "map sees a change of the list",
+   "checker": "x = [1, 2, 3]\nr = list(map(lambda v, x=x: x.pop() if v == 1 else v, x))\nassert r == [3, 2] and user_answer, f'{r}'",
+   "answer": "x",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "map sees a change of the list",
+   "checker": "x = [1, 2, 3]\nr = list(map(lambda v, x=x: x.pop() if v == 1 else v, x))\nassert r == [3, 2] and user_answer, f'{r}'",
+   "answer": "",
+   "correct": false,
+   "error": "[3, 2]",
+   "error_type": "AssertionError"
+  },
+  {
+   "name": "format field names with a sign",
+   "checker": "d = {'-1': user_answer.strip()}\nassert '{0[-1]}'.format(d) == 'ok', '{0[-1]}!'.format(d)",
+   "answer": "ok",
+   "correct": true,
+   "error": null,
+   "error_type": null
+  },
+  {
+   "name": "format field names with a sign",
+   "checker": "d = {'-1': user_answer.strip()}\nassert '{0[-1]}'.format(d) == 'ok', '{0[-1]}!'.format(d)",
+   "answer": "no",
+   "correct": false,
+   "error": "no!",
+   "error_type": "AssertionError"
+  },
+  {
    "name": "try and except",
    "checker": "try:\n    v = float(user_answer)\nexcept ValueError:\n    v = None\nassert v == 1.5, 'Expected 1.5'",
    "answer": "1.5",
@@ -1489,24 +2057,6 @@
    "error": null,
    "error_type": null,
    "go_unsupported": "len() counts bytes, so non-ASCII text needs .codepoints()"
-  },
-  {
-   "name": "format method with precision",
-   "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)",
-   "answer": "2",
-   "correct": false,
-   "error": "got 2.00",
-   "error_type": "AssertionError",
-   "go_unsupported": ".format() has no width or precision"
-  },
-  {
-   "name": "percent format with precision",
-   "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x",
-   "answer": "2",
-   "correct": false,
-   "error": "got 2.00",
-   "error_type": "AssertionError",
-   "go_unsupported": "% has no width or precision"
   }
  ]
 }

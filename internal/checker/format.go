@@ -21,81 +21,169 @@ import (
 // maxReprDepth stops repr() of very deeply nested lists.
 const maxReprDepth = 200
 
+// maxFloatPrecision limits the digits of a formatted number: making them
+// takes about ten bytes of memory for each digit.
+const maxFloatPrecision = 1_000_000
+
+// intTextLimit is Python 3.11's error for an int with too many digits to
+// turn into text. Making such a text takes long.
+const intTextLimit = "Exceeds the limit (4300 digits) for integer string conversion; use sys.set_int_max_str_digits() to increase the limit"
+
+// intValueText is intText for a Starlark int, quick for small ones.
+func intValueText(v starlark.Int) (string, error) {
+	if small, ok := v.Int64(); ok {
+		return strconv.FormatInt(small, 10), nil
+	}
+	return intText(v.BigInt())
+}
+
+// intText returns the decimal text of n, or Python's error when it has more
+// than maxIntDigits digits.
+func intText(n *big.Int) (string, error) {
+	// A number of more than 14400 bits has more than 4334 digits.
+	if n.BitLen() > 14400 {
+		return "", errors.New(intTextLimit)
+	}
+	text := n.Text(10)
+	digits := len(text)
+	if n.Sign() < 0 {
+		digits--
+	}
+	if digits > maxIntDigits {
+		return "", errors.New(intTextLimit)
+	}
+	return text, nil
+}
+
+// maxReprBytes limits the text of repr() and str(). Text made of many small
+// values is slow to build: 4 MB takes about a fifth of a second, and much
+// more than any checker message needs.
+const maxReprBytes = 4 << 20
+
 // pyStr returns Python's str(v).
-func pyStr(v starlark.Value) string {
+func pyStr(v starlark.Value) (string, error) {
 	if s, ok := v.(starlark.String); ok {
-		return string(s)
+		return string(s), nil
 	}
 	return pyRepr(v)
 }
 
-// pyRepr returns Python's repr(v).
-func pyRepr(v starlark.Value) string {
-	var b strings.Builder
-	writeRepr(&b, v, map[starlark.Value]bool{}, 0)
-	return b.String()
+// pyRepr returns Python's repr(v). It fails when the text would be larger
+// than maxReprBytes: a list that holds another list twice at each level has
+// a huge text although it is small.
+func pyRepr(v starlark.Value) (string, error) {
+	w := &reprWriter{}
+	if err := w.write(v); err != nil {
+		return "", err
+	}
+	return w.b.String(), nil
 }
 
-func writeRepr(b *strings.Builder, v starlark.Value, open map[starlark.Value]bool, depth int) {
-	if depth > maxReprDepth {
-		b.WriteString("...")
-		return
+// reprWriter builds the text of repr().
+type reprWriter struct {
+	b     strings.Builder
+	depth int // how deep the value being written is nested
+	// open holds the lists and dicts being written, outermost first. A
+	// value that holds itself is written as [...], like Python does.
+	open []starlark.Value
+}
+
+func (w *reprWriter) isOpen(v starlark.Value) bool {
+	for _, x := range w.open {
+		if x == v {
+			return true
+		}
 	}
+	return false
+}
+
+func (w *reprWriter) write(v starlark.Value) error {
+	b := &w.b
+	if b.Len() > maxReprBytes {
+		return errors.New(tooMuchMemory)
+	}
+	if w.depth > maxReprDepth {
+		b.WriteString("...")
+		return nil
+	}
+	w.depth++
+	defer func() { w.depth-- }()
 	switch v := v.(type) {
+	// A repr is at least as long as the text, so a long text fails at once.
 	case starlark.String:
-		b.WriteString(pyReprString(string(v)))
+		if b.Len()+len(v) > maxReprBytes {
+			return errors.New(tooMuchMemory)
+		}
+		return writeReprString(b, string(v), maxReprBytes)
 	case starlark.Bytes:
-		b.WriteString(pyReprBytes(string(v)))
+		if b.Len()+len(v) > maxReprBytes {
+			return errors.New(tooMuchMemory)
+		}
+		return writeReprBytes(b, string(v), maxReprBytes)
 	case starlark.Float:
 		b.WriteString(pyFloatRepr(float64(v)))
-	case *starlark.List:
-		if open[v] {
-			b.WriteString("[...]")
-			return
+	case starlark.Int:
+		text, err := intValueText(v)
+		if err != nil {
+			return err
 		}
-		open[v] = true
+		b.WriteString(text)
+	case *starlark.List:
+		if w.isOpen(v) {
+			b.WriteString("[...]")
+			return nil
+		}
+		w.open = append(w.open, v)
 		b.WriteByte('[')
 		for i := 0; i < v.Len(); i++ {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, v.Index(i), open, depth+1)
+			if err := w.write(v.Index(i)); err != nil {
+				return err
+			}
 		}
 		b.WriteByte(']')
-		delete(open, v)
+		w.open = w.open[:len(w.open)-1]
 	case starlark.Tuple:
 		b.WriteByte('(')
 		for i, x := range v {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, x, open, depth+1)
+			if err := w.write(x); err != nil {
+				return err
+			}
 		}
 		if len(v) == 1 {
 			b.WriteByte(',')
 		}
 		b.WriteByte(')')
 	case *starlark.Dict:
-		if open[v] {
+		if w.isOpen(v) {
 			b.WriteString("{...}")
-			return
+			return nil
 		}
-		open[v] = true
+		w.open = append(w.open, v)
 		b.WriteByte('{')
 		for i, item := range v.Items() {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, item[0], open, depth+1)
+			if err := w.write(item[0]); err != nil {
+				return err
+			}
 			b.WriteString(": ")
-			writeRepr(b, item[1], open, depth+1)
+			if err := w.write(item[1]); err != nil {
+				return err
+			}
 		}
 		b.WriteByte('}')
-		delete(open, v)
+		w.open = w.open[:len(w.open)-1]
 	case *starlark.Set:
 		if v.Len() == 0 {
 			b.WriteString("set()")
-			return
+			return nil
 		}
 		b.WriteByte('{')
 		iter := v.Iterate()
@@ -105,24 +193,48 @@ func writeRepr(b *strings.Builder, v starlark.Value, open map[starlark.Value]boo
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeRepr(b, x, open, depth+1)
+			if err := w.write(x); err != nil {
+				return err
+			}
 		}
 		b.WriteByte('}')
 	default:
+		// The text of text.elems() and the like holds the whole text.
+		if b.Len()+sourceSize(v) > maxReprBytes {
+			return errors.New(tooMuchMemory)
+		}
 		b.WriteString(v.String())
 	}
+	if b.Len() > maxReprBytes {
+		return errors.New(tooMuchMemory)
+	}
+	return nil
 }
 
-// pyReprString returns Python's repr() of a string: single quotes, or double
-// quotes when the text has a single quote and no double quote.
-func pyReprString(s string) string {
+// pyReprString returns Python's repr() of a string. It fails when the text
+// would be larger than maxReprBytes.
+func pyReprString(s string) (string, error) {
+	var b strings.Builder
+	if err := writeReprString(&b, s, maxReprBytes); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+// writeReprString writes Python's repr() of a string to b: single quotes,
+// or double quotes when the text has a single quote and no double quote.
+// It stops with an error as soon as b is longer than limit; b then holds
+// the start of the text.
+func writeReprString(b *strings.Builder, s string, limit int) error {
 	quote := '\''
 	if strings.ContainsRune(s, '\'') && !strings.ContainsRune(s, '"') {
 		quote = '"'
 	}
-	var b strings.Builder
 	b.WriteRune(quote)
 	for _, r := range s {
+		if b.Len() > limit {
+			return errors.New(tooMuchMemory)
+		}
 		switch {
 		case r == quote || r == '\\':
 			b.WriteByte('\\')
@@ -134,31 +246,37 @@ func pyReprString(s string) string {
 		case r == '\r':
 			b.WriteString(`\r`)
 		case r < ' ' || r == 0x7f:
-			fmt.Fprintf(&b, `\x%02x`, r)
+			writeEscape(b, 'x', r, 2)
 		case r < 0x80 || unicode.IsPrint(r):
 			b.WriteRune(r)
 		case r <= 0xff:
-			fmt.Fprintf(&b, `\x%02x`, r)
+			writeEscape(b, 'x', r, 2)
 		case r <= 0xffff:
-			fmt.Fprintf(&b, `\u%04x`, r)
+			writeEscape(b, 'u', r, 4)
 		default:
-			fmt.Fprintf(&b, `\U%08x`, r)
+			writeEscape(b, 'U', r, 8)
 		}
 	}
 	b.WriteRune(quote)
-	return b.String()
+	if b.Len() > limit {
+		return errors.New(tooMuchMemory)
+	}
+	return nil
 }
 
-// pyReprBytes returns Python's repr() of a bytes value.
-func pyReprBytes(s string) string {
+// writeReprBytes writes Python's repr() of a bytes value to b, like
+// writeReprString.
+func writeReprBytes(b *strings.Builder, s string, limit int) error {
 	quote := byte('\'')
 	if strings.IndexByte(s, '\'') >= 0 && strings.IndexByte(s, '"') < 0 {
 		quote = '"'
 	}
-	var b strings.Builder
 	b.WriteString("b")
 	b.WriteByte(quote)
 	for i := 0; i < len(s); i++ {
+		if b.Len() > limit {
+			return errors.New(tooMuchMemory)
+		}
 		c := s[i]
 		switch {
 		case c == quote || c == '\\':
@@ -171,19 +289,37 @@ func pyReprBytes(s string) string {
 		case c == '\r':
 			b.WriteString(`\r`)
 		case c < ' ' || c >= 0x7f:
-			fmt.Fprintf(&b, `\x%02x`, c)
+			writeEscape(b, 'x', rune(c), 2)
 		default:
 			b.WriteByte(c)
 		}
 	}
 	b.WriteByte(quote)
-	return b.String()
+	if b.Len() > limit {
+		return errors.New(tooMuchMemory)
+	}
+	return nil
+}
+
+// writeEscape writes r as an escape like \x00, \u00ff or \U0001f600, with
+// the given number of hex digits.
+func writeEscape(b *strings.Builder, kind byte, r rune, digits int) {
+	const hexDigits = "0123456789abcdef"
+	b.WriteByte('\\')
+	b.WriteByte(kind)
+	for shift := (digits - 1) * 4; shift >= 0; shift -= 4 {
+		b.WriteByte(hexDigits[(r>>shift)&0xf])
+	}
 }
 
 // pyASCII returns Python's ascii(v): repr() with non-ASCII letters escaped.
-func pyASCII(v starlark.Value) string {
+func pyASCII(v starlark.Value) (string, error) {
+	text, err := pyRepr(v)
+	if err != nil {
+		return "", err
+	}
 	var b strings.Builder
-	for _, r := range pyRepr(v) {
+	for _, r := range text {
 		switch {
 		case r < 0x80:
 			b.WriteRune(r)
@@ -195,7 +331,7 @@ func pyASCII(v starlark.Value) string {
 			fmt.Fprintf(&b, `\U%08x`, r)
 		}
 	}
-	return b.String()
+	return b.String(), nil
 }
 
 // pyTypeName returns the name Python uses for the type of v.
@@ -272,11 +408,15 @@ func parseFormatSpec(spec string, defaultAlign rune, typeName string) (formatSpe
 	readNumber := func() (int, bool, error) {
 		start := pos
 		n := 0
-		for pos < len(r) && r[pos] >= '0' && r[pos] <= '9' {
-			n = n*10 + int(r[pos]-'0')
-			if n > 1_000_000 {
+		for pos < len(r) {
+			d, ok := decimalValue(r[pos])
+			if !ok {
+				break
+			}
+			if n > (math.MaxInt-d)/10 {
 				return 0, false, errors.New("Too many decimal digits in format string")
 			}
+			n = n*10 + d
 			pos++
 		}
 		return n, pos > start, nil
@@ -330,6 +470,11 @@ func parseFormatSpec(spec string, defaultAlign rune, typeName string) (formatSpe
 			return fs, groupingError(fs)
 		}
 	}
+	// A huge width would make a huge text in one step, before the memory
+	// watch could stop the checker.
+	if fillSize := utf8.RuneLen(fs.fill); fs.width > 0 && uint64(fs.width)*uint64(max(fillSize, 1)) > maxRepeatBytes {
+		return fs, errors.New(tooMuchMemory)
+	}
 	return fs, nil
 }
 
@@ -364,7 +509,7 @@ func formatValue(v starlark.Value, spec string) (string, error) {
 		return formatInt(n, spec, "bool")
 	case starlark.Int:
 		if spec == "" {
-			return v.String(), nil
+			return intValueText(v)
 		}
 		return formatInt(v.BigInt(), spec, "int")
 	case starlark.Float:
@@ -374,7 +519,7 @@ func formatValue(v starlark.Value, spec string) (string, error) {
 		return formatFloat(float64(v), spec, "float")
 	}
 	if spec == "" {
-		return pyStr(v), nil
+		return pyStr(v)
 	}
 	return "", fmt.Errorf("unsupported format string passed to %s.__format__", pyTypeName(v))
 }
@@ -403,10 +548,21 @@ func formatString(s, spec string) (string, error) {
 	case fs.align == '=':
 		return "", errors.New("'=' alignment not allowed in string format specifier")
 	}
-	if fs.precision >= 0 && utf8.RuneCountInString(s) > fs.precision {
-		s = string([]rune(s)[:fs.precision])
+	if fs.precision >= 0 {
+		s = firstRunes(s, fs.precision)
 	}
 	return pad(s, fs), nil
+}
+
+// firstRunes returns the first n characters of s.
+func firstRunes(s string, n int) string {
+	for i := range s {
+		if n == 0 {
+			return s[:i]
+		}
+		n--
+	}
+	return s
 }
 
 // pad adds fill characters to reach the width, for text and for numbers
@@ -474,7 +630,17 @@ func formatInt(n *big.Int, spec, typeName string) (string, error) {
 	if !fs.alternate {
 		prefix = ""
 	}
-	digits := new(big.Int).Abs(n).Text(base)
+	// Python limits only decimal text: other bases are quick to make.
+	var digits string
+	if base == 10 {
+		text, err := intText(new(big.Int).Abs(n))
+		if err != nil {
+			return "", err
+		}
+		digits = text
+	} else {
+		digits = new(big.Int).Abs(n).Text(base)
+	}
 	if fs.typ == 'X' {
 		digits = strings.ToUpper(digits)
 	}
@@ -504,6 +670,9 @@ func formatFloat(x float64, spec, typeName string) (string, error) {
 
 // formatFloatSpec follows format_float_internal in CPython.
 func formatFloatSpec(x float64, fs formatSpec) (string, error) {
+	if fs.precision > maxFloatPrecision {
+		return "", errors.New(tooMuchMemory)
+	}
 	code, precision, addDot0, percent := fs.typ, fs.precision, false, false
 	defaultPrecision := 6
 	if code == 0 {
@@ -574,21 +743,37 @@ func assembleNumber(sign, prefix, digits, rest string, fs formatSpec, groupSize 
 }
 
 // groupDigits puts sep between groups of size digits, counted from the right.
-// With minWidth it adds leading zeros (also grouped) until the text is that wide.
+// With minWidth it first adds leading zeros (grouped too) until the text is
+// at least that wide, the way Python pads format(1234, "010,").
 func groupDigits(digits string, sep byte, size, minWidth int) string {
-	for {
-		var b strings.Builder
-		for i := 0; i < len(digits); i++ {
-			if i > 0 && (len(digits)-i)%size == 0 {
-				b.WriteByte(sep)
-			}
-			b.WriteByte(digits[i])
-		}
-		if b.Len() >= minWidth {
-			return b.String()
-		}
-		digits = "0" + digits
+	if need := digitsForWidth(minWidth, size); need > len(digits) {
+		digits = strings.Repeat("0", need-len(digits)) + digits
 	}
+	n := len(digits)
+	var b strings.Builder
+	b.Grow(n + n/size)
+	for i := 0; i < n; i++ {
+		if i > 0 && (n-i)%size == 0 {
+			b.WriteByte(sep)
+		}
+		b.WriteByte(digits[i])
+	}
+	return b.String()
+}
+
+// digitsForWidth returns the fewest digits that, grouped by size, make a
+// text at least width long. n digits make n + (n-1)/size characters. A text
+// never starts with a separator, so when width would end on one, one more
+// digit is needed.
+func digitsForWidth(width, size int) int {
+	if width <= 1 {
+		return 1
+	}
+	groups, rest := (width-1)/(size+1), (width-1)%(size+1)
+	if rest < size {
+		return groups*size + rest + 1
+	}
+	return (groups+1)*size + 1
 }
 
 // floatDigits returns the decimal digits of |x| without leading and trailing

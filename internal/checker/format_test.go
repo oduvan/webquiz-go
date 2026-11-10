@@ -3,6 +3,7 @@ package checker
 import (
 	"math"
 	"math/big"
+	"strings"
 	"testing"
 
 	"go.starlark.net/starlark"
@@ -220,11 +221,42 @@ func TestPythonStrAndRepr(t *testing.T) {
 		{cyclic, "[[...]]", "[[...]]"},
 	}
 	for _, c := range cases {
-		if got := pyStr(c.value); got != c.str {
-			t.Errorf("str(%s) = %q, want %q", c.value, got, c.str)
+		if got, err := pyStr(c.value); got != c.str || err != nil {
+			t.Errorf("str(%s) = %q, %v; want %q", c.value, got, err, c.str)
 		}
-		if got := pyRepr(c.value); got != c.repr {
-			t.Errorf("repr(%s) = %q, want %q", c.value, got, c.repr)
+		if got, err := pyRepr(c.value); got != c.repr || err != nil {
+			t.Errorf("repr(%s) = %q, %v; want %q", c.value, got, err, c.repr)
+		}
+	}
+}
+
+// TestGroupDigitsMatchesSlowVersion compares groupDigits with the simple
+// way that Python's output can be found: add one zero at a time until the
+// grouped text is wide enough. groupDigits does it in one go.
+func TestGroupDigitsMatchesSlowVersion(t *testing.T) {
+	slow := func(digits string, sep byte, size, minWidth int) string {
+		for {
+			var b strings.Builder
+			for i := 0; i < len(digits); i++ {
+				if i > 0 && (len(digits)-i)%size == 0 {
+					b.WriteByte(sep)
+				}
+				b.WriteByte(digits[i])
+			}
+			if b.Len() >= minWidth {
+				return b.String()
+			}
+			digits = "0" + digits
+		}
+	}
+	for _, size := range []int{3, 4} {
+		for _, digits := range []string{"1", "12", "123", "1234", "12345678"} {
+			for width := 0; width <= 30; width++ {
+				got, want := groupDigits(digits, ',', size, width), slow(digits, ',', size, width)
+				if got != want {
+					t.Errorf("groupDigits(%q, size %d, width %d) = %q, want %q", digits, size, width, got, want)
+				}
+			}
 		}
 	}
 }

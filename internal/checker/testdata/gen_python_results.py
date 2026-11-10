@@ -122,6 +122,39 @@ CASES = [
     {"name": "is_integer", "checker": "assert float(user_answer).is_integer(), 'Whole number please'", "answers": ["4.0", "4.5"]},
     {"name": "format method without spec", "checker": "x = float(user_answer)\nassert x == 1, 'got {}'.format(x)", "answers": ["1", "2"]},
     {"name": "percent format without precision", "checker": "x = int(user_answer)\nassert x == 1, 'got %d' % x", "answers": ["1", "2"]},
+    {"name": "format method with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)", "answers": ["1", "2"]},
+    {"name": "percent format with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x", "answers": ["1", "2"]},
+    {"name": "format method with names and specs", "checker": "x = float(user_answer)\nassert x == 2.5, 'got {val:>8.3f} ({0!r})'.format(user_answer, val=x)",
+     "answers": ["2.5", "3.14159", " 7 "]},
+    {"name": "percent format with flags", "checker": "n = int(user_answer)\nassert n == 42, 'got %05d, %+.1e, %-6s|, %x' % (n, n, user_answer.strip(), n)",
+     "answers": ["42", "255", "-7"]},
+    {"name": "percent format with a mapping", "checker": "d = {'a': user_answer.strip(), 'n': len(user_answer)}\nassert d['a'] == 'ok', '%(a)s has %(n)d letters' % d",
+     "answers": ["ok", "nope"]},
+    # Text read as numbers: like Python's int() and float(), the helpers take
+    # any Unicode decimal digit, Unicode spaces and "_" between digits.
+    {"name": "to_int with Unicode digits", "checker": "assert to_int(user_answer) == 42, f'got {to_int(user_answer)}'",
+     "answers": ["４２", "٤٢", " 42　", "\x1c42", "+4_2", "1_000", "4__2", "42²"]},
+    {"name": "int() text forms", "checker": "n = int(user_answer)\nassert n == 7, f'{n}'",
+     "answers": ["७", " +7 ", "0_7", "\x1c7", "7_", "Ⅶ", "1٣"]},
+    {"name": "int() digit limit", "checker": "n = int(user_answer)\nassert n > 0", "answers": ["9" * 4300, "9" * 4301]},
+    {"name": "distance with Unicode digits", "checker": "assert distance(user_answer) == 1500, f'got {distance(user_answer)}'",
+     "answers": ["１.５km", "1_500m", "1.5E3", "+1500м", "１５００", "2\x1ckm", "1.5e3km", "inf"]},
+    {"name": "direction_angle with Unicode digits", "checker": "assert direction_angle(user_answer) == 2030, 'wrong angle'",
+     "answers": ["２０-３０", "20-3_0", " 20 -　30 ", "20-٣٠", "+20-+30"]},
+    {"name": "float() text forms", "checker": "x = float(user_answer)\nassert x > 0, f'{x}'",
+     "answers": ["１.５", "Infinity", "-inf", "+nan", "+1E-3", "1_0e1_0", " 1.5 ", "\x1c1.5", "١٫٥", "in_f", ".5_0", "1e5_"]},
+    # Names and statements that fix round 3 changed
+    {"name": "bytes() is not in the sandbox", "checker": "b = bytes(user_answer, 'utf-8')\nassert b", "answers": ["x"]},
+    {"name": "fail() is not in the sandbox", "checker": "if user_answer != 'ok':\n    fail('wrong')", "answers": ["ok", "no"]},
+    {"name": "bytes literal", "checker": "assert b'ab' + b'c' == b'abc' and user_answer, 'empty'", "answers": ["x", ""]},
+    {"name": "+= with a tuple", "checker": "x = []\nx += user_answer.strip(),\nassert x == ['ok'], f'{x}'", "answers": ["ok", "no"]},
+    {"name": "%= with a tuple", "checker": "s = '%s-%s'\ns %= user_answer.strip(), 'x'\nassert s == 'a-x', s", "answers": ["a", "b"]},
+    # Only NaN: Starlark cannot compare other numbers with a bool.
+    {"name": "NaN compared with a bool", "checker": "x = float(user_answer)\nassert not (x <= True) and not (False > x) and x != True, f'{x}'", "answers": ["nan", "-nan"]},
+    {"name": "zip and map stop at the shortest", "checker": "w = user_answer.split()\nr = list(zip(w, range(10 ** 9), 'abc'))\nm = list(map(lambda a, b: a + b, w, 'xyz'))\nassert len(r) == 2 and m == ['ax', 'by'], f'{r} {m}'", "answers": ["a b", "a b c d"]},
+    # x=x: in 1.19 a lambda could not read the checker's variables.
+    {"name": "map sees a change of the list", "checker": "x = [1, 2, 3]\nr = list(map(lambda v, x=x: x.pop() if v == 1 else v, x))\nassert r == [3, 2] and user_answer, f'{r}'", "answers": ["x", ""]},
+    {"name": "format field names with a sign", "checker": "d = {'-1': user_answer.strip()}\nassert '{0[-1]}'.format(d) == 'ok', '{0[-1]}!'.format(d)", "answers": ["ok", "no"]},
     # Python features the Go checker cannot run
     {"name": "try and except", "checker": "try:\n    v = float(user_answer)\nexcept ValueError:\n    v = None\nassert v == 1.5, 'Expected 1.5'",
      "answers": ["1.5", "abc"], "go_unsupported": "try/except is not supported"},
@@ -131,10 +164,6 @@ CASES = [
     {"name": "import", "checker": "import math\nassert math.sqrt(float(user_answer)) == 3", "answers": ["9"], "go_unsupported": "import is not supported"},
     {"name": "length of a Cyrillic word", "checker": "assert len(user_answer.strip()) == 4, 'Чотири літери'", "answers": ["Київ"],
      "go_unsupported": "len() counts bytes, so non-ASCII text needs .codepoints()"},
-    {"name": "format method with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got {:.2f}'.format(x)", "answers": ["2"],
-     "go_unsupported": ".format() has no width or precision"},
-    {"name": "percent format with precision", "checker": "x = float(user_answer)\nassert x == 1, 'got %.2f' % x", "answers": ["2"],
-     "go_unsupported": "% has no width or precision"},
 ]
 
 

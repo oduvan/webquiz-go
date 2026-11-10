@@ -107,6 +107,14 @@ func TestHelperErrorTexts(t *testing.T) {
 		{"DirectionAngle", DirectionAngle, "20-30-40", angleError},
 		{"DirectionAngle", DirectionAngle, "abc", "invalid literal for int() with base 10: 'abc'"},
 		{"DirectionAngle", DirectionAngle, "-5", "invalid literal for int() with base 10: ''"},
+		{"ToInt", ToInt, "\u216b", "invalid literal for int() with base 10: '\u216b'"},
+		{"ToInt", ToInt, "4__2", "invalid literal for int() with base 10: '4__2'"},
+		// Python 3.11+ refuses more than 4300 digits, after checking the text.
+		{"ToInt", ToInt, strings.Repeat("1", 4301), "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"},
+		{"ToInt", ToInt, strings.Repeat("0", 5000) + "1", "Exceeds the limit (4300 digits) for integer string conversion: value has 5001 digits; use sys.set_int_max_str_digits() to increase the limit"},
+		{"ToInt", ToInt, strings.Repeat("1", 4301) + "x", "invalid literal for int() with base 10: '" + strings.Repeat("1", 199)},
+		// Python shows at most 200 characters of the text.
+		{"ToInt", ToInt, strings.Repeat("x", 300), "invalid literal for int() with base 10: '" + strings.Repeat("x", 199)},
 	}
 	for _, c := range cases {
 		_, err := c.fn(c.input)
@@ -127,6 +135,20 @@ func TestHelperPythonDetails(t *testing.T) {
 	}{
 		{"ToInt", ToInt, "+5", 5},
 		{"ToInt", ToInt, "1_000", 1000},
+		// Python's int() reads any Unicode decimal digit and Unicode spaces.
+		{"ToInt", ToInt, "\uff14\uff12", 42},
+		{"ToInt", ToInt, "\u0664\u0662", 42},
+		{"ToInt", ToInt, "1\u0663", 13},
+		{"ToInt", ToInt, "\U0001d7d7", 9},
+		{"ToInt", ToInt, "\u00a042\u3000", 42},
+		{"ToInt", ToInt, "\x1c42", 42},
+		{"Distance", Distance, "\uff11.\uff15km", 1500},
+		{"Distance", Distance, "1_500m", 1500},
+		{"Distance", Distance, "1.5E3", 1500},
+		{"Distance", Distance, "+1500м", 1500},
+		{"DirectionAngle", DirectionAngle, "\uff12\uff10-\uff13\uff10", 2030},
+		{"DirectionAngle", DirectionAngle, "20-3_0", 2030},
+		{"DirectionAngle", DirectionAngle, " 20 -\u300030 ", 2030},
 		{"Distance", Distance, "2.3km", 2300},
 		{"Distance", Distance, "1e3m", 1000},
 		{"Distance", Distance, "-1.5km", -1500},

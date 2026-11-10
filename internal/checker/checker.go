@@ -7,6 +7,7 @@ import (
 	"runtime/metrics"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.starlark.net/resolve"
@@ -137,14 +138,16 @@ func starlarkSyntaxError(err error, lines int) *SyntaxError {
 // runState lets a running check be stopped from outside: by the timer, the
 // memory watch or the step limit.
 type runState struct {
-	once    sync.Once
-	stopped chan struct{}
-	reason  string
+	once      sync.Once
+	stopped   chan struct{}
+	isStopped atomic.Bool // the same as a closed stopped, but quick to read
+	reason    string
 }
 
 func (s *runState) stop(thread *starlark.Thread, reason string) {
 	s.once.Do(func() {
 		s.reason = reason
+		s.isStopped.Store(true)
 		close(s.stopped)
 		thread.Cancel(reason)
 	})
@@ -182,6 +185,10 @@ func run(prog *starlark.Program, answer string) (result Result) {
 	}()
 	if _, err := prog.Init(thread, globals); err != nil {
 		return Result{Error: errorText(err)}
+	}
+	// A builtin cut short by a stop may let the code end without error.
+	if state.isStopped.Load() {
+		return Result{Error: state.reason}
 	}
 	return Result{Correct: true}
 }
@@ -227,11 +234,16 @@ var (
 
 // errorText returns the error message of a failed check without Starlark's
 // file, line and traceback. Errors about unknown names read like Python's.
+// A message larger than maxReprBytes, like a Starlark error that holds a
+// whole long text, is replaced: it is no use to a student.
 func errorText(err error) string {
 	msg := err.Error()
 	var evalErr *starlark.EvalError
 	if errors.As(err, &evalErr) {
 		msg = evalErr.Msg
+	}
+	if len(msg) > maxReprBytes {
+		return tooMuchMemory
 	}
 	msg = strings.TrimPrefix(msg, "Starlark computation cancelled: ")
 	for _, pattern := range []*regexp.Regexp{undefinedName, unassignedName} {
