@@ -88,6 +88,33 @@ After partitioning, insert the SD card back into the Raspberry Pi and start the 
 
 ---
 
+### The WebQuiz Program on the Raspberry Pi
+
+WebQuiz 2.0 is one ready-made program file for the Raspberry Pi. It does not need Python or `pip`. There are two files on the [Releases](https://github.com/oduvan/webquiz-go/releases) page:
+
+- `webquiz-linux-arm64.zip` — for a 64-bit system on Raspberry Pi 3, 4 and 5;
+- `webquiz-linux-arm.zip` — for a 32-bit system and for older or smaller boards (Zero, 1, 2).
+
+The ready-made image switches from the Python version to this program in its next update. Until then, the image keeps working as described in this chapter.
+
+If you want to run the program yourself (for example, on a Raspberry Pi with your own system), copy the file to the Raspberry Pi, unzip it and start it:
+
+```
+unzip webquiz-linux-arm64.zip
+chmod +x webquiz-linux-arm64
+./webquiz-linux-arm64
+```
+
+WebQuiz keeps its files (`webquiz.yaml`, `quizzes/`, `data/`, `logs/`) in the folder where the program lies. To keep them somewhere else, for example on the `data` partition, set the folder with the environment variable `WEBQUIZ_BINARY_DIR`:
+
+```
+WEBQUIZ_BINARY_DIR=/path/to/data ./webquiz-linux-arm64
+```
+
+The same variable works in a service file for systemd (`Environment=WEBQUIZ_BINARY_DIR=/path/to/data`).
+
+---
+
 ### Wi-Fi Configuration
 
 After the second boot, a **`wifi.conf.example`** file will appear in the **`data`** partition, which serves as a template for creating your own **`wifi.conf`** file.

@@ -506,8 +506,21 @@ In addition to multiple choice questions, WebQuiz supports text input questions 
   - `to_int(str)` — Convert string to integer (strips whitespace)
   - `distance(str)` — Parse distance with units: "2000", "2000m", "2км", "2km" all return 2000
   - `direction_angle(str)` — Parse direction angle: "20" returns 2000, "20-30" returns 2030
+- The answer is correct when the code ends without an error. Use `assert condition, 'message'`: the message is shown to the student when the check fails.
 - If the code raises any exception, the answer is marked incorrect
 - If checker is empty, exact match with `correct_value` is used (with whitespace stripped)
+
+**What the checker language can do:**
+
+The checker runs in a small, safe, Python-like language called Starlark. Most normal Python code for checking an answer works as it is: `assert` with a message, `if`, `for`, `while`, `def`, `lambda`, list comprehensions, f-strings (also with formats like `{x:.2f}`), `**`, chained comparisons like `0 < x < 10`, and string methods.
+
+These things do **not** work:
+- `try` / `except`, `raise`, `class`, `import`, `with`, `global`, `del` and `yield`. You do not need `import math`: `math` is already there.
+- `len(user_answer)` and `user_answer[0]` count bytes, not letters. For text that is not plain English letters, such as Ukrainian, make a list of the letters first: `len(list(user_answer))` or `list(user_answer)[0]`.
+- `True` and `False` are not numbers. Instead of `n += c.isdigit()` write `n += 1 if c.isdigit() else 0`.
+- Text cannot be unpacked: instead of `a, b = user_answer` write `a, b = list(user_answer)`.
+
+A checker is stopped after 2 seconds, or when it uses too much memory. The answer is then marked wrong, and the other students are not affected. If a checker has a mistake that the server can find (for example, it uses `try`), a warning is written to the log when the quiz is loaded, and the quiz editor shows an error when you save it. Test every new checker yourself before the lesson.
 
 Example with math validation:
 
@@ -516,7 +529,7 @@ Example with math validation:
   correct_value: "4"
   checker: |
     result = float(user_answer)
-    assert abs(result - sqrt(16)) < 0.01, f'Expected 4, got {result}'
+    assert abs(result - math.sqrt(16)) < 0.01, f'Expected 4, got {result}'
   points: 2
 ```
 
@@ -784,9 +797,9 @@ question: "What is 2:1?"
 
 #### Downloading Tests Through Admin Interface
 
-If the `config.yaml` configuration file has the **`quizzes`** section filled in, the administrator can download tests directly from the web interface.
+If the `webquiz.yaml` configuration file has the **`quizzes`** section filled in, the administrator can download tests directly from the web interface.
 
-Example section in `config.yaml`:
+Example section in `webquiz.yaml`:
 
 ```
 quizzes:
@@ -915,7 +928,7 @@ questions:
 The YAML format for tests in **WebQuiz** allows:
 
 ✅ Creating questions with single and multiple choice
-✅ Creating text input questions with Python validation
+✅ Creating text input questions with checker-code validation
 ✅ Adding images to questions and answer options
 ✅ Setting minimum number of correct answers
 ✅ Showing or hiding correct answers after completion

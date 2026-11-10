@@ -7,22 +7,27 @@ The system is designed to work **inside your own network**, so you should not op
 
 ### Download and Launch
 
-The easiest way to start using **WebQuiz** is by running the prebuilt binary file.
+The easiest way to start using **WebQuiz** is by running the prebuilt program. It is one file. You do not need to install Python or anything else.
 
-1. Go to the [Releases](https://github.com/oduvan/webquiz/releases) page on the project’s GitHub repository.
-2. Download the binary file that matches your operating system (Windows, macOS, or Linux).
+1. Go to the [Releases](https://github.com/oduvan/webquiz-go/releases) page on the project’s GitHub repository.
+2. Download the file that matches your computer:
+   - **Windows:** `webquiz-windows-setup.exe` (installer) or `webquiz-windows.exe.zip` (portable). Windows 10 or newer.
+   - **macOS:** `webquiz-macos-apple-silicon.zip` for Macs with an Apple chip (M1 and newer), or `webquiz-macos-intel.zip` for older Intel Macs. macOS 12 or newer.
+   - **Linux:** `webquiz-linux.zip` for a normal 64-bit computer, `webquiz-linux-arm64.zip` for a 64-bit Raspberry Pi (3, 4, 5), or `webquiz-linux-arm.zip` for older and smaller Raspberry Pi boards (Zero, 1, 2).
 3. If the file comes as an archive, extract it into any folder you prefer.
-4. Run the file:
-   - **Windows (Installer):** download `webquiz-windows-setup.exe`, run the installer, and launch WebQuiz from the Start Menu.
-   - **Windows (Portable):** extract `webquiz-windows.exe.zip`, then double-click `webquiz.exe` or run it from the command line.
-   - **macOS / Linux:** first grant execution permission:
+4. Run the program:
+   - **Windows (Installer):** run `webquiz-windows-setup.exe` and start WebQuiz from the Start Menu.
+   - **Windows (Portable):** extract `webquiz-windows.exe.zip`, then double-click the `.exe` file or run it from the command line.
+   - **macOS / Linux:** first allow the file to run. Use the real file name from the archive, for example:
      ```
-     chmod +x webquiz
+     chmod +x webquiz-linux
      ```
      then start it:
      ```
-     ./webquiz
+     ./webquiz-linux
      ```
+
+WebQuiz keeps all its files in the folder where the program lies (see [Files and Folders Created](#files-and-folders-created)). Put the program in its own folder, for example `WebQuiz`.
 
 #### Important for macOS Users
 
@@ -46,18 +51,17 @@ WebQuiz will now launch normally. This is a one-time procedure — subsequent la
 
 #### Important for Windows Users
 
-Windows Defender or other antivirus software may flag the binary file as a potential threat. **This is normal behavior for applications created with PyInstaller** — it's a well-known false-positive issue ([details on GitHub](https://github.com/pyinstaller/pyinstaller/issues/6754)).
+Windows Defender or other antivirus software may sometimes warn about the program, although it is safe. New programs that few people have downloaded yet are often flagged by mistake. This is called a false positive.
 
-This is **not a virus**. WebQuiz is safe, open-source software. You can:
-- Review the source code on [GitHub](https://github.com/oduvan/webquiz)
+WebQuiz is open-source software. You can:
+- Review the source code on [GitHub](https://github.com/oduvan/webquiz-go)
 - Add the file to Windows Defender exclusions
-- Use the alternative Python installation method (`pip install webquiz`)
 
-If you see a warning, allow the application to run or add it to your antivirus's trusted applications list.
+If you see a warning, allow the program to run or add it to your antivirus's trusted applications list.
 
 ---
 
-5. After launching, the admin panel page will open in your terminal at [http://localhost:8080/admin/](http://localhost:8080/admin/):
+5. After launching, the admin panel page will open in your browser at [http://localhost:8080/admin/](http://localhost:8080/admin/):
 
 ![First admin panel launch](../imgs/first_admin.png)
 
@@ -78,11 +82,13 @@ They are used to store configuration, results, and diagnostic information.
 
 | File / Folder | Purpose |
 |---------------|----------|
-| **config.yaml** | The main configuration file. Stores system parameters, including user registration settings, test format, and general options. |
-| **quizzes/** | Directory for storing quizzes in YAML format. You can create your own question files or edit the default example that comes included. |
-| **results/** | Quiz results in CSV format will be stored here. They can be viewed or opened in spreadsheet editors. |
+| **webquiz.yaml** | The main configuration file. Stores system parameters, including user registration settings and general options. |
+| **quizzes/** | Directory for storing quizzes in YAML format. You can create your own question files or edit the default example that comes included. Pictures go to `quizzes/imgs/` and files for download go to `quizzes/attach/`. |
+| **data/** | Quiz results in CSV format will be stored here. They can be viewed or opened in spreadsheet editors. |
 | **logs/** | Directory containing application logs. Records messages about launches, errors, or warnings. If something goes wrong during testing, these files will help identify the cause. |
-| **static/** | Contains the web interface that users see. Typically, you don't need to edit these files. |
+| **static/** | Contains the quiz page that students see. Typically, you don't need to edit these files. |
+
+To keep these files in another folder, set the environment variable `WEBQUIZ_BINARY_DIR` to that folder before you start the program.
 
 ---
 
@@ -99,7 +105,7 @@ To take the quiz:
 
 2. Enter your name (or any test name if you're just checking functionality).
 3. Click the **Register** button — the system will load the example quiz from the configuration file, and you can complete it like a normal user.
-4. After finishing the quiz, open the **results** folder — you'll find a file with the results in CSV format. If needed, also check the **logs** folder to ensure the server is running without errors.
+4. After finishing the quiz, open the **data** folder — you'll find a file with the results in CSV format. If needed, also check the **logs** folder to ensure the server is running without errors.
 
 ![Quiz completion](../imgs/reg_default_test.png)
 
@@ -111,29 +117,26 @@ An answer or a registration is never counted twice, even if the server got the f
 
 ---
 
-### Alternative Launch and Configuration Methods
+### Build from Source and Command-Line Options
 
-If you want to configure WebQuiz more flexibly or integrate it into your own scripts, additional launch methods are available:
+If you want to build WebQuiz yourself, you need Go and Node.js:
 
-- **Run via Python:**
-  ```
-  pip install webquiz
-  python -m webquiz
-  ```
+```
+git clone https://github.com/oduvan/webquiz-go.git
+cd webquiz-go
+make build
+./bin/webquiz
+```
 
-- **Run via Poetry (for developers):**
-  ```
-  git clone https://github.com/oduvan/webquiz.git
-  cd webquiz
-  poetry install
-  webquiz
-  ```
-
-- **Additional command-line options:**
-  - `--config` — specify a custom configuration file path.
-  - `--csv-file` — define a custom location for saving results.
-  - `--log-file` — change the path of the log file.
-  - `-d` or `--daemon` — run the server in background mode.
-  - `--stop`, `--status` — stop or check the status of the server.
+Additional command-line options:
+- `--config` — specify a custom configuration file path.
+- `--port` — the port to listen on (default: 8080).
+- `--master-key` — the master key for the admin panel.
+- `--quizzes-dir` — the folder with quiz files.
+- `--csv-dir` — define a custom location for saving results.
+- `--logs-dir` — change the folder of the log files.
+- `-d` or `--daemon` — run the server in background mode (not on Windows).
+- `--stop`, `--status` — stop or check the status of the server.
+- `--version` — print the version and exit.
 
 These capabilities will come in handy if you want to use WebQuiz as part of a larger system or automatically start it when your device boots.
