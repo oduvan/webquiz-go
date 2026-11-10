@@ -1,6 +1,6 @@
 // Ports of tests/test_auto_advance.py: with show_right_answer: false the next question
 // comes by itself after an answer; with true the student presses "Continue".
-import { defaultQuiz, expect, optionByText, test, waitForContinue, waitForQuestionText } from '../../fixtures/quiz';
+import { defaultQuiz, expect, HIDDEN_CLASS, hasHiddenClass, optionByText, test, waitForContinue, waitForQuestionText } from '../../fixtures/quiz';
 import type { Page } from '@playwright/test';
 
 async function register(page: Page, url: string, name: string) {
@@ -30,7 +30,7 @@ test('the next question comes by itself', async ({ page, launch }) => {
   await register(page, server.url, 'AutoAdvanceTester');
   await expect(page.locator('.question-text')).toHaveText('Question 1?');
   await answer(page, 'A');
-  await expect(page.locator('#continue-btn')).toBeHidden();
+  expect(await hasHiddenClass(page.locator('#continue-btn')), 'Continue stays hidden with auto-advance').toBe(true);
 
   await waitForQuestionText(page, 'Question 2?');
   await expect(page.locator('.question-text')).toContainText('Question 2?');
@@ -55,7 +55,7 @@ test('with show_right_answer true the student presses Continue', async ({ page, 
   await expect(page.locator('.question-text')).toHaveText('Question 1?');
   await answer(page, 'A');
   await waitForContinue(page, 3000);
-  await expect(page.locator('#continue-btn')).not.toHaveClass(/hidden/);
+  expect(await hasHiddenClass(page.locator('#continue-btn')), 'Continue is shown with show_right_answer: true').toBe(false);
   await expect(page.locator('.quiz-option[class*="feedback-"]').first()).toBeVisible();
 
   await page.waitForTimeout(1500); // no auto-advance meanwhile
@@ -121,7 +121,8 @@ test('the last question goes straight to the results', async ({ page, launch }) 
   await answer(page, 'A');
   await expect(page.locator('#results')).toBeVisible({ timeout: 3000 });
   await expect(page.locator('#results')).toContainText('Результат:');
-  await expect(page.locator('#continue-btn')).toBeHidden();
+  // Its own class, like the Python test: the whole test section is hidden by now
+  expect(await hasHiddenClass(page.locator('#continue-btn')), 'Continue never appeared').toBe(true);
 });
 
 // py: tests/test_auto_advance.py::test_button_state_during_auto_advance
@@ -140,7 +141,7 @@ test('the next question starts with a disabled submit button', async ({ page, la
   await answer(page, 'A');
   await waitForQuestionText(page, 'Second?');
   const submit = page.locator('#submit-answer-btn');
+  await expect(submit).not.toHaveClass(HIDDEN_CLASS);
   await expect(submit).toBeVisible();
-  await expect(submit).not.toHaveClass(/hidden/);
   await expect(submit).toBeDisabled();
 });

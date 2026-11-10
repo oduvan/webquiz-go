@@ -1,5 +1,5 @@
 // Ports of tests/test_selenium_registration_fields.py: extra registration fields from the config.
-import { defaultQuiz, expect, test } from '../../fixtures/quiz';
+import { defaultQuiz, expect, hasHiddenClass, test } from '../../fixtures/quiz';
 
 // The old form was a table with "Label:" cells (the tests found them with
 // //td[contains(text(), 'Grade:')]). The new form has a <label class="registration-label">
@@ -52,9 +52,11 @@ test('an empty field keeps the form and shows an error', async ({ page, launch }
   await page.goto(server.url + '/');
   await page.locator('#username').fill('IncompleteStudent');
   await page.locator('.register-btn').click();
+  await page.waitForTimeout(500); // like the Python test: a moment for the error to appear
+  // Still on the registration form, with the error shown (their own "hidden" class, as in Python)
+  expect(await hasHiddenClass(page.locator('#registration'))).toBe(false);
+  expect(await hasHiddenClass(page.locator('#registration-error'))).toBe(false);
   await expect(page.locator('#registration-error')).toBeVisible();
-  await expect(page.locator('#registration')).toBeVisible();
-  await expect(page.locator('#registration')).not.toHaveClass(/hidden/);
   // The message names the field, as the old page did
   await expect(page.locator('#registration-error')).toContainText('Grade');
 });

@@ -71,6 +71,16 @@ export async function optionByText(page: Page, text: string): Promise<Locator> {
   return optionByIndex(page, index);
 }
 
+// The old page hid elements with the "hidden" class, and the Python tests read that
+// class (`"hidden" in element.get_attribute("class")`). The ports read the element's
+// own class too: Playwright's toBeHidden() would also pass when only a parent is hidden.
+export const HIDDEN_CLASS = /(^|\s)hidden(\s|$)/;
+
+// Reads the class once, without waiting, like a plain Selenium assert.
+export async function hasHiddenClass(locator: Locator): Promise<boolean> {
+  return HIDDEN_CLASS.test((await locator.getAttribute('class')) || '');
+}
+
 export async function expectSelected(option: Locator, selected = true) {
   if (selected) {
     await expect(option).toHaveClass(/(^|\s)selected(\s|$)/);

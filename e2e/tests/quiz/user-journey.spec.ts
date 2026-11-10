@@ -9,6 +9,7 @@ import {
   optionByIndex,
   optionByText,
   submitAnswer,
+  hasHiddenClass,
   test,
   waitForContinue,
   waitForQuestionText,
@@ -49,7 +50,7 @@ test('an empty name keeps the registration form', async ({ page, launch }) => {
   await page.locator('.register-btn').click();
   await expect(username).toBeVisible();
   await expect(page.locator('#registration')).toBeVisible();
-  await expect(page.locator('#registration')).not.toHaveClass(/hidden/);
+  expect(await hasHiddenClass(page.locator('#registration'))).toBe(false);
 });
 
 // py: tests/test_user_journey_selenium.py::test_complete_quiz_journey
@@ -226,14 +227,14 @@ test('submit and continue buttons change with the answer', async ({ page, launch
   const submit = page.locator('#submit-answer-btn');
   const next = page.locator('#continue-btn');
   await expect(submit).toBeDisabled();
-  await expect(next).toBeHidden();
+  expect(await hasHiddenClass(next)).toBe(true);
 
   await (await optionByText(page, 'Option 1')).click();
   await expect(submit).toBeEnabled();
   await submit.click();
   await waitForContinue(page);
-  await expect(submit).toBeHidden();
-  await expect(next).toBeVisible();
+  expect(await hasHiddenClass(submit)).toBe(true);
+  expect(await hasHiddenClass(next)).toBe(false);
 });
 
 // py: tests/test_user_journey_selenium.py::test_results_display_accuracy

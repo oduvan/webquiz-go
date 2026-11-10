@@ -3,7 +3,18 @@
 // __networkDown every request fails, and __dropResponses lets the server handle a
 // request but loses the response, the case where a retry must not record anything twice.
 import type { Page } from '@playwright/test';
-import { cookieValue, defaultQuiz, expect, findOptions, registerUser, test, waitForContinue, waitForQuestionText } from '../../fixtures/quiz';
+import {
+  cookieValue,
+  defaultQuiz,
+  expect,
+  findOptions,
+  HIDDEN_CLASS,
+  hasHiddenClass,
+  registerUser,
+  test,
+  waitForContinue,
+  waitForQuestionText,
+} from '../../fixtures/quiz';
 
 const TWO_QUESTIONS = defaultQuiz({
   title: 'Retry Quiz',
@@ -43,6 +54,8 @@ async function installFetchPatchOnLoad(page: Page, networkDown = false) {
   await page.addInitScript(fetchPatch(networkDown));
 }
 
+// The banner is always in the page; like the Python tests (banner_visible), the
+// checks read its own "hidden" class.
 const banner = (page: Page) => page.locator('#connection-banner');
 
 // py: tests/test_selenium_connection_retry.py::test_lost_answer_response_is_retried_without_duplicate
@@ -64,7 +77,7 @@ test('a lost answer response is retried and counted once', async ({ page, contex
   await page.locator('#submit-answer-btn').click();
   await page.locator('#continue-btn').click();
   await expect(page.locator('#results-content')).toBeVisible();
-  await expect(banner(page)).toBeHidden({ timeout: 10000 });
+  await expect(banner(page)).toHaveClass(HIDDEN_CLASS, { timeout: 10000 });
 
   const userId = await cookieValue(context, 'user_id');
   const data = await (await request.get(`${server.url}/api/verify-user/${userId}`)).json();
@@ -84,7 +97,8 @@ test('offline: the banner shows and the chosen answer is kept and sent later', a
   await page.evaluate(() => ((window as unknown as { __networkDown: boolean }).__networkDown = true));
   await page.locator('#submit-answer-btn').click();
 
-  await expect(banner(page)).toBeVisible({ timeout: 5000 });
+  await expect(banner(page)).not.toHaveClass(HIDDEN_CLASS, { timeout: 5000 });
+  await expect(banner(page)).toBeVisible();
   await expect(page.locator('#submit-answer-btn')).toBeDisabled();
 
   // The answer is locked while the page retries
@@ -95,8 +109,9 @@ test('offline: the banner shows and the chosen answer is kept and sent later', a
   await page.waitForTimeout(1500);
   await page.evaluate(() => ((window as unknown as { __networkDown: boolean }).__networkDown = false));
   await waitForContinue(page, 10000);
-  await expect(banner(page)).toBeHidden();
-  await expect(options.nth(0)).toHaveClass(/feedback-correct/);
+  // Read at the moment Continue can be clicked, like the Python test
+  expect(await hasHiddenClass(banner(page))).toBe(true);
+  expect(await options.nth(0).getAttribute('class')).toMatch(/feedback-correct/);
 
   const userId = await cookieValue(context, 'user_id');
   const data = await (await request.get(`${server.url}/api/verify-user/${userId}`)).json();
@@ -110,15 +125,16 @@ test('a page loaded while offline waits instead of showing the registration form
   await installFetchPatchOnLoad(page, true);
   await page.reload();
 
-  await expect(banner(page)).toBeVisible({ timeout: 5000 });
+  await expect(banner(page)).not.toHaveClass(HIDDEN_CLASS, { timeout: 5000 });
+  await expect(banner(page)).toBeVisible();
   await page.waitForTimeout(1500);
-  await expect(page.locator('#loading')).toBeVisible();
-  await expect(page.locator('#registration')).toBeHidden();
+  expect(await hasHiddenClass(page.locator('#loading'))).toBe(false);
+  expect(await hasHiddenClass(page.locator('#registration'))).toBe(true);
 
   await page.evaluate(() => ((window as unknown as { __networkDown: boolean }).__networkDown = false));
   await waitForQuestionText(page, 'First question', 10000);
-  await expect(banner(page)).toBeHidden({ timeout: 10000 });
-  await expect(page.locator('#registration')).toBeHidden();
+  await expect(banner(page)).toHaveClass(HIDDEN_CLASS, { timeout: 10000 });
+  expect(await hasHiddenClass(page.locator('#registration'))).toBe(true);
 });
 
 // py: tests/test_selenium_connection_retry.py::test_lost_registration_response_starts_quiz
@@ -132,6 +148,7 @@ test('a lost registration response: the retry returns the same student', async (
   await page.locator('.register-btn').click();
 
   await waitForQuestionText(page, 'First question', 10000);
-  await expect(page.locator('#registration-error')).toBeHidden();
+  const error = page.locator('#registration-error');
+  expect(await hasHiddenClass(error), 'no registration error expected, got: ' + (await error.textContent())).toBe(true);
   await expect(page.locator('#username-display')).toHaveText('Anna');
 });
