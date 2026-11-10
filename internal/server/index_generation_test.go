@@ -314,8 +314,7 @@ func TestSpecialCharactersInQuizData(t *testing.T) {
 
 // Python looked for user-select: none, a copy listener and a
 // .text-answer-input rule in the page's inline script and style. The Go page
-// keeps them in its built files (assets/*.css and *.js). While the quiz page
-// is still the placeholder (Task 14 builds it), the test skips; a real page without the rules fails.
+// keeps them in its built files (assets/*.css and *.js).
 // py: tests/test_index_generation.py::test_question_text_copy_prevention
 func TestQuestionTextCopyPrevention(t *testing.T) {
 	t.Parallel()
@@ -330,9 +329,6 @@ func TestQuestionTextCopyPrevention(t *testing.T) {
 		all.Write(res.Body)
 	}
 	assets := all.String()
-	if strings.Contains(assets, "Placeholder page") {
-		t.Skip("the quiz page is still the placeholder (Task 14 builds it)")
-	}
 	if !regexp.MustCompile(`user-select:\s*none`).MatchString(assets) {
 		t.Error("should have user-select: none to prevent text selection")
 	}

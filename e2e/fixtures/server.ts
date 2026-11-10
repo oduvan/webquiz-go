@@ -9,7 +9,6 @@ import { stringify } from 'yaml';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(here, '..', '..');
 export const binaryPath = path.join(root, 'e2e', '.bin', process.platform === 'win32' ? 'webquiz.exe' : 'webquiz');
-export const hasServerSource = existsSync(path.join(root, 'cmd', 'webquiz', 'main.go'));
 
 type Dict = Record<string, unknown>;
 
