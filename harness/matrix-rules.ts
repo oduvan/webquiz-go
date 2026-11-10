@@ -888,7 +888,23 @@ export function checkQuestionTimeUp(matrixCase: MatrixCase, question: MatrixQues
     same('"time is up" message', 'index.html:1269-1274; translations.py time_is_up', `⏱ ${T.time_is_up}`, q?.timeUp ? norm(q.timeUp) : null),
     same('countdown shows 0:00 in red', 'index.html:1997-2002', { text: '0:00', red: true }, q?.timer ? { text: norm(q.timer.text), red: q.timer.warning } : null),
   ];
-  if (feedbackShown(matrixCase.settings)) results.push(...checkFeedback(matrixCase, question, null, snap));
+  if (feedbackShown(matrixCase.settings)) {
+    results.push(...checkFeedback(matrixCase, question, null, snap));
+  } else {
+    const options = q?.options ?? [];
+    results.push(
+      same(
+        'options locked, no marks, no "Continue"',
+        'index.html:2063-2091 (no is_correct in the reply)',
+        { locked: true, marks: [], cont: false },
+        {
+          locked: options.length > 0 && options.every((option) => option.classes.includes('disabled')),
+          marks: options.flatMap((option) => option.classes.filter((name) => name.startsWith('feedback-'))),
+          cont: snap.cont.visible,
+        },
+      ),
+    );
+  }
   return results;
 }
 

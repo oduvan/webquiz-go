@@ -211,6 +211,9 @@ export async function runStudentCase(env: MatrixEnv, matrixCase: MatrixCase, scr
     record.notes.push(`server folder: ${path.relative(env.runDir, serverDir)}`);
     const admin = new AdminApi(server.url);
     await admin.login();
+    // The version the page shows under the quiz (server.py:2968-2986, get_package_version)
+    const running = await admin.call('GET', '/api/admin/version-check');
+    const version = typeof running.json?.running_version === 'string' ? running.json.running_version : env.version;
     const switched = await admin.call('POST', '/api/admin/switch-quiz', {
       quiz_filename: QUIZ_FILE,
       ...(matrixCase.settingsFrom === 'start' ? { settings: startSettings(matrixCase.settings) } : {}),
@@ -246,7 +249,7 @@ export async function runStudentCase(env: MatrixEnv, matrixCase: MatrixCase, scr
         .catch(() => undefined);
     });
 
-    const outcomes = await mainStudent(env, matrixCase, screen, record, folder, page, admin, mainReply);
+    const outcomes = await mainStudent(env, matrixCase, screen, record, folder, page, admin, mainReply, version);
     const order = mainReply.order ?? QUESTIONS.map((q) => q.id);
 
     // The results screen while the second student has not finished
@@ -385,6 +388,7 @@ async function mainStudent(
   page: Page,
   admin: AdminApi,
   mainReply: { userId: string | null; order: number[] | null },
+  version: string,
 ): Promise<Outcome[]> {
   const T = textsFor(matrixCase);
   const settings = matrixCase.settings;
@@ -403,7 +407,7 @@ async function mainStudent(
     folder,
     'registration',
     'Registration form',
-    record.add('registration', [...checkRegistration(matrixCase, snap), checkFooter(env.version, snap), ...snapChecks(snap)]),
+    record.add('registration', [...checkRegistration(matrixCase, snap), checkFooter(version, snap), ...snapChecks(snap)]),
   );
 
   await page.fill('#username', MAIN.username);

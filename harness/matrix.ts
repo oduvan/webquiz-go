@@ -2,10 +2,11 @@
 // config, every screen is a screenshot, and every screen is checked against what
 // WebQuiz 1.19 shows for that combination. The teacher's pages get a tour too.
 //
-//     harness/node_modules/.bin/tsx harness/matrix.ts [--case NAME] [--quick] [--jobs N] [--binary PATH]
+//     harness/node_modules/.bin/tsx harness/matrix.ts [--case NAME] [--quick] [--no-teacher] [--jobs N] [--binary PATH]
 //
 // --case NAME   run one case (see the list printed at the start); "teacher" runs only the tour
 // --quick       only desktop with the light theme (and one teacher tour)
+// --no-teacher  skip the teacher tour
 // --jobs N      runs at the same time (default 3)
 // --binary PATH the WebQuiz binary (default: $WEBQUIZ_BINARY, then e2e/.bin/webquiz, then bin/webquiz)
 //
@@ -27,6 +28,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 interface Options {
   caseName: string | null;
   quick: boolean;
+  teacher: boolean;
   jobs: number;
   binary: string | null;
 }
@@ -37,10 +39,11 @@ function fail(message: string): never {
 }
 
 function parseArgs(args: string[]): Options {
-  const options: Options = { caseName: null, quick: false, jobs: 3, binary: null };
+  const options: Options = { caseName: null, quick: false, teacher: true, jobs: 3, binary: null };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--quick') options.quick = true;
+    else if (arg === '--no-teacher') options.teacher = false;
     else if (arg === '--case') options.caseName = args[++i] ?? fail('--case needs a name');
     else if (arg === '--jobs') options.jobs = Number(args[++i]);
     else if (arg === '--binary') options.binary = args[++i] ?? fail('--binary needs a path');
@@ -83,7 +86,7 @@ function planJobs(cases: MatrixCase[], options: Options): Job[] {
       for (const screen of screens) jobs.push({ kind: 'student', matrixCase, screen, weight: weight(matrixCase, screen) });
     }
   }
-  if (!wanted || wanted === 'teacher') {
+  if (options.teacher && (!wanted || wanted === 'teacher')) {
     for (const tour of options.quick ? TOURS.slice(0, 1) : TOURS) jobs.push({ kind: 'teacher', tour, weight: 25 });
   }
   return jobs.sort((a, b) => b.weight - a.weight);
