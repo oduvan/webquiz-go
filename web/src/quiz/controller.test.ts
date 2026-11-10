@@ -340,6 +340,25 @@ describe('time limits', () => {
     expect(state().test.continueButton.hidden).toBe(false);
   });
 
+  it('countdown ticks redraw the page only when the shown time changes', async () => {
+    const boot = makeBoot({ quiz_time_limit: 60, questions: [choice(1, { time_limit: 30 }), choice(2)] });
+    const { controller, state } = await registered(boot, {
+      'api/question-start': () => ({ json: { remaining_seconds: 30, quiz_remaining_seconds: 60 } }),
+    });
+    expect(state().test.question!.timer.text).toBe('0:30');
+    expect(state().test.quizTimer.text).toBe('1:00');
+    let updates = 0;
+    const unsubscribe = controller.subscribe(() => updates++);
+    // Both clocks tick every 250 ms, but the shown seconds stay the same for 3 ticks
+    await vi.advanceTimersByTimeAsync(750);
+    expect(updates).toBe(0);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(state().test.question!.timer.text).toBe('0:29');
+    expect(state().test.quizTimer.text).toBe('0:59');
+    expect(updates).toBe(2); // one per clock
+    unsubscribe();
+  });
+
   it('a timed-out answer without right answers moves on after 1.5 seconds', async () => {
     const boot = makeBoot({ show_right_answer: false, questions: [choice(1, { time_limit: 2 }), choice(2)] });
     const { state } = await registered(boot, {

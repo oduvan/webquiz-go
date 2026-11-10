@@ -849,10 +849,14 @@ export class QuizController {
   private tickQuestionCountdown() {
     if (!this.questionCountdown) return;
     const remaining = (this.questionCountdown.deadline - Date.now()) / 1000;
-    // Shown on the question on the screen, if it has a timer
+    // Shown on the question on the screen, if it has a timer. The page is drawn
+    // again only when the shown time changes (about once a second, not every tick).
     const view = this.state.test.question;
     if (view && view.question.time_limit > 0) {
-      this.setQuestion({ timer: { text: formatTimer(remaining), warning: remaining <= 10, pending: false } });
+      const timer = { text: formatTimer(remaining), warning: remaining <= 10, pending: false };
+      if (timer.text !== view.timer.text || timer.warning !== view.timer.warning || view.timer.pending) {
+        this.setQuestion({ timer });
+      }
     }
     if (remaining <= 0) {
       const questionId = this.questionCountdown.questionId;
@@ -885,7 +889,13 @@ export class QuizController {
   private tickQuizCountdown() {
     if (!this.quizCountdown) return;
     const remaining = (this.quizCountdown.deadline - Date.now()) / 1000;
-    this.setTest({ quizTimer: { visible: this.state.test.quizTimer.visible, text: formatTimer(remaining), warning: remaining <= 10 } });
+    const shown = this.state.test.quizTimer;
+    const text = formatTimer(remaining);
+    const warning = remaining <= 10;
+    // Drawn again only when the shown time changes
+    if (text !== shown.text || warning !== shown.warning) {
+      this.setTest({ quizTimer: { visible: shown.visible, text, warning } });
+    }
     if (remaining <= 0) {
       if (this.quizCountdown.intervalId) clearInterval(this.quizCountdown.intervalId);
       this.quizCountdown = null;
