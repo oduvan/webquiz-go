@@ -116,6 +116,25 @@ func (s *session) serve(wg *sync.WaitGroup, localAddr string) {
 	}
 }
 
+// dropVisitors takes each connection that reaches the socket and closes it
+// at once, until the socket is closed. A session that is closed without ever
+// being served needs it while it closes: the SSH library hands a new
+// connection to the listener while it holds a lock, and when one connection
+// already waits it keeps that lock until someone takes the first one
+// (forwardList.forward in golang.org/x/crypto/ssh). Closing the listener
+// needs the same lock, so without a reader it could wait forever.
+func (s *session) dropVisitors() {
+	for {
+		remote, err := s.listener.Accept()
+		if errors.Is(err, io.EOF) {
+			return
+		}
+		if err == nil {
+			remote.Close()
+		}
+	}
+}
+
 // forward copies data both ways between a visitor's connection and the local
 // WebQuiz server, until both directions have ended.
 func (s *session) forward(remote net.Conn, localAddr string) {

@@ -106,6 +106,11 @@ type Manager struct {
 	dial              func(ctx context.Context, network, addr string) (net.Conn, error)
 	transport         http.RoundTripper // nil means http.DefaultTransport
 
+	// afterOpenForTests, when set, runs in attempt right after the SSH
+	// connection opened, before attempt checks that its run is still the
+	// current one. Only tests set it, to stop a run at that moment.
+	afterOpenForTests func()
+
 	logger atomic.Pointer[slog.Logger]
 
 	keysMu   sync.Mutex // EnsureKeys runs one call at a time
@@ -391,13 +396,21 @@ func (m *Manager) attempt(ctx context.Context, r *run) (*session, error) {
 	if err != nil {
 		return nil, m.failed(r, err)
 	}
+	if m.afterOpenForTests != nil {
+		m.afterOpenForTests()
+	}
 	baseURL := strings.TrimRight(serverConfig.BaseURL, "/")
 	s.url = baseURL + "/" + socketID + "/"
 
 	m.mu.Lock()
 	if m.run != r {
-		// Disconnect, Close or another Connect came first.
+		// Disconnect, Close or another Connect came first. Nobody serves
+		// this connection, so take and close the visitors that reach it
+		// while it closes: see dropVisitors. The caller of attempt is
+		// counted in r.wg, so adding to r.wg here is safe, and stopping
+		// the run waits for this goroutine too.
 		m.mu.Unlock()
+		r.wg.Go(s.dropVisitors)
 		s.close(m.closeTimeout)
 		return nil, fmt.Errorf("Failed to establish SSH tunnel: %w", context.Canceled)
 	}

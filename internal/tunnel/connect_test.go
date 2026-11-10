@@ -434,6 +434,77 @@ func TestDisconnectStopsConnecting(t *testing.T) {
 	}
 }
 
+// Not a port. A run can be stopped (by Disconnect, Close or another Connect)
+// just after its SSH connection opened. Connect then closes that connection
+// without serving it. Visitors that reach the socket in that moment must not
+// keep the close waiting. The SSH library keeps one new connection for the
+// listener; with a second one it waits, and holds a lock that closing the
+// listener needs too, until someone takes the first one. Before the fix
+// nobody took it, so Connect, Disconnect and everything after them (config
+// saves, shutdown) waited forever.
+func TestStoppedRunClosesWithWaitingVisitors(t *testing.T) {
+	checkGoroutines(t)
+	m, srv := newTunnelSetup(t, "abc123", 8080)
+	opened := make(chan struct{})
+	proceed := make(chan struct{})
+	m.afterOpenForTests = func() {
+		close(opened)
+		<-proceed
+	}
+	result := make(chan error, 1)
+	go func() { result <- m.Connect(context.Background()) }()
+	select {
+	case <-opened:
+	case <-time.After(waitTimeout):
+		close(proceed)
+		t.Fatal("Connect did not open the SSH connection")
+	}
+
+	// Two visitors reach the socket.
+	srv.dialSocket(t, "/var/run/tunnels/abc123")
+	srv.dialSocket(t, "/var/run/tunnels/abc123")
+	waitForGoroutine(t, "the SSH library to wait with the second visitor", func(stack string) bool {
+		header, _, _ := strings.Cut(stack, "\n")
+		// The name of the library function that waits. If a new version of
+		// golang.org/x/crypto renames it, check whether the library still
+		// waits like this before you change the name here.
+		return strings.Contains(header, "[chan send") && strings.Contains(stack, "ssh.(*forwardList).forward(")
+	})
+
+	// Disconnect stops the run before Connect checks that its run is current.
+	disconnected := make(chan struct{})
+	go func() {
+		m.Disconnect()
+		close(disconnected)
+	}()
+	waitUntil(t, "Disconnect to stop the run", func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return m.run == nil
+	})
+	close(proceed)
+
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Connect() error = %v, want the error of a stopped run", err)
+		}
+	case <-time.After(waitTimeout):
+		t.Fatal("Connect still waits while it closes the stopped run's connection")
+	}
+	select {
+	case <-disconnected:
+	case <-time.After(waitTimeout):
+		t.Fatal("Disconnect still waits")
+	}
+	if got, want := srv.cancelPaths(), []string{"/var/run/tunnels/abc123"}; !slices.Equal(got, want) {
+		t.Errorf("the client stopped listening on %q, want %q", got, want)
+	}
+	if st := m.Status(); st.Connected || st.URL != "" || st.Error != "" {
+		t.Errorf("status = %+v, want disconnected with no error", st)
+	}
+}
+
 // Not a port. When the SSH connection fails, Connect returns the reason, the
 // status shows it and the callback reports it, as Python's connect() did.
 // After a failed first Connect the manager does not keep trying: Python's

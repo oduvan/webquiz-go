@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -138,6 +139,43 @@ func checkGoroutines(t *testing.T) {
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
+	})
+}
+
+// waitUntil waits until done returns true, and fails the test after waitTimeout.
+func waitUntil(t *testing.T, what string, done func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(waitTimeout)
+	for !done() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// waitForGoroutine waits until the stack of some goroutine, as
+// runtime.Stack writes it, makes match return true, and fails the test after
+// waitTimeout. A test uses it to wait until a goroutine of a library blocks
+// at a certain place.
+func waitForGoroutine(t *testing.T, what string, match func(stack string) bool) {
+	t.Helper()
+	waitUntil(t, what, func() bool {
+		buf := make([]byte, 1<<16)
+		for {
+			n := runtime.Stack(buf, true)
+			if n < len(buf) {
+				buf = buf[:n]
+				break
+			}
+			buf = make([]byte, 2*len(buf))
+		}
+		for _, stack := range strings.Split(string(buf), "\n\n") {
+			if match(stack) {
+				return true
+			}
+		}
+		return false
 	})
 }
 
