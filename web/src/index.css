@@ -36,3 +36,11 @@ body {
   padding: 4px 10px;
   font-size: 18px;
 }
+
+/* The CSV table page inside the file manager pop-up has no theme button of its own */
+body.embedded {
+  background: var(--card);
+}
+body.embedded .theme-toggle {
+  display: none;
+}

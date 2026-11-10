@@ -386,17 +386,6 @@ func copyTree(src, dst string) error {
 	return nil
 }
 
-// isSafeFilename is _is_safe_filename: no path parts, no NUL, not too long.
-func isSafeFilename(name string) bool {
-	switch {
-	case name == "", name == ".", name == "..":
-		return false
-	case strings.Contains(name, ".."), strings.ContainsAny(name, "/\\\x00"):
-		return false
-	}
-	return len(name) <= 255
-}
-
 // serveQuizFile is GET /attach/{filename} (public, serve_quiz_file): a file
 // of quizzes/attach, sent as a download.
 func (s *Server) serveQuizFile(w http.ResponseWriter, r *http.Request) error {

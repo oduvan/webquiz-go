@@ -1,6 +1,10 @@
 package server
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/oduvan/webquiz-go/internal/transfer"
+)
 
 // The admin WebSocket (/ws/admin) tells the admin page about students who
 // wait for approval (new_registration, registration_updated,
@@ -21,9 +25,10 @@ func (s *Server) registrationFieldsLocked(user *User) map[string]any {
 	return fields
 }
 
-// adminInitialStateLocked is the initial_state message of websocket_admin.
-// The caller holds mu.
-func (s *Server) adminInitialStateLocked() map[string]any {
+// adminInitialStateLocked is the initial_state message of websocket_admin,
+// with the transfer requests that wait for the admin. The caller holds mu
+// (and the transfer manager's lock, see joinAdminSocket).
+func (s *Server) adminInitialStateLocked(transferRequests []transfer.RequestView) map[string]any {
 	pending := map[string]any{}
 	if s.cfg.Registration.Approve {
 		for userID, user := range s.users {
@@ -44,11 +49,11 @@ func (s *Server) adminInitialStateLocked() map[string]any {
 		"pending_users":     pending,
 		"requires_approval": s.cfg.Registration.Approve,
 		"tunnel":            tunnelInfo,
-		"transfer_requests": s.incomingTransfersLocked(),
+		"transfer_requests": transferRequests,
 	}
 }
 
 // websocketAdmin is /ws/admin (local network only).
 func (s *Server) websocketAdmin(w http.ResponseWriter, r *http.Request) error {
-	return s.serveWebSocket(w, r, s.adminClients, func() any { return s.adminInitialStateLocked() })
+	return s.serveWebSocketJoin(w, r, s.adminClients, s.joinAdminSocket)
 }

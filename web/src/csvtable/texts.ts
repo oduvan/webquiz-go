@@ -1,0 +1,22 @@
+// Texts of the CSV table page. They are English, like the Python page,
+// and live here so a translation can replace them in one place.
+export const csvText = {
+  fileManager: '← File Manager',
+  themeTitle: 'Toggle dark/light theme',
+  question: 'Question',
+  user: 'User',
+  allQuestions: 'All questions',
+  allUsers: 'All users',
+  reload: '🔄 Reload',
+  reloadTitle: 'Read the file again (it grows while the quiz runs)',
+  openNewWindow: '↗ Open in new window',
+  openNewWindowTitle: 'Open this table with the same filters in a new window',
+  loading: 'Loading...',
+  noData: 'No data to display',
+  noRowsMatch: 'No rows match the filters',
+  couldNotLoad: 'Could not load the file: ',
+  showing: (shown: number, total: number) => `Showing ${shown} of ${total} rows`,
+  loginBefore: 'Please log in on the ',
+  loginLink: 'File Manager',
+  loginAfter: ' page first, then reload this page.',
+};
