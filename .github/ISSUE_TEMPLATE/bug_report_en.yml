@@ -37,7 +37,7 @@ body:
     attributes:
       label: WebQuiz Version
       description: What version of WebQuiz are you using? (visible in admin panel or run `webquiz --version`)
-      placeholder: "e.g., 1.11.4"
+      placeholder: "e.g., 2.0"
     validations:
       required: true
 
@@ -47,8 +47,8 @@ body:
       label: Installation Method
       description: How did you install WebQuiz?
       options:
-        - Pre-built binary
-        - pip install
+        - Pre-built binary (.zip)
+        - Windows installer (webquiz-windows-setup.exe)
         - From source
     validations:
       required: true

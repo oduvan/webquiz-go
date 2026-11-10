@@ -37,7 +37,7 @@ body:
     attributes:
       label: Версія WebQuiz
       description: Яку версію WebQuiz ви використовуєте? (видно в панелі адміністратора або запустіть `webquiz --version`)
-      placeholder: "напр., 1.11.4"
+      placeholder: "напр., 2.0"
     validations:
       required: true
 
@@ -47,8 +47,8 @@ body:
       label: Спосіб встановлення
       description: Як ви встановили WebQuiz?
       options:
-        - Готовий бінарний файл
-        - pip install
+        - Готовий бінарний файл (.zip)
+        - Інсталятор для Windows (webquiz-windows-setup.exe)
         - З вихідного коду
     validations:
       required: true
