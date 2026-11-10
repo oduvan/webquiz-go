@@ -1,6 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from '@playwright/test';
+import { parse } from 'yaml';
 import {
   adminLogin,
   expandQuestion,
@@ -326,4 +327,31 @@ test('the quiz settings are saved', async ({ page, request, launch }) => {
     show_right_answer: false,
     show_answers_on_completion: true,
   });
+});
+
+test('a save keeps the quiz description and the keys the editor does not write', async ({ page, launch }) => {
+  const server = await launch({
+    quizzes: {
+      'default.yaml': {
+        title: 'Rivers',
+        description: 'A quiz about rivers',
+        questions: [
+          { question: 'Q1', options: ['A', 'B'], correct_answer: 0, hint: 'Think of water' },
+          { question: 'T', checker: 'assert True', note: { level: 2 } },
+        ],
+      },
+    },
+  });
+  await adminLogin(page, server.url);
+  await selectAndEditQuiz(page);
+  await page.locator('#quiz-title').fill('Rivers and lakes');
+  await saveQuiz(page);
+
+  // The file the server wrote
+  const onDisk = parse(readFileSync(path.join(server.dir, 'quizzes', 'default.yaml'), 'utf-8')) as Dict;
+  expect(onDisk.title).toBe('Rivers and lakes');
+  expect(onDisk.description).toBe('A quiz about rivers');
+  const questions = onDisk.questions as Dict[];
+  expect(questions[0]).toEqual({ question: 'Q1', options: ['A', 'B'], correct_answer: 0, hint: 'Think of water' });
+  expect(questions[1]).toEqual({ question: 'T', checker: 'assert True', note: { level: 2 } });
 });

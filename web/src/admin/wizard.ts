@@ -38,6 +38,7 @@ export interface QuestionDraft {
   explanation: string;
   explanationOpen: boolean; // the explanation field is unfolded
   stick: boolean;
+  source: Dict; // the question as read from the file ({} for a new one): its other keys are kept
 }
 
 export interface QuizDraft {
@@ -50,6 +51,7 @@ export interface QuizDraft {
   timeLimitMode: TimeLimitMode;
   timeLimitSeconds: string;
   questions: QuestionDraft[];
+  source: Dict; // the quiz as read from the file ({} for a new one): its other keys are kept
 }
 
 let lastKey = 0;
@@ -111,6 +113,7 @@ export function newQuestion(): QuestionDraft {
     explanation: '',
     explanationOpen: false,
     stick: false,
+    source: {},
   };
 }
 
@@ -126,6 +129,7 @@ export function newQuizDraft(): QuizDraft {
     timeLimitMode: 'none',
     timeLimitSeconds: '60',
     questions: [newQuestion()],
+    source: {},
   };
 }
 
@@ -179,6 +183,7 @@ function questionFromFile(value: unknown): QuestionDraft {
     // Folded while empty; a written explanation opens unfolded
     explanationOpen: explanation.trim() !== '',
     stick: Boolean(question.stick_to_the_previous),
+    source: question,
   };
 }
 
@@ -199,6 +204,7 @@ export function draftFromQuiz(parsed: unknown): QuizDraft {
     timeLimitMode: mode,
     timeLimitSeconds: seconds,
     questions: Array.isArray(quizData.questions) ? quizData.questions.map(questionFromFile) : [],
+    source: quizData,
   };
 }
 
@@ -244,6 +250,64 @@ export function validateWizardPoints(questions: QuestionDraft[]): string | null 
     if (roundPoints(points) !== points) return T.pointsTooManyDecimals(i + 1);
   }
   return null;
+}
+
+// The keys the editor writes. A file's other keys (the quiz "description", a
+// key of another WebQuiz version) are kept as they were, so a save from the
+// editor does not lose them. The editor's own keys are never copied from the
+// file: a key it no longer writes (options of a question that became a text
+// question, a removed time limit) goes away.
+const QUIZ_KEYS = [
+  'questions',
+  'title',
+  'show_right_answer',
+  'randomize_questions',
+  'show_answers_on_completion',
+  'show_final_list',
+  'show_explanation',
+  'time_limit',
+];
+const QUESTION_KEYS = [
+  'question',
+  'image',
+  'file',
+  'options',
+  'correct_answer',
+  'min_correct',
+  'points',
+  'stick_to_the_previous',
+  'explanation',
+  'time_limit',
+  'checker',
+  'correct_value',
+  'default_value',
+];
+
+function hasKey(object: Dict, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+// Sets a key as the object's own key (also a key named "__proto__").
+function setKey(object: Dict, key: string, value: unknown) {
+  Object.defineProperty(object, key, { value, enumerable: true, writable: true, configurable: true });
+}
+
+// The editor's values together with the file's other keys, in the file's key
+// order where possible: the editor's keys take their old place, or come at
+// the end when they are new.
+export function keepOtherKeys(source: Dict, written: Dict, editorKeys: string[]): Dict {
+  const result: Dict = {};
+  Object.keys(source).forEach((key) => {
+    if (editorKeys.indexOf(key) === -1) {
+      setKey(result, key, source[key]);
+    } else if (hasKey(written, key)) {
+      setKey(result, key, written[key]);
+    }
+  });
+  Object.keys(written).forEach((key) => {
+    if (!hasKey(result, key)) setKey(result, key, written[key]);
+  });
+  return result;
 }
 
 function questionData(question: QuestionDraft): Dict | null {
@@ -300,11 +364,11 @@ function questionData(question: QuestionDraft): Dict | null {
   if (question.explanation.trim() !== '') data.explanation = question.explanation;
   // The question's own time limit is kept in every mode; it is used in per-question mode
   if (question.timeLimit.trim() !== '') data.time_limit = Number(question.timeLimit);
-  return data;
+  return keepOtherKeys(question.source, data, QUESTION_KEYS);
 }
 
 // The quiz data the editor saves (the "quiz_data" of create-quiz and of
-// PUT /api/admin/quiz/{filename}).
+// PUT /api/admin/quiz/{filename}), with the file's other keys kept.
 export function wizardData(draft: QuizDraft): Dict {
   const questions: Dict[] = [];
   draft.questions.forEach((question) => {
@@ -324,7 +388,7 @@ export function wizardData(draft: QuizDraft): Dict {
     const seconds = draft.timeLimitSeconds.trim();
     quizData.time_limit = { [draft.timeLimitMode]: seconds === '' ? 0 : Number(seconds) };
   }
-  return quizData;
+  return keepOtherKeys(draft.source, quizData, QUIZ_KEYS);
 }
 
 // The Markdown for an image in an explanation. Names with spaces or brackets

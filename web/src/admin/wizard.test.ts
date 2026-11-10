@@ -271,6 +271,72 @@ describe('wizardData', () => {
     expect(wizardData(draft).time_limit).toEqual({ per_question: 0 });
   });
 
+  it('keeps the keys the editor does not write, in their order', () => {
+    const quiz = {
+      title: 'Rivers',
+      description: 'A quiz about rivers',
+      questions: [
+        { question: 'Q1', hint: 'Think of water', options: ['A', 'B'], correct_answer: 0, extra: { level: 2 } },
+        { question: 'T', checker: 'assert True', note: 'kept' },
+      ],
+      show_right_answer: true,
+      custom_setting: [1, 2],
+    };
+    const saved = wizardData(draftFromQuiz(quiz));
+    expect(saved.description).toBe('A quiz about rivers');
+    expect(saved.custom_setting).toEqual([1, 2]);
+    const [q1, q2] = saved.questions as Record<string, unknown>[];
+    expect(q1).toEqual({ question: 'Q1', hint: 'Think of water', options: ['A', 'B'], correct_answer: 0, extra: { level: 2 } });
+    expect(q2).toEqual({ question: 'T', checker: 'assert True', note: 'kept' });
+    // The file's order; the editor's new keys come last
+    expect(Object.keys(saved)).toEqual([
+      'title',
+      'description',
+      'questions',
+      'show_right_answer',
+      'custom_setting',
+      'randomize_questions',
+      'show_answers_on_completion',
+      'show_final_list',
+    ]);
+    expect(Object.keys(q1)).toEqual(['question', 'hint', 'options', 'correct_answer', 'extra']);
+  });
+
+  it('never copies its own keys from the file', () => {
+    const draft = draftFromQuiz({
+      time_limit: { whole_quiz: 60 },
+      show_explanation: true,
+      questions: [
+        { question: 'Q', checker: 'assert True', correct_value: '1', hint: 'kept', min_correct: 3 },
+        { question: 'R', options: ['A', 'B'], correct_answer: [0, 1], min_correct: 2, points: 2, note: 'kept' },
+      ],
+    });
+    draft.timeLimitMode = 'none';
+    // The text question becomes a choice question, the other one a text question
+    draft.questions[0] = {
+      ...draft.questions[0],
+      type: 'single',
+      options: [
+        { key: 1, text: 'X', correct: true },
+        { key: 2, text: 'Y', correct: false },
+      ],
+    };
+    draft.questions[1] = { ...draft.questions[1], type: 'text', checker: '', correctValue: 'r', points: '1' };
+    const saved = wizardData(draft);
+    expect('time_limit' in saved).toBe(false);
+    expect('show_explanation' in saved).toBe(false);
+    const [q1, q2] = saved.questions as Record<string, unknown>[];
+    expect(q1).toEqual({ question: 'Q', options: ['X', 'Y'], correct_answer: 0, hint: 'kept' });
+    expect(q2).toEqual({ question: 'R', correct_value: 'r', note: 'kept' });
+  });
+
+  it('keeps an odd key name as a plain key', () => {
+    const parsed = JSON.parse('{"__proto__": "x", "questions": [{"question": "Q", "options": ["A", "B"], "correct_answer": 0}]}');
+    const text = JSON.stringify(wizardData(draftFromQuiz(parsed)));
+    expect(JSON.parse(text)).toMatchObject({ questions: [{ question: 'Q' }] });
+    expect(text).toContain('"__proto__":"x"');
+  });
+
   it('loads and saves a quiz back to the same data', () => {
     const quiz = {
       title: 'Round trip',
