@@ -70,9 +70,24 @@ func TestLanguagesAndKeyCount(t *testing.T) {
 	if Default != "uk" {
 		t.Errorf("Default = %q", Default)
 	}
-	// translations.py has 70 keys in each language.
-	if n := len(Get("uk")); n != 70 {
-		t.Errorf("uk has %d keys, translations.py has 70: %v", n, keys(Get("uk")))
+	// translations.py has 70 keys in each language. 2.0 adds 2: the answer verdict.
+	if n := len(Get("uk")); n != 72 {
+		t.Errorf("uk has %d keys, want 72 (the 70 of translations.py and 2 new ones): %v", n, keys(Get("uk")))
+	}
+}
+
+// The verdict next to the "Continue" button after an answer (new in 2.0).
+func TestAnswerVerdictTexts(t *testing.T) {
+	cases := map[string]map[string]string{
+		"uk": {"answer_verdict_correct": "✓ Правильно", "answer_verdict_incorrect": "✗ Неправильно"},
+		"en": {"answer_verdict_correct": "✓ Correct", "answer_verdict_incorrect": "✗ Incorrect"},
+	}
+	for lang, texts := range cases {
+		for key, want := range texts {
+			if got := Get(lang)[key]; got != want {
+				t.Errorf("%s.%s = %q, want %q", lang, key, got, want)
+			}
+		}
 	}
 }
 

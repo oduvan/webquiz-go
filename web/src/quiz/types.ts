@@ -3,6 +3,9 @@ import type { ClientQuestion } from '../shared/boot';
 // The classes an option gets when the right answers are shown.
 export type FeedbackClass = 'feedback-correct' | 'feedback-incorrect' | 'feedback-missed';
 
+// Whether the answer counts as right, said in words next to "Continue" (new in 2.0).
+export type Verdict = 'correct' | 'incorrect';
+
 // The countdown of a question with a per-question time limit.
 export interface QuestionTimer {
   text: string; // "M:SS"
@@ -105,6 +108,9 @@ export interface ViewState {
     question: QuestionView | null;
     submit: { hidden: boolean; disabled: boolean };
     continueButton: { hidden: boolean; disabled: boolean };
+    // Shown next to "Continue" after an answer, only while right answers are shown;
+    // null for a timeout and on any other screen
+    verdict: Verdict | null;
     explanation: { visible: boolean; question: string; html: string; nextDisabled: boolean };
   };
   results: { visible: boolean; content: ResultsContent | null };

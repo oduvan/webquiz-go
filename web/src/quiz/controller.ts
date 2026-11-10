@@ -17,6 +17,7 @@ import type {
   MessageView,
   QuestionView,
   ResultsContent,
+  Verdict,
   ViewState,
 } from './types';
 
@@ -87,6 +88,7 @@ export class QuizController {
         question: null,
         submit: { hidden: false, disabled: true },
         continueButton: { hidden: true, disabled: false },
+        verdict: null,
         explanation: { visible: false, question: '', html: '', nextDisabled: false },
       },
       results: { visible: false, content: null },
@@ -408,6 +410,7 @@ export class QuizController {
       // The quiz is done: the results come from the server, the same as after a reload
       this.pendingExplanation = null;
       this.hideExplanationStep();
+      this.setTest({ verdict: null });
       await this.fetchAndShowFinalResults();
       return;
     }
@@ -442,6 +445,7 @@ export class QuizController {
       // A text question can be sent at once when it has a starting text
       submit: { hidden: false, disabled: isText ? !this.textAnswer.trim() : true },
       continueButton: { ...this.state.test.continueButton, hidden: true },
+      verdict: null,
     });
   }
 
@@ -613,7 +617,15 @@ export class QuizController {
         return;
       }
 
-      this.showAnswerFeedback(data.is_correct, data.correct_answer, data.checker_error, data.correct_value, timedOut);
+      // The verdict next to "Continue" says in words whether the answer counts (new in 2.0).
+      // The reply has is_correct only while right answers are shown. A timeout gets no
+      // verdict: the question already says "Time is up".
+      let verdict: Verdict | null = null;
+      if (!timedOut && !sendingTimeUp && data.is_correct !== undefined) {
+        verdict = data.is_correct ? 'correct' : 'incorrect';
+      }
+
+      this.showAnswerFeedback(data.is_correct, data.correct_answer, data.checker_error, data.correct_value, timedOut, verdict);
     } catch (error) {
       this.showError('test', this.T.submit_error + messageOf(error));
       // The student can send it again
@@ -632,6 +644,7 @@ export class QuizController {
     checkerError: unknown,
     correctValue: unknown,
     timedOut: boolean,
+    verdict: Verdict | null,
   ) {
     const question = this.questions[this.currentQuestionIndex];
     const view = this.state.test.question;
@@ -703,6 +716,7 @@ export class QuizController {
 
     this.setSubmit({ hidden: true });
     this.setContinue({ hidden: false, disabled: false });
+    this.setTest({ verdict });
   }
 
   private showTimeUpMessage() {
@@ -754,6 +768,7 @@ export class QuizController {
       containerHidden: true,
       submit: { ...this.state.test.submit, hidden: true },
       continueButton: { ...this.state.test.continueButton, hidden: true },
+      verdict: null,
     });
     window.scrollTo(0, 0);
   }

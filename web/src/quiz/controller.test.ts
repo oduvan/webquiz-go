@@ -320,6 +320,201 @@ describe('explanations', () => {
   });
 });
 
+// The words "✓ Correct" or "✗ Incorrect" next to Continue (new in 2.0).
+describe('the verdict next to Continue', () => {
+  it('says "correct" for a right answer and is gone on the next question', async () => {
+    const { controller, state } = await registered(makeBoot(), {
+      'api/submit-answer': () => ({ json: { is_correct: true, correct_answer: 0, test_completed: false } }),
+    });
+    expect(state().test.verdict).toBeNull();
+    controller.selectCurrentAnswer(0);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.verdict).toBe('correct');
+    expect(state().test.continueButton).toEqual({ hidden: false, disabled: false });
+
+    controller.continueClicked();
+    // The answered question fades out with its verdict
+    expect(state().test.verdict).toBe('correct');
+    await vi.advanceTimersByTimeAsync(450);
+    expect(state().test.question!.question.id).toBe(2);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it('says "incorrect" for a wrong answer', async () => {
+    const { controller, state } = await registered(makeBoot(), {
+      'api/submit-answer': () => ({ json: { is_correct: false, correct_answer: 0, test_completed: false } }),
+    });
+    controller.selectCurrentAnswer(1);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.verdict).toBe('incorrect');
+  });
+
+  it('says "incorrect" for a partly right several-answers answer, though the picked option is right', async () => {
+    const boot = makeBoot({ questions: [choice(1, { is_multiple_choice: true })] });
+    const { controller, state } = await registered(boot, {
+      'api/submit-answer': () => ({ json: { is_correct: false, correct_answer: [0, 1], test_completed: true } }),
+    });
+    controller.selectCurrentAnswer(0);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.question!.feedback).toEqual({ 0: ['feedback-correct'], 1: ['feedback-missed'] });
+    expect(state().test.verdict).toBe('incorrect');
+  });
+
+  it('follows is_correct for typed answers', async () => {
+    const text = (id: number) => ({ id, points: 1, time_limit: 0, question: 'Type ' + id, type: 'text', default_value: '' }) as ClientQuestion;
+    const { controller, state } = await registered(makeBoot({ questions: [text(1), text(2)] }), {
+      'api/submit-answer': (body) =>
+        ({ json: { is_correct: body!.selected_answer === '42', is_text_question: true, correct_value: '42', test_completed: body!.question_id === 2 } }),
+    });
+    controller.setTextAnswer('42');
+    controller.submitClicked();
+    await flush();
+    expect(state().test.question!.textFeedback).toBe('feedback-correct');
+    expect(state().test.verdict).toBe('correct');
+
+    controller.continueClicked();
+    await vi.advanceTimersByTimeAsync(450);
+    expect(state().test.question!.question.id).toBe(2);
+    expect(state().test.verdict).toBeNull();
+    controller.setTextAnswer('24');
+    controller.submitClicked();
+    await flush();
+    expect(state().test.question!.correctValue).toBe('42');
+    expect(state().test.verdict).toBe('incorrect');
+  });
+
+  it('is not shown while right answers are hidden', async () => {
+    const { controller, state } = await registered(makeBoot({ show_right_answer: false }), {
+      'api/submit-answer': () => ({ json: { time_taken: 1, test_completed: false } }),
+    });
+    controller.selectCurrentAnswer(0);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.verdict).toBeNull();
+    await vi.advanceTimersByTimeAsync(100 + 450);
+    expect(state().test.question!.question.id).toBe(2);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it('is not shown when the countdown runs out: the question says "Time is up"', async () => {
+    const boot = makeBoot({ questions: [choice(1, { time_limit: 2 }), choice(2)] });
+    const { state } = await registered(boot, {
+      'api/question-start': (body) => ({ json: body!.question_id === 1 ? { remaining_seconds: 2 } : {} }),
+      'api/submit-answer': () => ({ json: { timed_out: true, is_correct: false, correct_answer: 0, test_completed: false } }),
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    await flush();
+    expect(state().test.question!.timeUp).toBe(true);
+    expect(state().test.continueButton.hidden).toBe(false);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it("is not shown for the page's own time-up, even when the reply does not say timed_out", async () => {
+    const boot = makeBoot({ questions: [choice(1, { time_limit: 2 }), choice(2)] });
+    const { calls, state } = await registered(boot, {
+      'api/question-start': (body) => ({ json: body!.question_id === 1 ? { remaining_seconds: 2 } : {} }),
+      'api/submit-answer': () => ({ json: { is_correct: false, correct_answer: 0, test_completed: false } }),
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    await flush();
+    expect(calls.find((call) => call.url === 'api/submit-answer')!.body!.selected_answer).toBeNull();
+    expect(state().test.continueButton.hidden).toBe(false);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it('is not shown when a sent answer comes back timed out', async () => {
+    const { controller, state } = await registered(makeBoot(), {
+      'api/submit-answer': () => ({ json: { timed_out: true, is_correct: false, correct_answer: 0, test_completed: false } }),
+    });
+    controller.selectCurrentAnswer(0);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.question!.timeUp).toBe(true);
+    expect(state().test.continueButton.hidden).toBe(false);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it('is not shown when the whole-quiz time closes the quiz', async () => {
+    const final = { test_results: [], correct_count: 0, total_count: 2, percentage: 0 };
+    const { controller, state } = await registered(makeBoot({ quiz_time_limit: 10 }), {
+      'api/submit-answer': () => ({ json: { timed_out: true, is_correct: false, correct_answer: 0, test_completed: true } }),
+      'api/verify-user/': () => ({ json: { valid: true, test_completed: true, final_results: final } }),
+    });
+    controller.selectCurrentAnswer(0);
+    controller.submitClicked();
+    await flush();
+    expect(state().results.visible).toBe(true);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it('is gone when the results are shown', async () => {
+    const final = { test_results: [], correct_count: 1, total_count: 1, percentage: 100 };
+    const { controller, state } = await registered(makeBoot({ questions: [choice(1)] }), {
+      'api/submit-answer': () => ({ json: { is_correct: true, correct_answer: 0, test_completed: true } }),
+      'api/verify-user/': () => ({ json: { valid: true, test_completed: true, final_results: final } }),
+    });
+    controller.selectCurrentAnswer(0);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.verdict).toBe('correct');
+    controller.continueClicked();
+    await vi.advanceTimersByTimeAsync(450);
+    expect(state().results.visible).toBe(true);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it('is hidden on the explanation step and stays hidden on the next question', async () => {
+    const { controller, state } = await registered(makeBoot(), {
+      'api/submit-answer': () => ({ json: { is_correct: true, correct_answer: 0, explanation_html: '<p>Because</p>', test_completed: false } }),
+    });
+    controller.selectCurrentAnswer(0);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.verdict).toBe('correct');
+    controller.continueClicked();
+    expect(state().test.explanation.visible).toBe(true);
+    expect(state().test.verdict).toBeNull();
+    void controller.nextAfterExplanation();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(state().test.question!.question.id).toBe(2);
+    expect(state().test.verdict).toBeNull();
+  });
+
+  it('a retried answer shows the verdict of the stored result', async () => {
+    let attempts = 0;
+    const { controller, calls, state } = await registered(makeBoot(), {
+      'api/submit-answer': () => {
+        attempts++;
+        if (attempts === 1) throw new TypeError('Failed to fetch'); // the reply is lost on the way
+        return { json: { is_correct: false, correct_answer: 0, test_completed: false } };
+      },
+    });
+    controller.selectCurrentAnswer(1);
+    controller.submitClicked();
+    await flush();
+    expect(state().test.verdict).toBeNull(); // the page waits for the connection
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(calls.filter((call) => call.url === 'api/submit-answer')).toHaveLength(2);
+    expect(state().test.verdict).toBe('incorrect');
+  });
+
+  it('is not shown after a reload', async () => {
+    document.cookie = 'user_id=123456;path=/';
+    fakeServer({
+      'api/verify-user/123456': () => ({ json: { valid: true, user_id: '123456', username: 'Anna', approved: true, next_question_index: 1, test_completed: false } }),
+      'api/question-start': () => ({ json: {} }),
+    });
+    const controller = new QuizController(makeBoot());
+    controller.start();
+    await flush();
+    expect(controller.getSnapshot().test.question!.question.id).toBe(2);
+    expect(controller.getSnapshot().test.verdict).toBeNull();
+  });
+});
+
 describe('time limits', () => {
   it('a question countdown sends an empty answer at zero', async () => {
     const boot = makeBoot({ questions: [choice(1, { time_limit: 5 }), choice(2)] });

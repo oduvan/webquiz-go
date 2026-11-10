@@ -1,7 +1,7 @@
 package i18n
 
-// The texts below are copied from webquiz/translations.py of WebQuiz 1.19.
-// Keep both languages with the same keys.
+// The texts below are copied from webquiz/translations.py of WebQuiz 1.19,
+// except the ones marked "new in 2.0". Keep both languages with the same keys.
 
 var ukTexts = map[string]string{
 	// Loading state
@@ -55,6 +55,10 @@ var ukTexts = map[string]string{
 
 	// Answer feedback (JS)
 	"correct_answer_value": "✓ Правильна відповідь: ",
+
+	// The verdict next to the "Continue" button after an answer (new in 2.0)
+	"answer_verdict_correct":   "✓ Правильно",
+	"answer_verdict_incorrect": "✗ Неправильно",
 
 	// Error messages
 	"error_prefix":       "Помилка: ",
@@ -151,6 +155,10 @@ var enTexts = map[string]string{
 
 	// Answer feedback (JS)
 	"correct_answer_value": "✓ Correct answer: ",
+
+	// The verdict next to the "Continue" button after an answer (new in 2.0)
+	"answer_verdict_correct":   "✓ Correct",
+	"answer_verdict_incorrect": "✗ Incorrect",
 
 	// Error messages
 	"error_prefix":       "Error: ",
