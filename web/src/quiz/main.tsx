@@ -30,6 +30,7 @@ function devBoot(): QuizBoot {
 
 export function startQuizPage() {
   const boot = readBoot<QuizBoot>(devBoot());
+  document.documentElement.lang = boot.language; // the page's language follows the config
   // The controller starts once, before React renders (StrictMode may render twice)
   const controller = boot.state === 'quiz' ? new QuizController(boot) : null;
   if (controller) controller.start();
