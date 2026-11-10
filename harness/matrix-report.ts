@@ -34,6 +34,8 @@ export class RunRecord {
   where = 'start';
   error: string | null = null;
   seconds = 0;
+  /** The version the server reports (/api/admin/version-check), when the run asked. */
+  serverVersion: string | null = null;
 
   constructor(
     readonly caseName: string,
