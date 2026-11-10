@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -80,7 +81,9 @@ type Deps struct {
 // Locking: mu guards the offers and requests. The manager calls
 // Deps.FilesInUse and Deps.Notify while holding mu, so a server must never
 // call the manager while holding a lock that FilesInUse takes. HTTP calls
-// to other servers happen without mu.
+// to other servers happen without mu. Every locked section releases mu with
+// defer (see locked): a panic in a callback fails only that call and never
+// leaves the manager locked.
 type Manager struct {
 	deps   Deps
 	log    *slog.Logger
@@ -89,6 +92,13 @@ type Manager struct {
 	// Values of transfer.py that tests change.
 	maxFilesPerOffer int
 	maxFileSize      int64
+	// beforeSave runs when a downloaded file is about to be saved (tests
+	// only; nil otherwise).
+	beforeSave func()
+
+	// saveMu lets one downloaded file at a time be checked and moved to its
+	// name (see save).
+	saveMu sync.Mutex
 
 	mu       sync.Mutex
 	outgoing []*offer   // in the order they were made (Python's dict order)
@@ -230,6 +240,14 @@ func (m *Manager) notifyLocked(message map[string]any) {
 		}
 	}()
 	m.deps.Notify(message)
+}
+
+// locked runs fn while holding mu. The deferred unlock keeps mu free when
+// fn panics (for example in a callback of the server).
+func (m *Manager) locked(fn func()) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	fn()
 }
 
 func (m *Manager) directories() map[string]string { return m.deps.Directories() }
@@ -450,10 +468,10 @@ func (m *Manager) Send(ctx context.Context, target, files any) (OfferView, error
 
 	o := &offer{token: randomToken(), id: randomID(), to: targetName, files: offered, created: time.Now(), status: statusWaiting}
 	// Registered before sending: the receiver may download right after accepting.
-	m.mu.Lock()
-	m.removeExpiredLocked()
-	m.outgoing = append(m.outgoing, o)
-	m.mu.Unlock()
+	m.locked(func() {
+		m.removeExpiredLocked()
+		m.outgoing = append(m.outgoing, o)
+	})
 
 	body := offerBody{From: ownName, Token: o.token, Files: offered}
 	status, responseBody, err := m.postJSON(ctx, baseURL+"/"+targetName+"/api/transfer/offer", body)
@@ -531,7 +549,7 @@ func (m *Manager) findWaitingOfferLocked(token any) *offer {
 	}
 	m.removeExpiredLocked()
 	for _, o := range m.outgoing {
-		if o.token == text {
+		if subtle.ConstantTimeCompare([]byte(o.token), []byte(text)) == 1 {
 			if o.status != statusWaiting {
 				return nil
 			}
@@ -811,47 +829,54 @@ func (m *Manager) removeRequestLocked(r *request) {
 // their default action. When a choice is not possible, nothing is
 // downloaded, the request stays open and the error has status 400.
 func (m *Manager) Accept(ctx context.Context, requestID string, choices any) (AcceptResult, error) {
-	m.mu.Lock()
-	r, err := m.takePendingLocked(requestID)
+	var r *request
 	var baseURL string
 	var plan []plannedFile
-	if err == nil {
-		baseURL, _, err = m.requireEndpoint()
-	}
-	if err == nil {
-		plan, err = m.buildPlan(r, choices)
-	}
-	if err == nil {
-		r.status = statusDownloading
-	}
-	m.mu.Unlock()
+	var err error
+	m.locked(func() {
+		r, err = m.takePendingLocked(requestID)
+		if err == nil {
+			baseURL, _, err = m.requireEndpoint()
+		}
+		if err == nil {
+			plan, err = m.buildPlan(r, choices)
+		}
+		if err == nil {
+			r.status = statusDownloading
+		}
+	})
 	if err != nil {
 		return AcceptResult{}, err
 	}
+	result, err := m.download(ctx, r, baseURL+"/"+r.from, plan)
+	if err != nil {
+		return AcceptResult{}, err
+	}
+	m.log.Info(fmt.Sprintf("File transfer from '%s': %d saved, %d skipped, %d failed",
+		r.from, len(result.Saved), len(result.Skipped), len(result.Failed)))
+	return result, nil
+}
 
-	senderURL := baseURL + "/" + r.from
+// download is the part of accept from the first download on: it downloads
+// the planned files and reports the result to the sender. The request is
+// removed at the end whatever happens, also after a panic (Python's
+// finally), so it cannot stay "downloading" and count against the limit.
+func (m *Manager) download(ctx context.Context, r *request, senderURL string, plan []plannedFile) (AcceptResult, error) {
+	defer m.locked(func() { m.removeRequestLocked(r) })
 	result := AcceptResult{From: r.from, Saved: []SavedFile{}, Skipped: []FileAction{}, Failed: []FailedFile{}}
 	renamedMedia := map[mediaFile]string{}
 	// Images and attachments first, so quizzes can point to their saved names.
 	slices.SortStableFunc(plan, func(a, b plannedFile) int {
 		return boolOrder(!isMediaType(a.file.fileType)) - boolOrder(!isMediaType(b.file.fileType))
 	})
-	err = m.downloadAll(ctx, r, senderURL, plan, renamedMedia, &result)
-	if err == nil {
-		status := "accepted"
-		if len(result.Failed) > 0 && len(result.Saved) == 0 {
-			status = "failed"
-		}
-		m.reportResult(ctx, senderURL, r.token, status)
-	}
-	m.mu.Lock()
-	m.removeRequestLocked(r)
-	m.mu.Unlock()
-	if err != nil {
+	if err := m.downloadAll(ctx, r, senderURL, plan, renamedMedia, &result); err != nil {
 		return AcceptResult{}, err
 	}
-	m.log.Info(fmt.Sprintf("File transfer from '%s': %d saved, %d skipped, %d failed",
-		r.from, len(result.Saved), len(result.Skipped), len(result.Failed)))
+	status := "accepted"
+	if len(result.Failed) > 0 && len(result.Saved) == 0 {
+		status = "failed"
+	}
+	m.reportResult(ctx, senderURL, r.token, status)
 	return result, nil
 }
 
@@ -928,6 +953,20 @@ func (m *Manager) downloadFile(ctx context.Context, senderURL, token, sender str
 			m.log.Warn(fmt.Sprintf("Cannot update file references in received quiz: %v", err))
 		}
 	}
+	if m.beforeSave != nil {
+		m.beforeSave()
+	}
+	return m.save(tempPath, directory, saveAs, overwrite)
+}
+
+// save moves a downloaded file to its name after the last checks: a file
+// that must not be replaced must not exist, and a file the running server
+// uses must not be replaced. The checks and the move are one step (saveMu),
+// so two downloads that save the same name at the same moment cannot both
+// pass the check; in Python nothing could run between them either.
+func (m *Manager) save(tempPath, directory, saveAs string, overwrite bool) error {
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
 	finalPath := filepath.Join(directory, saveAs)
 	if !overwrite && exists(finalPath) {
 		return newError("A file named '%s' appeared meanwhile", saveAs)
@@ -948,12 +987,14 @@ func (m *Manager) reportResult(ctx context.Context, senderURL, token, status str
 
 // Reject forgets an incoming request and tells the sender (reject).
 func (m *Manager) Reject(ctx context.Context, requestID string) error {
-	m.mu.Lock()
-	r, err := m.takePendingLocked(requestID)
-	if err == nil {
-		m.removeRequestLocked(r)
-	}
-	m.mu.Unlock()
+	var r *request
+	var err error
+	m.locked(func() {
+		r, err = m.takePendingLocked(requestID)
+		if err == nil {
+			m.removeRequestLocked(r)
+		}
+	})
 	if err != nil {
 		return err
 	}
