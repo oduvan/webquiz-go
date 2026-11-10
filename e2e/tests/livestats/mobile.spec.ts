@@ -29,3 +29,28 @@ test('the live stats page fits a 375 px screen', async ({ page, request, launch 
     expect(box!.x + box!.width).toBeLessThanOrEqual(375);
   }
 });
+
+// The project's rule: 768 px and less is the phone layout (the old page used
+// max-width: 768px); 769 px gets the wide layout.
+test('768 px is still the phone layout of live stats, 769 px the wide one', async ({ page, request, launch }) => {
+  const server = await launch({
+    quizzes: defaultQuiz({ title: 'Edge', questions: [{ question: 'Q?', options: ['A', 'B'], correct_answer: 0 }] }),
+  });
+  await request.post(`${server.url}/api/register`, { data: { username: 'Anna' } });
+  const style = (selector: string, property: string) =>
+    page.locator(selector).first().evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property);
+
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto(server.url + '/live-stats/');
+  await expect(page.locator('#statsBody tr')).toHaveCount(1);
+  expect(await style('.live-page', 'padding-left')).toBe('10px');
+  expect(await style('.filter-button', 'font-size')).toBe('14px');
+  expect(await style('.stats-table td', 'padding-left')).toBe('4px');
+  expect(await style('.state-cell', 'font-size')).toBe('12px');
+
+  await page.setViewportSize({ width: 769, height: 1024 });
+  expect(await style('.live-page', 'padding-left')).toBe('20px');
+  expect(await style('.filter-button', 'font-size')).toBe('16px');
+  expect(await style('.stats-table td', 'padding-left')).toBe('12px');
+  expect(await style('.state-cell', 'font-size')).toBe('14px');
+});
