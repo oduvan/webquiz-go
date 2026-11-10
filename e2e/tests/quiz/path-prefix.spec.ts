@@ -95,3 +95,66 @@ test('the whole quiz works under /abc123/, like behind the tunnel', async ({ pag
     await proxy.close();
   }
 });
+
+test('the approval flow works under /abc123/ too', async ({ page, context, request, launch }) => {
+  const server = await launch({
+    config: { ...EN, registration: { approve: true, fields: ['Group'] } },
+    quizzes: defaultQuiz({ title: 'Approval behind the tunnel', questions: [{ question: 'Q1?', options: ['A', 'B'], correct_answer: 0 }] }),
+  });
+  const proxy = await startPrefixProxy(server.url, 'abc123');
+  try {
+    const failed: string[] = [];
+    page.on('requestfailed', (request) => failed.push('failed ' + request.url()));
+    page.on('response', (response) => {
+      if (response.status() >= 400) failed.push(response.status() + ' ' + response.url());
+    });
+    const apiCalls: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.pathname.indexOf('/api/') !== -1) apiCalls.push(request.method() + ' ' + url.pathname);
+    });
+
+    await page.goto(proxy.url);
+    await page.locator('#username').fill('Remote');
+    await page.locator('[data-field-name="group"]').fill('7-B');
+    await page.locator('.register-btn').click();
+    await expect(page.locator('#waiting-approval')).toBeVisible();
+
+    // Save changes: api/update-registration through the prefix
+    await page.locator('#waiting-username').fill('Remote K');
+    await page.locator('.save-registration-btn').click();
+    await expect(page.locator('#waiting-error')).toHaveText('✓ Data updated successfully!');
+
+    // Check: api/verify-user through the prefix, not approved yet
+    await page.locator('.check-status-btn').click();
+    await expect(page.locator('#waiting-error')).toHaveText('You have not been approved yet. Please wait.');
+
+    // The teacher approves on the server itself (the admin API is for the local network only)
+    const userId = (await context.cookies()).find((cookie) => cookie.name === 'user_id')!.value;
+    expect((await request.post(`${server.url}/api/admin/auth`, { data: { master_key: 'test123' } })).status()).toBe(200);
+    expect((await request.put(`${server.url}/api/admin/approve-user`, { data: { user_id: userId } })).status()).toBe(200);
+
+    await page.locator('.check-status-btn').click();
+    await expect(page.locator('.question-text')).toHaveText('Q1?');
+    await expect(page.locator('#username-display')).toHaveText('Remote K');
+    await page.locator('#option_0').click();
+    await page.locator('#submit-answer-btn').click();
+    await page.locator('#continue-btn').click();
+    await expect(page.locator('#results')).toContainText('Result: 1/1 (100%)');
+
+    for (const call of [
+      'POST /abc123/api/register',
+      'PUT /abc123/api/update-registration',
+      `GET /abc123/api/verify-user/${userId}`,
+      'POST /abc123/api/question-start',
+      'POST /abc123/api/submit-answer',
+    ]) {
+      expect(apiCalls).toContain(call);
+    }
+    expect(apiCalls.filter((call) => call.indexOf(' /abc123/api/') === -1)).toEqual([]);
+    expect(failed).toEqual([]);
+    expect(proxy.outside.filter((url) => url !== '/favicon.ico')).toEqual([]);
+  } finally {
+    await proxy.close();
+  }
+});

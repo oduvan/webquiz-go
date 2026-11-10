@@ -97,6 +97,57 @@ test('answers shown on completion: the student waits for the class, then reloads
   await expect(results).not.toContainText('Correct answers will be available');
 });
 
+const NO_LIST_QUIZ = defaultQuiz({
+  title: 'No list',
+  show_right_answer: true,
+  show_final_list: false,
+  questions: [
+    { question: 'First question?', options: ['Right', 'Wrong'], correct_answer: 0, points: 2 },
+    { question: 'Second question?', options: ['Right', 'Wrong'], correct_answer: 0 },
+  ],
+});
+
+test('show_final_list false: the results show only the score, no list of questions', async ({ page, launch }) => {
+  const server = await launch({ config: EN, quizzes: NO_LIST_QUIZ });
+  await registerUser(page, server.url);
+  await page.locator('#option_0').click();
+  await page.locator('#submit-answer-btn').click();
+  await page.locator('#continue-btn').click();
+  await expect(page.locator('.question-text')).toHaveText('Second question?');
+  await page.locator('#option_1').click();
+  await page.locator('#submit-answer-btn').click();
+  await page.locator('#continue-btn').click();
+
+  const results = page.locator('#results');
+  await expect(results).toContainText('Result: 1/2 (50%)');
+  await expect(results).toContainText('Points: 2/3 (67%)');
+  await expect(page.locator('.results-table')).toHaveCount(0);
+  await expect(results).not.toContainText('First question?');
+
+  // The same after a reload, when the results come straight from the server
+  await page.reload();
+  await expect(results).toContainText('Result: 1/2 (50%)');
+  await expect(page.locator('.results-table')).toHaveCount(0);
+});
+
+test("show_final_list false also applies to the page's own results", async ({ page, launch }) => {
+  const server = await launch({ config: EN, quizzes: NO_LIST_QUIZ });
+  await registerUser(page, server.url);
+  await page.locator('#option_0').click();
+  await page.locator('#submit-answer-btn').click();
+  await page.locator('#continue-btn').click();
+  await expect(page.locator('.question-text')).toHaveText('Second question?');
+  await page.locator('#option_1').click();
+  await page.locator('#submit-answer-btn').click();
+  await expect(page.locator('#continue-btn')).toBeVisible();
+  // The server's results cannot be read: the page shows what it counted itself
+  await page.route('**/api/verify-user/**', (route) => route.fulfill({ status: 500, body: 'oops' }));
+  await page.locator('#continue-btn').click();
+
+  await expect(page.locator('#results')).toContainText('Result: 1/2 (50%)');
+  await expect(page.locator('.results-table')).toHaveCount(0);
+});
+
 test('a text answer: submit follows the text, a wrong answer shows the checker message', async ({ page, launch }) => {
   const server = await launch({
     config: EN,
