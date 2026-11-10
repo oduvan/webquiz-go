@@ -113,6 +113,8 @@ WEBQUIZ_BINARY_DIR=/path/to/data ./webquiz-linux-arm64
 
 The same variable works in a service file for systemd (`Environment=WEBQUIZ_BINARY_DIR=/path/to/data`).
 
+WebQuiz 2.0 sends the page files (scripts and styles) compressed, so the quiz page loads fast even on slow Wi-Fi. Keep quiz images small, for example under 200 KB each: every student's page downloads all quiz images while the student registers, so the images are the biggest part of what the class downloads at the start of a lesson.
+
 ---
 
 ### Wi-Fi Configuration

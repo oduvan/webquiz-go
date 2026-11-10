@@ -4,7 +4,8 @@ package web
 
 import "embed"
 
-// Dist is the content of web/dist: the five HTML pages and assets/.
+// Dist is the content of web/dist: the five HTML pages and assets/, with a
+// gzip copy (name.gz) of most files (web/build/gzip.ts).
 //
 //go:embed all:dist
 var Dist embed.FS

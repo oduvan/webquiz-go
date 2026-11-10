@@ -34,7 +34,7 @@ WebQuiz 2.0 is the Go rewrite of the Python/aiohttp WebQuiz 1.19 (<https://githu
 - `internal/tunnel/` - SSH tunnel manager; `internal/transfer/` - file transfer between servers
 - `internal/netinfo/`, `internal/version/` - network addresses; version and repository address (`RepoURL`, `PagesURL` live only here)
 - `internal/testutil/` - `StartServer` (in-process server on a free port, temp folders), `BuildBinary`
-- `web/` - five pages: `index.html` (quiz), `admin.html`, `files.html`, `live-stats.html`, `csv-table.html`; sources in `web/src/{quiz,admin,files,livestats,csvtable,shared}`
+- `web/` - five pages: `index.html` (quiz), `admin.html`, `files.html`, `live-stats.html`, `csv-table.html`; sources in `web/src/{quiz,admin,files,livestats,csvtable,shared}`; `web/build/gzip.ts` is the Vite plugin that writes the gzip copies
 - `e2e/` - Playwright tests; `e2e/fixtures/server.ts` starts the built binary in a temp folder
 - `scripts/screenshots.ts` - takes the screenshots of `docs/imgs` from the real binary
 - `migration/` - `python-tests.txt` (911 ids of the 1.19 tests) and the check that every id is ported (a normal Go test)
@@ -141,6 +141,7 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 - **Quiz interface language** - `language` (`uk` or `en`, default `uk`) from `internal/i18n`; the pages get the texts in the boot data; hot-reloadable
 - **Dark/Light theme** - toggle on every page, `theme` key in localStorage, CSS variables. The button (and the student's name badge on the quiz page) sit at the top of the page with `position: absolute` and scroll away with it, as in 1.19; never `position: fixed`, which covered the text on a phone
 - **Quiz file attachments** - `file` field, files in `quizzes/attach/`, served at `/attach/` with forced download
+- **Gzip copies of the page files** - `vite build` writes `name.gz` (best compression, only when smaller) next to every .js, .css, .svg, .json and .html in `web/dist`. `serveAssets` sends the copy when Accept-Encoding allows gzip, with `Content-Encoding: gzip`, the type of the file itself and `Vary: Accept-Encoding`. Pictures (`/imgs/`) and the HTML pages (made per request) are sent as they are
 - **Question text copy prevention** - questions have `user-select: none` and a `copy` handler; text inputs stay selectable
 - **File manager** shows the whole `webquiz.yaml` (also `master_key`) to every computer on the local network, as in 1.19
 
