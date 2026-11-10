@@ -157,7 +157,7 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 - Release notes: if `.github/release-notes/vX.Y.md` exists at the release tag, the workflow puts it at the top of the GitHub release notes
 
 ## Release
-**Trigger**: GitHub Actions -> "Release and Deploy" -> enter version (X.Y.Z)
+**Trigger**: GitHub Actions -> "Release" -> enter version (X.Y.Z)
 
 **Process**: write `VERSION` and tag -> build the web pages once -> `make dist-binaries` (Linux amd64/arm64/arm, macOS Intel/Apple Silicon, Windows) -> Windows installer (Inno Setup) -> PDFs of the docs (pandoc + xelatex, uk/en) -> GitHub release with the zips, the installer and the PDFs -> deploy GitHub Pages
 
