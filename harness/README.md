@@ -76,7 +76,7 @@ WEBQUIZ_BINARY=/path/to/webquiz harness/node_modules/.bin/tsx harness/matrix.ts 
 WEBQUIZ_BINARY=/path/to/webquiz harness/node_modules/.bin/tsx harness/matrix.ts --case teacher   # only the teacher pages
 ```
 
-Run it from the repository folder. Options: `--case NAME` runs one case (the names are printed at the start), `--quick` runs only desktop with the light theme (and one teacher tour), `--no-teacher` skips the teacher tour, `--jobs N` sets how many runs go at the same time (default 3), `--binary PATH` names the binary (else `WEBQUIZ_BINARY`, then `e2e/.bin/webquiz`, then `bin/webquiz`). Every run starts its own server on a free port (never 8198 or 8199). The full matrix takes about 10 minutes with 3 jobs.
+Run it from the repository folder. Options: `--case NAME` runs one case (the names are printed at the start), `--quick` runs only desktop with the light theme (and one teacher tour), `--no-teacher` skips the teacher tour, `--jobs N` sets how many runs go at the same time (default 3), `--binary PATH` names the binary (else `WEBQUIZ_BINARY`, then `e2e/.bin/webquiz`, then `bin/webquiz`). Every run starts its own server on a free port (never 8198 or 8199). The full matrix takes about 6 minutes with 3 jobs.
 
 To check the checks themselves, run the student cases against a WebQuiz 1.19 server: `WEBQUIZ_BINARY=<python venv>/bin/webquiz harness/node_modules/.bin/tsx harness/matrix.ts --no-teacher`. The Python CLI takes the same `--config` and `--port` options, and every student check must pass there. (The teacher tour finds its way with the Go pages' element ids, so it is for the Go version only.)
 
