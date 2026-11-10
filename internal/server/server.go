@@ -59,6 +59,11 @@ type Options struct {
 	// the CSV files. Zero means DefaultFlushInterval (5 s, as in Python);
 	// tests make it short so they need not wait.
 	FlushInterval time.Duration
+	// Executable is the program file whose version the version check compares
+	// with the running version (it is run with --version). Empty means the
+	// file of this program, found when the server is made. Tests use a small
+	// script, because in a test the program file is the test binary.
+	Executable string
 	// Now is the clock (nil: time.Now). Tests can move time with it.
 	Now func() time.Time
 	// Logger gets every log line in addition to the log file in logs_dir.
@@ -116,6 +121,7 @@ type Server struct {
 	staticDir     string // paths.static_dir
 	logFile       string // log_file: logs_dir/NNNN.log
 	masterKey     string // master_key: a change in the config needs a restart
+	executable    string // the program file, for the version check
 	handler       http.Handler
 
 	// ctx ends when Close is called. Use it, not a request's context, for
@@ -140,6 +146,13 @@ type Server struct {
 	// switch) happen at a time, so a new run never picks the number of files
 	// that a flush is still writing. Lock order: csvMu, then mu.
 	csvMu sync.Mutex
+
+	// configMu lets one config save run at a time (the file is read, changed
+	// and written back). Lock order: configMu, csvMu, mu.
+	configMu sync.Mutex
+	// configHook, when set, runs in a config save before the new settings are
+	// applied; an error makes the save fail and roll back. For tests.
+	configHook func(*config.Config) error
 
 	mu sync.Mutex
 
@@ -217,6 +230,10 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 		startSettings: map[string]any{},
 
 		answersBeingChecked: map[string]int{},
+	}
+	s.executable = opts.Executable
+	if s.executable == "" {
+		s.executable, _ = os.Executable()
 	}
 	if s.grace == 0 {
 		s.grace = time.Duration(timelimits.GraceSeconds() * float64(time.Second))
