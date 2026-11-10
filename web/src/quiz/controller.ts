@@ -40,7 +40,7 @@ function messageOf(error: unknown): string {
 }
 
 // Reply fields the page reads. Values come from JSON, so they are checked where used.
-type Reply = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+type Reply = Record<string, any>;
 
 export class QuizController {
   readonly boot: QuizBoot;

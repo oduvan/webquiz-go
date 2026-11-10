@@ -30,7 +30,8 @@ export interface SocketLike {
 
 const OPEN = 1; // WebSocket.OPEN
 
-type Message = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+// A message from the socket. Values come from JSON, so they are checked where used.
+type Message = Record<string, any>;
 
 export class LiveStatsClient {
   readonly maxReconnectAttempts = 5;
