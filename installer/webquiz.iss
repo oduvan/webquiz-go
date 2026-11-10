@@ -3,7 +3,7 @@
   #define MyAppVersion "0.0.0"
 #endif
 #define MyAppPublisher "WebQuiz"
-#define MyAppURL "https://github.com/oduvan/webquiz"
+#define MyAppURL "https://github.com/oduvan/webquiz-go"
 #define MyAppExeName "webquiz.exe"
 
 [Setup]
