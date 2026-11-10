@@ -10,6 +10,11 @@ type WaitingListener = (waiting: boolean) => void;
 const listeners: WaitingListener[] = [];
 let requestsWaiting = 0;
 
+// True while at least one request waits for the connection.
+export function isConnectionWaiting(): boolean {
+  return requestsWaiting > 0;
+}
+
 // The listener gets true when the first request starts waiting for the connection
 // and false when the last one is done. Returns a function that removes the listener.
 export function onConnectionWaiting(listener: WaitingListener): () => void {

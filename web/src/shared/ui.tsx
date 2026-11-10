@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
-import { onConnectionWaiting } from './api';
+import { useSyncExternalStore } from 'react';
+import { isConnectionWaiting, onConnectionWaiting } from './api';
 
 export function Button({ className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
@@ -28,14 +28,18 @@ export function Banner({ children, tone = 'warning' }: { children: ReactNode; to
   );
 }
 
-// Shown while any request waits for the connection (see fetchWithRetry).
+function subscribeToConnection(onChange: () => void): () => void {
+  return onConnectionWaiting(() => onChange());
+}
+
+// Shown while any request waits for the connection (see fetchWithRetry). It reads
+// the current state when it is drawn: a page may start requests before React draws it.
+// Like the old page's banner, the element is always there, hidden with "hidden".
 export function ConnectionBanner({ text }: { text: string }) {
-  const [waiting, setWaiting] = useState(false);
-  useEffect(() => onConnectionWaiting(setWaiting), []);
-  if (!waiting) return null;
+  const waiting = useSyncExternalStore(subscribeToConnection, isConnectionWaiting);
   return (
-    <div id="connection-banner">
-      <Banner>{text}</Banner>
+    <div id="connection-banner" className={waiting ? '' : 'hidden'}>
+      {waiting ? <Banner>{text}</Banner> : null}
     </div>
   );
 }
