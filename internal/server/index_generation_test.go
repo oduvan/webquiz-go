@@ -315,7 +315,7 @@ func TestSpecialCharactersInQuizData(t *testing.T) {
 // Python looked for user-select: none, a copy listener and a
 // .text-answer-input rule in the page's inline script and style. The Go page
 // keeps them in its built files (assets/*.css and *.js). While the quiz page
-// is still a placeholder (Task 14 builds it), the test skips.
+// is still the placeholder (Task 14 builds it), the test skips; a real page without the rules fails.
 // py: tests/test_index_generation.py::test_question_text_copy_prevention
 func TestQuestionTextCopyPrevention(t *testing.T) {
 	t.Parallel()
@@ -330,10 +330,15 @@ func TestQuestionTextCopyPrevention(t *testing.T) {
 		all.Write(res.Body)
 	}
 	assets := all.String()
-	if !regexp.MustCompile(`user-select:\s*none`).MatchString(assets) {
-		t.Skip("the quiz page is not built yet (Task 14): no user-select rule in its files")
+	if strings.Contains(assets, "Placeholder page") {
+		t.Skip("the quiz page is still the placeholder (Task 14 builds it)")
 	}
-	if !regexp.MustCompile(`addEventListener\(\s*["']copy["']`).MatchString(assets) && !strings.Contains(assets, "onCopy") {
+	if !regexp.MustCompile(`user-select:\s*none`).MatchString(assets) {
+		t.Error("should have user-select: none to prevent text selection")
+	}
+	// A copy handler: addEventListener("copy" ...) or React's onCopy prop
+	// (minified bundles keep the property name "onCopy" in a props object).
+	if !regexp.MustCompile(`addEventListener\(\s*["']copy["']|onCopy\s*:`).MatchString(assets) {
 		t.Error("should have a copy event handler to prevent copying")
 	}
 	if !strings.Contains(assets, "text-answer-input") {

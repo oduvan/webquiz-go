@@ -9,6 +9,9 @@ import (
 
 func paFieldsServer(t *testing.T, quizzes map[string]any, fields ...any) *testutil.TestServer {
 	t.Helper()
+	if fields == nil {
+		fields = []any{} // fields: [] in the YAML, as Python sent, not null
+	}
 	return testutil.StartServer(t, testutil.Options{
 		Config:        map[string]any{"registration": map[string]any{"fields": fields}},
 		Quizzes:       quizzes,
@@ -248,5 +251,3 @@ func TestUserCSVStatistics(t *testing.T) {
 		t.Errorf("row: %v", row)
 	}
 }
-
-var _ = testutil.Options{}

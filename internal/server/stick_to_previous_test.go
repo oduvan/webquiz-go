@@ -45,9 +45,23 @@ func paOrdersOf(t *testing.T, ts *testutil.TestServer, n int) [][]int {
 	return out
 }
 
-// paFollows reports whether question b is directly after question a.
-func paFollows(order []int, a, b int) bool {
-	return slices.Index(order, b) == slices.Index(order, a)+1
+// paFollows reports whether question b is directly after question a. Like
+// Python's order.index(), it fails the test when an id is missing, and when
+// the order is not a permutation of 1..len(order).
+func paFollows(t *testing.T, order []int, a, b int) bool {
+	t.Helper()
+	sorted := slices.Clone(order)
+	slices.Sort(sorted)
+	for i, id := range sorted {
+		if id != i+1 {
+			t.Fatalf("order %v is not a permutation of 1..%d", order, len(order))
+		}
+	}
+	ia, ib := slices.Index(order, a), slices.Index(order, b)
+	if ia < 0 || ib < 0 {
+		t.Fatalf("question %d or %d is missing from order %v", a, b, order)
+	}
+	return ib == ia+1
 }
 
 func paStickyServer(t *testing.T, quiz map[string]any) *testutil.TestServer {
@@ -78,7 +92,7 @@ func TestSimpleStickyPair(t *testing.T) {
 	t.Parallel()
 	ts := paStickyServer(t, paStickyQuiz("Sticky Pair Quiz", true, paStickyQuestion(1, nil, nil), paStickyQuestion(2, true, nil), paStickyQuestion(3, nil, nil)))
 	for _, order := range paOrdersOf(t, ts, 10) {
-		if !paFollows(order, 1, 2) {
+		if !paFollows(t, order, 1, 2) {
 			t.Errorf("Q2 should follow Q1, got order: %v", order)
 		}
 	}
@@ -89,7 +103,7 @@ func TestStickyChainOfThree(t *testing.T) {
 	t.Parallel()
 	ts := paStickyServer(t, paStickyQuiz("Sticky Chain Quiz", true, paStickyQuestion(1, nil, nil), paStickyQuestion(2, true, nil), paStickyQuestion(3, true, nil), paStickyQuestion(4, nil, nil)))
 	for _, order := range paOrdersOf(t, ts, 10) {
-		if !paFollows(order, 1, 2) || !paFollows(order, 2, 3) {
+		if !paFollows(t, order, 1, 2) || !paFollows(t, order, 2, 3) {
 			t.Errorf("Q1, Q2, Q3 should be consecutive, got order: %v", order)
 		}
 	}
@@ -104,7 +118,7 @@ func TestMultipleStickyGroups(t *testing.T) {
 	t.Parallel()
 	ts := paStickyServer(t, fiveWithGroups())
 	for _, order := range paOrdersOf(t, ts, 10) {
-		if !paFollows(order, 1, 2) || !paFollows(order, 3, 4) || !paFollows(order, 4, 5) {
+		if !paFollows(t, order, 1, 2) || !paFollows(t, order, 3, 4) || !paFollows(t, order, 4, 5) {
 			t.Errorf("groups broken: %v", order)
 		}
 	}
@@ -117,10 +131,12 @@ func TestPositions245Sticky(t *testing.T) {
 	seen := map[string]bool{}
 	for _, order := range paOrdersOf(t, ts, 20) {
 		seen[fmt.Sprint(order)] = true
-		if !paFollows(order, 1, 2) || !paFollows(order, 3, 4) || !paFollows(order, 4, 5) {
+		if !paFollows(t, order, 1, 2) || !paFollows(t, order, 3, 4) || !paFollows(t, order, 4, 5) {
 			t.Errorf("groups broken: %v", order)
 		}
 	}
+	// Python asserted len(orders_seen) >= 1 here (its comment hoped for 2);
+	// this mirrors it. The loop above already checks every order.
 	if len(seen) < 1 {
 		t.Error("should have valid sticky group orderings")
 	}
@@ -201,7 +217,7 @@ func TestStickyWithTextQuestions(t *testing.T) {
 	text := map[string]any{"question": "Q2 (text)", "checker": "assert True", "stick_to_the_previous": true}
 	ts := paStickyServer(t, paStickyQuiz("Mixed Quiz", true, paStickyQuestion(1, nil, nil), text, paStickyQuestion(3, nil, nil)))
 	for _, order := range paOrdersOf(t, ts, 5) {
-		if !paFollows(order, 1, 2) {
+		if !paFollows(t, order, 1, 2) {
 			t.Errorf("Q2 should follow Q1, got: %v", order)
 		}
 	}
@@ -215,7 +231,7 @@ func TestStickyGroupsActuallyShuffle(t *testing.T) {
 	firsts := map[int]bool{}
 	for _, order := range paOrdersOf(t, ts, 20) {
 		firsts[order[0]] = true
-		if !paFollows(order, 1, 2) {
+		if !paFollows(t, order, 1, 2) {
 			t.Errorf("Q2 should follow Q1, got: %v", order)
 		}
 	}
@@ -243,7 +259,7 @@ func TestStickyWithPoints(t *testing.T) {
 	ts := paStickyServer(t, paStickyQuiz("Points Quiz", true, paStickyQuestion(1, nil, map[string]any{"points": 2}),
 		paStickyQuestion(2, true, map[string]any{"points": 3}), paStickyQuestion(3, nil, nil)))
 	for _, order := range paOrdersOf(t, ts, 5) {
-		if !paFollows(order, 1, 2) {
+		if !paFollows(t, order, 1, 2) {
 			t.Errorf("Q2 should follow Q1, got: %v", order)
 		}
 	}

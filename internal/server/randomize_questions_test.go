@@ -33,7 +33,7 @@ func paRandomServer(t *testing.T, quiz map[string]any, config map[string]any) *t
 	return testutil.StartServer(t, testutil.Options{Config: config, Quizzes: map[string]any{"test.yaml": quiz}})
 }
 
-// verifyOrder registers a student and returns the id and the verify-user reply.
+// paRegisterAndVerify registers a student and returns the id and the verify-user reply.
 func paRegisterAndVerify(t *testing.T, ts *testutil.TestServer, name string) (string, map[string]any) {
 	t.Helper()
 	userID := ts.RegisterStudent(t, name)
