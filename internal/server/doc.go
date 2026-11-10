@@ -43,11 +43,14 @@
 //   - websocket.go: the WebSocket hub (serveWebSocket, broadcastLiveStats,
 //     broadcastAdmin).
 //   - tunnel.go: the SSH tunnel manager and its status messages.
+//   - admin_config.go: config save with hot reload and rollback, the version
+//     check and the tunnel buttons. download.go: quiz downloads from ZIP
+//     archives (with the token rules) and /attach/ files.
 //   - admin_auth.go: the admin login (session cookie) and the session check.
 //   - logging.go: the log file logs_dir/NNNN.log in Python's log format.
-//   - Handlers that later tasks build answer 501 until then: admin_quiz.go
-//     (Task 8), admin_config.go (Task 9), files.go and transfer_handlers.go
-//     (Task 10), startup_log.go and network.go (Task 11).
+//   - Handlers that later tasks build answer 501 until then: files.go and
+//     transfer_handlers.go (Task 10), startup_log.go and network.go
+//     (Task 11).
 //
 // Rules for handlers:
 //
@@ -67,10 +70,11 @@
 //   - s.text, s.isTrustedIP and s.validSession take mu themselves. A Go
 //     mutex cannot be locked twice by the same caller, so inside a locked
 //     section read s.translations[key] and s.cfg directly instead.
-//   - Lock order: csvMu, then mu. csvMu lets one CSV flush or one quiz
-//     switch write CSV files at a time. SwitchQuiz takes both itself, so
-//     call it without holding mu (a config save that restarts the quiz, a
-//     file save that reloads it).
+//   - Lock order: configMu, csvMu, then mu. configMu lets one config save
+//     run at a time. csvMu lets one CSV flush or one quiz switch write CSV
+//     files at a time. SwitchQuiz takes csvMu and mu itself, so call it
+//     without holding mu (a config save that restarts the quiz, a file save
+//     that reloads it).
 //   - Checker code may run for 2 seconds, so it never runs under mu:
 //     submit-answer does its checks in a locked step, runs the checker
 //     without the lock, then does the whole order of checks again in a
