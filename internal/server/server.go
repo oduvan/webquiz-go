@@ -84,10 +84,11 @@ type answerResult struct {
 }
 
 // liveState is the state of one question of one student on the live stats
-// page: "think", "ok", "fail" or "timeout", and the seconds it took.
+// page: "think", "ok", "fail" or "timeout", and the seconds it took (null
+// while the student thinks).
 type liveState struct {
 	State     string   `json:"state"`
-	TimeTaken *float64 `json:"time_taken"`
+	TimeTaken *seconds `json:"time_taken"`
 }
 
 // Server is the WebQuiz server, Python's TestingServer.
@@ -130,6 +131,11 @@ type Server struct {
 	startOnce sync.Once
 	closeOnce sync.Once
 
+	// csvMu lets one CSV flush or one choice of new CSV file names (a quiz
+	// switch) happen at a time, so a new run never picks the number of files
+	// that a flush is still writing. Lock order: csvMu, then mu.
+	csvMu sync.Mutex
+
 	mu sync.Mutex
 
 	// Settings that the admin can change while the server runs (config hot reload).
@@ -150,18 +156,26 @@ type Server struct {
 
 	// The state of one quiz run (reset_server_state clears it).
 	users              map[string]*User                 // users: user_id -> student
-	userResponses      []map[string]any                 // user_responses: answers not yet written to the CSV files
+	userOrder          []string                         // the user_ids in the order the students registered (Python's dict order)
+	userResponses      []*answerRow                     // user_responses: answers not yet written to the CSV files
 	userProgress       map[string]int                   // user_progress: user_id -> last answered question id
 	questionStartTimes map[string]time.Time             // question_start_times: user_id -> start of the running question clock
 	currentQuestionIDs map[string]int                   // current_question_ids: user_id -> question whose clock runs
 	quizStartTimes     map[string]time.Time             // quiz_start_times: user_id -> first question-start (whole-quiz clock)
 	questionReadyTimes map[string]time.Time             // question_ready_times: user_id -> when the next question became available
-	userStats          map[string]map[string]any        // user_stats: user_id -> final results of a student who finished
-	userAnswers        map[string][]map[string]any      // user_answers: user_id -> answers for the statistics
+	userStats          map[string]*userStats            // user_stats: user_id -> final results of a student who finished
+	userAnswers        map[string][]*answerRecord       // user_answers: user_id -> answers for the statistics
 	answerResults      map[string]map[int]*answerResult // answer_results: user_id -> question id -> stored reply
 	registrationTokens map[string]string                // registration_tokens: token -> user_id
 	liveStats          map[string]map[int]liveState     // live_stats: user_id -> question id -> state
 	forceAllCompleted  bool                             // force_all_completed: the admin pressed "Show answers"
+
+	// answersBeingChecked counts, per user_id, the answers whose checker runs
+	// right now without the lock (see submitAnswer). The time limit watcher
+	// leaves those students alone until their answer is stored, as Python's
+	// watcher could not run while a checker ran. A quiz switch does not clear
+	// it: it counts requests, not quiz state.
+	answersBeingChecked map[string]int
 }
 
 // tunnelNames are the config values a tunnel status message carries.
@@ -195,6 +209,8 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 		adminSessions: map[string]time.Time{},
 		quiz:          emptyQuiz(),
 		startSettings: map[string]any{},
+
+		answersBeingChecked: map[string]int{},
 	}
 	if s.grace == 0 {
 		s.grace = time.Duration(timelimits.GraceSeconds() * float64(time.Second))
@@ -366,14 +382,15 @@ func (s *Server) shutdown() {
 // previous run. The caller holds mu (or the server is not shared yet).
 func (s *Server) resetStateLocked() {
 	s.users = map[string]*User{}
+	s.userOrder = nil
 	s.userResponses = nil
 	s.userProgress = map[string]int{}
 	s.questionStartTimes = map[string]time.Time{}
 	s.currentQuestionIDs = map[string]int{}
 	s.quizStartTimes = map[string]time.Time{}
 	s.questionReadyTimes = map[string]time.Time{}
-	s.userStats = map[string]map[string]any{}
-	s.userAnswers = map[string][]map[string]any{}
+	s.userStats = map[string]*userStats{}
+	s.userAnswers = map[string][]*answerRecord{}
 	s.answerResults = map[string]map[int]*answerResult{}
 	s.registrationTokens = map[string]string{}
 	s.liveStats = map[string]map[int]liveState{}

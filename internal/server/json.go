@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 
 	"github.com/oduvan/webquiz-go/internal/pyval"
 )
@@ -138,4 +139,113 @@ func writeText(w http.ResponseWriter, status int, text string) {
 // table already points to those handlers.
 func notImplemented(w http.ResponseWriter, _ *http.Request) error {
 	return writeError(w, http.StatusNotImplemented, "not implemented")
+}
+
+// The helpers below give a handler the results and errors of the Python
+// expressions it was written from, for request values decoded by readJSON.
+// A Python handler that failed on a bad request answered 500 with the
+// exception text (error_middleware); returning these errors does the same.
+
+// pyGetItem is Python's data[key]: a KeyError for a missing key, a TypeError
+// when data is not an object.
+func pyGetItem(data any, key string) (any, error) {
+	switch d := data.(type) {
+	case map[string]any:
+		value, ok := d[key]
+		if !ok {
+			return nil, keyError(key)
+		}
+		return value, nil
+	case []any:
+		return nil, errors.New("list indices must be integers or slices, not str")
+	case string:
+		return nil, errors.New("string indices must be integers, not 'str'")
+	}
+	return nil, fmt.Errorf("'%s' object is not subscriptable", pyval.KindOf(data))
+}
+
+// pyGet is Python's data.get(key, fallback).
+func pyGet(data any, key string, fallback any) (any, error) {
+	object, err := pyObject(data)
+	if err != nil {
+		return nil, err
+	}
+	if value, ok := object[key]; ok {
+		return value, nil
+	}
+	return fallback, nil
+}
+
+// pyStrip is Python's value.strip() for a value that should be text.
+func pyStrip(value any) (string, error) {
+	text, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("'%s' object has no attribute 'strip'", pyval.KindOf(value))
+	}
+	return pyval.Strip(text), nil
+}
+
+// pyStrKey is a value used as a key of a dict with text keys (users,
+// registration tokens), as in "user_id in self.users": text is the key, any
+// other value is a key that is never there, and a list or an object is
+// Python's "unhashable type" error.
+func pyStrKey(value any) (key string, ok bool, err error) {
+	switch kind := pyval.KindOf(value); kind {
+	case pyval.KindStr:
+		return value.(string), true, nil
+	case pyval.KindList, pyval.KindDict:
+		return "", false, fmt.Errorf("unhashable type: '%s'", kind)
+	}
+	return "", false, nil
+}
+
+// jsonKeyOrder returns the keys of the object body[field] of a JSON request
+// body in the order they were written. Python's dicts keep that order and
+// its handlers went through the keys in it; a decoded Go map has no order.
+// Repeated keys count once, at their first place; a repeated field counts
+// with its last value, as in Python's json module. It returns nil when the
+// value is not an object.
+func jsonKeyOrder(body []byte, field string) []string {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
+		return nil
+	}
+	var keys []string
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return keys
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return keys
+		}
+		if token == field {
+			keys = objectKeys(value)
+		}
+	}
+	return keys
+}
+
+// objectKeys returns the keys of a JSON object in their order, each once.
+func objectKeys(object []byte) []string {
+	decoder := json.NewDecoder(bytes.NewReader(object))
+	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
+		return nil
+	}
+	keys := []string{}
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return keys
+		}
+		if key, ok := token.(string); ok && !slices.Contains(keys, key) {
+			keys = append(keys, key)
+		}
+		var skip json.RawMessage
+		if err := decoder.Decode(&skip); err != nil {
+			return keys
+		}
+	}
+	return keys
 }
