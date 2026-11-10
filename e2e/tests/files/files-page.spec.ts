@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '../../fixtures/helpers';
 
@@ -41,6 +41,88 @@ test.describe('File manager', () => {
     await expect(page.locator('#quizzes-files .file-item[data-name="test_quiz.yaml"]')).toBeVisible();
     await expect(page.locator('#transfer-panel')).toHaveCount(0);
     await expect(page.locator('.transfer-checkbox')).toHaveCount(0);
+  });
+
+  // Python's test_send_panel_hidden_until_tunnel_connected checked both states of
+  // the panel. The test above and TestSendPanelHiddenUntilTunnelConnected (Go)
+  // check the hidden state; this one checks that the panel and the checkboxes
+  // appear once GET /api/admin/transfer says "available". A real "available"
+  // needs a connected tunnel, so the browser gets a made-up state with the
+  // JSON shape of transfer.State.
+  test('send panel and checkboxes appear when transfer is available, and Send posts the chosen files', async ({ page, server }) => {
+    mkdirSync(path.join(server.dir, 'data'), { recursive: true });
+    writeFileSync(path.join(server.dir, 'data', 'math_0001.csv'), 'user_id,question\r\n100001,What is 2 + 2?\r\n', 'utf-8');
+    await page.route('**/api/admin/transfer', (route) =>
+      route.fulfill({ json: { available: true, name: 'room-a', outgoing: [], incoming: [] } }),
+    );
+    let sendBody: unknown = null;
+    await page.route('**/api/admin/transfer/send', async (route) => {
+      sendBody = route.request().postDataJSON();
+      await route.fulfill({
+        json: {
+          success: true,
+          offer: {
+            id: 'o1',
+            to: 'room-b',
+            files: [
+              { type: 'csv', name: 'math_0001.csv', size: 37, sha256: '' },
+              { type: 'quizzes', name: 'test_quiz.yaml', size: 120, sha256: '' },
+            ],
+            created: '2026-11-10T10:00:00',
+            status: 'waiting',
+          },
+        },
+      });
+    });
+
+    await page.goto(`${server.url}/files/`);
+    await expect(page.locator('#transfer-panel')).toBeVisible();
+    await expect(page.locator('#transfer-own-name')).toHaveText('room-a');
+    await expect(page.locator('#transfer-selected-count')).toHaveText('0 files selected');
+
+    const csvItem = page.locator('#csv-files .file-item[data-name="math_0001.csv"]');
+    await csvItem.locator('.transfer-checkbox').check();
+    await page.locator('.tab[data-tab="quizzes"]').click();
+    const quizItem = page.locator('#quizzes-files .file-item[data-name="test_quiz.yaml"]');
+    await expect(quizItem.locator('.transfer-checkbox')).toBeVisible();
+    await quizItem.locator('.transfer-checkbox').check();
+    await expect(page.locator('#transfer-selected-count')).toHaveText('2 files selected');
+
+    await page.locator('#transfer-target').fill('room-b');
+    await page.locator('#transfer-send-btn').click();
+
+    await expect(page.locator('#message-area .message.success', { hasText: 'Request sent to room-b.' })).toBeVisible();
+    expect(sendBody).toEqual({
+      to: 'room-b',
+      files: [
+        { type: 'csv', name: 'math_0001.csv' },
+        { type: 'quizzes', name: 'test_quiz.yaml' },
+      ],
+    });
+    // A sent offer clears the selection
+    await expect(page.locator('#transfer-selected-count')).toHaveText('0 files selected');
+    await expect(quizItem.locator('.transfer-checkbox')).not.toBeChecked();
+  });
+
+  test('the Text button of a CSV file shows the file text', async ({ page, server }) => {
+    const text = 'user_id,question,selected_answer\r\n100001,"Name the capital, of France",Paris\r\n';
+    mkdirSync(path.join(server.dir, 'data'), { recursive: true });
+    writeFileSync(path.join(server.dir, 'data', 'geo_0001.csv'), text, 'utf-8');
+
+    await page.goto(`${server.url}/files/`);
+    const item = page.locator('#csv-files .file-item[data-name="geo_0001.csv"]');
+    await item.getByRole('button', { name: '📄 Text' }).click();
+
+    const viewer = page.locator('#file-viewer-modal');
+    await expect(viewer).toBeVisible();
+    await expect(viewer.locator('#file-viewer-title')).toHaveText('geo_0001.csv');
+    await expect(viewer.locator('#file-content')).toContainText('user_id,question,selected_answer');
+    await expect(viewer.locator('#file-content')).toContainText('100001,"Name the capital, of France",Paris');
+    // Text view: no table frame
+    await expect(viewer.locator('#csv-table-frame')).toHaveCount(0);
+
+    await viewer.getByRole('button', { name: 'Close' }).click();
+    await expect(viewer).toHaveCount(0);
   });
 
   test('config tab keeps the saved values and unsaved edits across tab changes', async ({ page, server }) => {
