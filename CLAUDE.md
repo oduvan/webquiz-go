@@ -38,7 +38,7 @@ WebQuiz 2.0 is the Go rewrite of the Python/aiohttp WebQuiz 1.19 (<https://githu
 - `e2e/` - Playwright tests; `e2e/fixtures/server.ts` starts the built binary in a temp folder
 - `scripts/screenshots.ts` - takes the screenshots of `docs/imgs` from the real binary
 - `migration/` - `python-tests.txt` (911 ids of the 1.19 tests) and the check that every id is ported (a normal Go test)
-- `harness/` - classroom test harness in TypeScript: a real server, real browsers, a scripted teacher, scripted and AI agent students (`npx tsx harness/run.ts <scenario>`, ports 8199 and 8198). Only `harness/checks.test.ts` runs as a test (`npm --prefix harness test`). See `harness/README.md`
+- `harness/` - classroom test harness in TypeScript: a real server, real browsers, a scripted teacher, scripted and AI agent students (`npx tsx harness/run.ts <scenario>`, ports 8199 and 8198). `harness/matrix.ts` takes scripted students through all pairs of quiz settings and config and checks every screen against 1.19 (free ports, output in `harness/runs/<stamp>-matrix/`). Only `harness/checks.test.ts` and `harness/matrix.test.ts` run as tests (`npm --prefix harness test`). See `harness/README.md`
 - `installer/webquiz.iss` - Inno Setup script for the Windows installer
 - `docs/uk/`, `docs/en/`, `docs/imgs/` - user guide (compiled to PDF with the version)
 - `gh-pages/index.html` - download page template (version placeholder: `{{VERSION}}`); `gh-pages/docs/` - Docsify config (en/, uk/)
