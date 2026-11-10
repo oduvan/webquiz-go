@@ -3,12 +3,16 @@ package server
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -126,30 +130,108 @@ func directoryListing(prefix, folder string, entries []os.DirEntry) string {
 
 // serveAssets serves the files of the web build at /assets/ (the quiz page
 // asks for ./assets/, the admin pages for /assets/). Their names carry a
-// hash of the content, so browsers may keep them for good. A name that is
-// not in the build is looked up in static_dir, as before the pages were built in.
+// hash of the content, so browsers may keep them for good. The build has a
+// gzip copy (name.gz) of most scripts and styles (web/build/gzip.ts): a
+// browser that accepts gzip gets the copy, with Content-Encoding: gzip and
+// the type of the file itself. A name that is not in the build is looked up
+// in static_dir, as before the pages were built in.
 func (s *Server) serveAssets(w http.ResponseWriter, r *http.Request) error {
 	name := strings.TrimPrefix(r.URL.Path, "/")
 	if !fs.ValidPath(name) {
 		return s.serveStatic(w, r)
 	}
-	file, err := s.pages.Open(name)
-	if err != nil {
+	file, _, ok := openBuildFile(s.pages, name)
+	if !ok {
 		return s.serveStatic(w, r)
 	}
 	defer file.Close()
+	content, err := seekable(file)
+	if err != nil {
+		return err
+	}
+	header := w.Header()
+	if packed, packedSize, ok := openBuildFile(s.pages, name+".gz"); ok {
+		defer packed.Close()
+		header.Add("Vary", "Accept-Encoding")
+		// ServeContent takes the type from the extension of the file's own
+		// name, so the answer has the type of the file, not of gzip data.
+		// When the extension names no type, ServeContent would look at the
+		// gzip data instead, so such a file is sent as it is.
+		if mime.TypeByExtension(path.Ext(name)) != "" && acceptsGzip(r.Header) {
+			if content, err = seekable(packed); err != nil {
+				return err
+			}
+			header.Set("Content-Encoding", "gzip")
+			// ServeContent leaves Content-Length out when Content-Encoding is set.
+			header.Set("Content-Length", strconv.FormatInt(packedSize, 10))
+		}
+	}
+	header.Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeContent(w, r, path.Base(name), time.Time{}, content)
+	return nil
+}
+
+// openBuildFile opens a file (not a folder) of the web build and gives its size.
+func openBuildFile(pages fs.FS, name string) (fs.File, int64, bool) {
+	file, err := pages.Open(name)
+	if err != nil {
+		return nil, 0, false
+	}
 	info, err := file.Stat()
 	if err != nil || info.IsDir() {
-		return s.serveStatic(w, r)
+		file.Close()
+		return nil, 0, false
 	}
-	content, ok := file.(interface {
-		Read([]byte) (int, error)
-		Seek(int64, int) (int64, error)
-	})
+	return file, info.Size(), true
+}
+
+// seekable gives the file as an io.ReadSeeker, which ServeContent needs.
+// The files of embed.FS and fstest.MapFS can seek.
+func seekable(file fs.File) (io.ReadSeeker, error) {
+	content, ok := file.(io.ReadSeeker)
 	if !ok {
-		return errors.New("the web build cannot seek its files")
+		return nil, errors.New("the web build cannot seek its files")
 	}
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	http.ServeContent(w, r, info.Name(), time.Time{}, content)
-	return nil
+	return content, nil
+}
+
+// acceptsGzip tells whether a request's Accept-Encoding allows gzip
+// (RFC 9110, section 12.5.3). A "gzip" (or "x-gzip") entry decides with its
+// weight: "gzip;q=0" means no. Without such an entry, a "*" entry decides the
+// same way. No header, or only other codings such as "identity", means no.
+func acceptsGzip(header http.Header) bool {
+	gzipWeight, anyWeight := -1.0, -1.0 // -1: not in the header
+	for _, value := range header.Values("Accept-Encoding") {
+		for _, entry := range strings.Split(value, ",") {
+			coding, params, _ := strings.Cut(entry, ";")
+			switch strings.ToLower(strings.TrimSpace(coding)) {
+			case "gzip", "x-gzip":
+				gzipWeight = max(gzipWeight, codingWeight(params))
+			case "*":
+				anyWeight = max(anyWeight, codingWeight(params))
+			}
+		}
+	}
+	if gzipWeight >= 0 {
+		return gzipWeight > 0
+	}
+	return anyWeight > 0
+}
+
+// codingWeight reads the weight ("q=0.5") from the parameters of one
+// Accept-Encoding entry: 1 without a weight, 0 for a weight that is not a
+// number above 0.
+func codingWeight(params string) float64 {
+	for _, param := range strings.Split(params, ";") {
+		key, value, found := strings.Cut(param, "=")
+		if !found || !strings.EqualFold(strings.TrimSpace(key), "q") {
+			continue
+		}
+		weight, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err != nil || !(weight > 0) {
+			return 0
+		}
+		return weight
+	}
+	return 1
 }

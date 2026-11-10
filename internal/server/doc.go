@@ -22,7 +22,8 @@
 //   - pages.go: the boot data of each page (QuizBoot, AdminBoot, FilesBoot,
 //     LiveStatsBoot, CSVTableBoot), renderPage, the quiz page file
 //     static_dir/index.html, the admin pages.
-//   - static.go: "/", /imgs/, /assets/ and the static folder.
+//   - static.go: "/", /imgs/, /assets/ (with the gzip copies of the build)
+//     and the static folder.
 //   - quizload.go: choosing the quiz at start, SwitchQuiz, start settings
 //     (checked and applied), the log warnings for checkers that do not compile.
 //   - student.go: the student API (register, update-registration,

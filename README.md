@@ -14,6 +14,7 @@ This is version 2.0, written in Go. It is one program file with no other parts t
 - Live statistics page that shows how every student is doing.
 - Results are saved as CSV files. You can open them in Excel or Google Sheets.
 - Quiz page in Ukrainian or English.
+- Small downloads: the scripts and styles of the pages are sent gzip-compressed, about 70% smaller. This helps on slow Wi-Fi, for example with a Raspberry Pi.
 - Optional SSH tunnel to reach the quiz from outside the local network, and sending files to another WebQuiz server.
 
 ## Download and run
