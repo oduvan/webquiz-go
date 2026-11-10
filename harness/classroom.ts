@@ -40,7 +40,9 @@ const LOOK_JS = String.raw`() => {
   const inputs = [];
   document.querySelectorAll('input[type=text], input:not([type]), textarea').forEach(el => {
     if (!visible(el)) return;
-    inputs.push({kind: el.tagName.toLowerCase(), label: el.placeholder || el.id || '', value: el.value, disabled: el.disabled});
+    const own = el.id ? document.querySelector('label[for="' + el.id + '"]') : null;
+    const label = own && own.innerText.trim() ? own.innerText.trim() : (el.placeholder || el.id || '');
+    inputs.push({kind: el.tagName.toLowerCase(), label, value: el.value, disabled: el.disabled});
   });
   return {text, clickable, inputs};
 }`;
@@ -464,13 +466,25 @@ export class Classroom {
       return `clicked '${label}'`;
     }
     if (cmd === 'type') {
+      // The answer box; else the first empty field of a form (the name, then the other fields in turn)
       let field = page.locator('textarea:visible:enabled');
       if ((await field.count()) === 0) {
         field = page.locator('input[type=text]:visible:enabled, input:not([type]):visible:enabled');
       }
-      if ((await field.count()) === 0) throw new Error('no place to type on the screen');
-      await field.first().fill(String(arg ?? ''));
-      return `typed '${arg}'`;
+      const count = await field.count();
+      if (count === 0) throw new Error('no place to type on the screen');
+      let target = field.first();
+      for (let i = 0; i < count; i++) {
+        if ((await field.nth(i).inputValue()) === '') {
+          target = field.nth(i);
+          break;
+        }
+      }
+      const name = await target.evaluate(
+        (el) => (el.id && document.querySelector(`label[for="${el.id}"]`)?.textContent?.trim()) || (el as HTMLInputElement).placeholder || el.id || 'the field',
+      );
+      await target.fill(String(arg ?? ''));
+      return `typed '${arg}' into ${name}`;
     }
     if (cmd === 'wait') {
       const seconds = Math.min(Number(arg || 1), 90);

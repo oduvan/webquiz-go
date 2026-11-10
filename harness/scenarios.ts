@@ -748,7 +748,7 @@ const FIRST_LESSON: TeacherScenario = {
         '2. Create a new quiz. File name: "first-lesson". Title: "Перший урок". It has three questions:',
         '   - question 1 has one correct answer: "Скільки буде 2 + 3?" with the options "4", "5" and "6"; the correct one is "5";',
         '   - question 2 has several correct answers: "Які з цих чисел парні?" with the options "2", "3", "4" and "7"; the correct ones are "2" and "4";',
-        '   - question 3 has a text answer: "Скільки годин у добі?"; the correct value is "24".',
+        '   - question 3 has a text answer: "Скільки годин у добі?"; the correct value is "24" (make sure that the answer 24 counts as correct).',
         '   Save the quiz.',
         '3. Start this quiz with 30 seconds for each question and with the correct answers shown to the students.',
         '4. Run `students 5` so that five students join.',

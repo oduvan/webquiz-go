@@ -363,7 +363,10 @@ export const COLLECT_JS = String.raw`(options) => {
   };
   // A class that names what the element does (not a style class like "px-4")
   const STYLE_CLASS = /^(cursor|rounded|bg|text|px|py|pt|pb|pl|pr|p|m|mx|my|mt|mb|ml|mr|w|h|min|max|flex|grid|gap|border|font|leading|whitespace|hover|disabled|dark|md|shadow|opacity|no|inline|block|items|justify|overflow|sticky|top|left|right|bottom|z|transition|break|order|basis|self|space|hidden|active|selected)(-|$)/;
-  const meaningfulClass = (el) => [...el.classList].find((c) => /[a-z]/.test(c) && !c.includes(':') && !c.includes('[') && !STYLE_CLASS.test(c)) || '';
+  const meaningfulClass = (el) =>
+    [...el.classList]
+      .filter((c) => /[a-z]/.test(c) && !c.includes(':') && !c.includes('[') && !STYLE_CLASS.test(c))
+      .sort((a, b) => b.length - a.length)[0] || '';
 
   const kindOf = (el) => {
     const tag = el.tagName.toUpperCase();
@@ -402,8 +405,18 @@ export const COLLECT_JS = String.raw`(options) => {
       item.label = ownText(el) || aria || attr(el, 'title');
     }
     if (kind === 'clickable' && hasWord(item.label)) {
-      // "☰ ▼ 1. Question" -> "1. Question": signs without words say nothing
-      item.label = item.label.split(' ').filter((part) => hasWord(part)).join(' ');
+      // "☰ ▼ 1. Question" -> "1. Question": signs before the first word say nothing
+      const parts = item.label.split(' ');
+      while (parts.length && !hasWord(parts[0])) parts.shift();
+      item.label = parts.join(' ');
+    }
+    {
+      // A picture and its file name often say the same: "sun.png sun.png" -> "sun.png"
+      const parts = item.label.split(' ');
+      const half = parts.length / 2;
+      if (parts.length >= 2 && parts.length % 2 === 0 && parts.slice(0, half).join(' ') === parts.slice(half).join(' ')) {
+        item.label = parts.slice(0, half).join(' ');
+      }
     }
     if (!hasWord(item.label)) {
       const title = attr(el, 'title') || (aria !== item.label ? aria : '');
@@ -487,23 +500,43 @@ export const COLLECT_JS = String.raw`(options) => {
   };
   const groups = new Map();
   items.forEach((item, index) => {
-    const key = item.kind + '\u0000' + item.label;
+    // Fields with the same label but different text in them are told apart by the text
+    const key = item.kind + '\u0000' + item.label + (item.value ? '\u0000' + item.value : '');
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(index);
   });
+  // The largest box around el that holds none of the others
+  const ownBox = (el, others) => {
+    let box = el;
+    while (box.parentElement && box.parentElement !== body && box.parentElement !== root &&
+           !others.some((other) => other !== el && box.parentElement.contains(other))) {
+      box = box.parentElement;
+    }
+    return box;
+  };
   for (const indexes of groups.values()) {
     const unnamed = !hasWord(items[indexes[0]].label) && !items[indexes[0]].hint;
     if (indexes.length < 2 && !unnamed) continue;
     const twins = indexes.map((i) => list[i]);
-    indexes.forEach((i, k) => {
+    const nears = indexes.map((i) => {
       const el = list[i];
-      let box = el;
-      while (box.parentElement && box.parentElement !== body && box.parentElement !== root &&
-             !twins.some((other) => other !== el && box.parentElement.contains(other))) {
-        box = box.parentElement;
-      }
+      let box = ownBox(el, twins);
       if (indexes.length === 1 && box !== el) box = el.parentElement || box;
-      let near = box === el ? '' : boxName(box, el);
+      return box === el ? '' : boxName(box, el);
+    });
+    // Twins whose boxes have the same name (the image field of every question): name a bigger box too
+    const plainNears = [...nears];
+    plainNears.forEach((near, k) => {
+      if (!near) return;
+      const same = indexes.filter((_, j) => plainNears[j] === near).map((i) => list[i]);
+      if (same.length < 2) return;
+      const el = list[indexes[k]];
+      const outer = ownBox(el, same);
+      const outerName = outer === el ? '' : boxName(outer, el);
+      if (outerName && outerName !== near) nears[k] = outerName + ' › ' + near;
+    });
+    indexes.forEach((i, k) => {
+      let near = nears[k];
       if (!near && indexes.length > 1) near = 'number ' + (k + 1) + ' of ' + indexes.length + ' with this name';
       if (near) items[i].near = near;
     });

@@ -14,7 +14,7 @@ Commands:
 - `open` — open the quiz page
 - `look` — show the screen again without doing anything
 - `click "<text>"` — click the button or answer option with this text (copy the text from CLICKABLE)
-- `type "<text>"` — type into the answer box or the name field
+- `type "<text>"` — type into the answer box, or into the first empty field of a form (TYPE INTO shows the fields)
 - `wait <seconds>` — wait, up to 90 seconds
 - `reload` — reload the page
 - `offline <seconds>` — turn the Wi-Fi off for that many seconds (it comes back by itself; the command returns at once)
@@ -24,9 +24,9 @@ Every command prints `STEP <n>`, the time, what happened, the text on the SCREEN
 
 ## What to do
 
-1. `open`, then `type "{name}"`, then click the registration button.
-2. Answer the questions as your persona would. The quiz is in Ukrainian; answer with your best guess. To answer: click an option (or type into the answer box), then click the submit button "Відправити відповідь". If a "Продовжити" (Continue) button appears, click it to go on.
-3. Stop when the screen shows your result ("Результат:"), or when you cannot go on. Use at most 60 commands.
+1. `open`, then `type "{name}"`, then click the registration button. If the form has more fields (TYPE INTO lists them), run `type` once more for each of them before you click the button: each `type` fills the next empty field.
+2. Answer the questions as your persona would. The quiz is usually in Ukrainian (in an English quiz the buttons are "Register", "Submit answer", "Continue" and "Next"); answer with your best guess. To answer: click an option (or type into the answer box), then click the submit button "Відправити відповідь". If a "Продовжити" (Continue) or "Далі" (Next) button appears, click it to go on. An option that is a picture shows in CLICKABLE as `[image circle.png]`: click it with exactly that text.
+3. Stop when the screen shows your result ("Результат:" or "Result:"), or when you cannot go on. Use at most 60 commands.
 
 Use only this tool. Do not read files, code or anything else.
 
