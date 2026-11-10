@@ -17,9 +17,10 @@ import (
 // flush_responses_to_csv, _append_answers_with_users_csv and
 // flush_users_to_csv). Each run of a quiz writes to csv_dir:
 //
-//   - <quiz>_NNNN.csv: one row per answer, appended every 5 seconds;
+//   - <quiz>_NNNN.csv: one row per answer, appended at every flush
+//     (Options.FlushInterval, 5 seconds);
 //   - <quiz>_NNNN.users.csv: one row per student with the statistics,
-//     written again every 5 seconds;
+//     written again at every flush;
 //   - <quiz>_NNNN.answers_with_users.csv (extra_answers_with_users_csv only):
 //     the answer rows with the student's name and registration fields.
 //
@@ -202,7 +203,7 @@ func (s *Server) takeResponsesLocked() (responsesSnapshot, bool) {
 
 // flushResponsesToCSV is flush_responses_to_csv: it appends the answers that
 // wait in memory to the answers CSV (and to the answers_with_users CSV). The
-// flush loop calls it every 5 seconds and Close once more.
+// flush loop calls it every s.flushInterval (5 s) and Close once more.
 func (s *Server) flushResponsesToCSV() error {
 	s.csvMu.Lock()
 	defer s.csvMu.Unlock()

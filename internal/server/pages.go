@@ -156,8 +156,8 @@ const (
 	bootMarker  = bootOpen + "__WEBQUIZ_BOOT__</script>"
 )
 
-// templateErrorHTML is templates/template_error.html of the Python version:
-// the page shown when a page of the web build is missing.
+// templateErrorHTML is templates/template_error.html of the Python version,
+// unchanged: the page shown when a page of the web build is missing.
 const templateErrorHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -167,6 +167,9 @@ const templateErrorHTML = `<!DOCTYPE html>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        input { padding: 10px; width: 300px; margin: 10px 0; border: 1px solid #ddd; border-radius: 3px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -385,11 +388,14 @@ func (s *Server) servePage(w http.ResponseWriter, file, title string, boot any) 
 // serveAdminPage is serve_admin_page (/admin/).
 func (s *Server) serveAdminPage(w http.ResponseWriter, r *http.Request) error {
 	trusted := s.isTrustedIP(getClientIP(r))
-	s.mu.Lock()
-	serverConfig := s.cfg.Server
-	quizzes := slices.Clone(s.cfg.Quizzes)
-	publicKeyPath := s.cfg.Tunnel.PublicKey
-	s.mu.Unlock()
+	var serverConfig config.ServerConfig
+	var quizzes []config.DownloadableQuiz
+	var publicKeyPath string
+	s.withLock(func() {
+		serverConfig = s.cfg.Server
+		quizzes = slices.Clone(s.cfg.Quizzes)
+		publicKeyPath = s.cfg.Tunnel.PublicKey
+	})
 
 	boot := AdminBoot{
 		IsTrustedIP:         trusted,
@@ -440,9 +446,8 @@ func (s *Server) tunnelPublicKey(path string) string {
 // serveFilesPage is serve_files_page (/files/).
 func (s *Server) serveFilesPage(w http.ResponseWriter, r *http.Request) error {
 	trusted := s.isTrustedIP(getClientIP(r))
-	s.mu.Lock()
-	path := s.cfg.ConfigPath
-	s.mu.Unlock()
+	var path string
+	s.withLock(func() { path = s.cfg.ConfigPath })
 	boot := FilesBoot{IsTrustedIP: trusted}
 	if path != "" {
 		content, data := s.readConfigForForm(path)

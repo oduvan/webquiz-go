@@ -45,6 +45,13 @@
 //   - mu guards all state. Do the state work under mu, and let it go before
 //     slow work (HTTP calls, big file writes). Broadcast while holding mu,
 //     right after the change: broadcasting only queues the message.
+//   - Release mu with defer: s.withLock(func() { ... }), or a small function
+//     that starts with s.mu.Lock() and defer s.mu.Unlock(). A panic is
+//     recovered (500 for that request), and without the defer it would leave
+//     mu locked, so every later request would wait forever.
+//   - s.text, s.isTrustedIP and s.validSession take mu themselves. A Go
+//     mutex cannot be locked twice by the same caller, so inside a locked
+//     section read s.translations[key] and s.cfg directly instead.
 //   - Use s.now() for times, s.grace and s.checkInterval for time limits, and
 //     s.ctx for work that must outlive a request (tunnel.Manager.Connect).
 //   - Texts for students and API errors come from s.translations (or s.text).

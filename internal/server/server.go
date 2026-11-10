@@ -41,9 +41,9 @@ func init() {
 // after the time limit is late.
 const NoGrace time.Duration = -1
 
-// flushInterval is how often answers and users are written to the CSV files
-// (periodic_flush).
-const flushInterval = 5 * time.Second
+// DefaultFlushInterval is how often answers and users are written to the
+// CSV files (periodic_flush).
+const DefaultFlushInterval = 5 * time.Second
 
 // Options are settings of a server that do not come from webquiz.yaml.
 type Options struct {
@@ -55,6 +55,10 @@ type Options struct {
 	// CheckInterval is how often the time limit watcher runs. Zero means
 	// timelimits.CheckInterval() (WEBQUIZ_TIME_LIMIT_CHECK_INTERVAL, 1 s).
 	CheckInterval time.Duration
+	// FlushInterval is how often waiting answers and the users are written to
+	// the CSV files. Zero means DefaultFlushInterval (5 s, as in Python);
+	// tests make it short so they need not wait.
+	FlushInterval time.Duration
 	// Now is the clock (nil: time.Now). Tests can move time with it.
 	Now func() time.Time
 	// Logger gets every log line in addition to the log file in logs_dir.
@@ -101,6 +105,7 @@ type Server struct {
 	// Fixed when the server is made.
 	grace         time.Duration
 	checkInterval time.Duration
+	flushInterval time.Duration
 	now           func() time.Time
 	pages         fs.FS
 	log           *slog.Logger
@@ -197,6 +202,7 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 	s := &Server{
 		grace:         opts.Grace,
 		checkInterval: opts.CheckInterval,
+		flushInterval: opts.FlushInterval,
 		now:           opts.Now,
 		pages:         opts.Pages,
 		quizzesDir:    own.Paths.QuizzesDir,
@@ -220,6 +226,9 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 	}
 	if s.checkInterval <= 0 {
 		s.checkInterval = timelimits.CheckInterval()
+	}
+	if s.flushInterval <= 0 {
+		s.flushInterval = DefaultFlushInterval
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -298,13 +307,14 @@ func (s *Server) Handler() http.Handler { return s.handler }
 // LogFile is the path of this server's log file.
 func (s *Server) LogFile() string { return s.logFile }
 
-// Start runs the background work of create_app: the CSV flush every 5
-// seconds (periodic_flush) and the time limit watcher (time_limit_watcher).
+// Start runs the background work of create_app: the CSV flush every
+// Options.FlushInterval (periodic_flush) and the time limit watcher
+// (time_limit_watcher).
 // It returns at once. The work stops when ctx ends or Close is called. A
 // second Start does nothing.
 func (s *Server) Start(ctx context.Context) {
 	s.startOnce.Do(func() {
-		s.loops.Go(func() { s.every(ctx, flushInterval, s.flushCSV) })
+		s.loops.Go(func() { s.every(ctx, s.flushInterval, s.flushCSV) })
 		s.loops.Go(func() {
 			s.every(ctx, s.checkInterval, func() { s.runSafely("check_time_limits", func() error { return s.checkTimeLimits(s.now()) }) })
 		})
@@ -376,6 +386,15 @@ func (s *Server) shutdown() {
 	if s.logOut != nil {
 		_ = s.logOut.close()
 	}
+}
+
+// withLock runs fn while holding mu. The deferred unlock keeps mu free when
+// fn panics: the panic then fails only this request (a 500), as an exception
+// did in Python, instead of leaving every later request waiting for mu.
+func (s *Server) withLock(fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fn()
 }
 
 // resetStateLocked is reset_server_state: it forgets every student of the

@@ -92,10 +92,14 @@ func (h *wsHub) add(c *wsClient, initial []byte) bool {
 
 // done removes a client that has finished.
 func (h *wsHub) done(c *wsClient) {
-	h.mu.Lock()
-	delete(h.clients, c)
-	h.mu.Unlock()
+	h.remove(c)
 	h.wg.Done()
+}
+
+func (h *wsHub) remove(c *wsClient) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.clients, c)
 }
 
 // count is the number of connected clients.
@@ -113,37 +117,47 @@ func (h *wsHub) broadcast(message any) {
 		h.log.Error(fmt.Sprintf("Failed to encode a %s message: %v", h.sendName, err))
 		return
 	}
-	var dropped []*wsClient
-	h.mu.Lock()
-	for c := range h.clients {
-		if !c.queue(data) {
-			delete(h.clients, c)
-			dropped = append(dropped, c)
-		}
-	}
-	h.mu.Unlock()
-	for _, c := range dropped {
+	for _, c := range h.queueAll(data) {
 		h.log.Warn(fmt.Sprintf("Failed to send message to %s client: too many messages are waiting", h.sendName))
 		c.stop()
 		_ = c.conn.CloseNow()
 	}
 }
 
+// queueAll queues data for every client and returns (and forgets) the
+// clients whose queue was full.
+func (h *wsHub) queueAll(data []byte) (dropped []*wsClient) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.clients {
+		if !c.queue(data) {
+			delete(h.clients, c)
+			dropped = append(dropped, c)
+		}
+	}
+	return dropped
+}
+
 // closeAll disconnects every client, turns new clients away and waits until
 // the goroutines of the clients have finished.
 func (h *wsHub) closeAll() {
+	for _, c := range h.closeHub() {
+		c.stop()
+		_ = c.conn.CloseNow()
+	}
+	h.wg.Wait()
+}
+
+// closeHub turns new clients away and returns the connected ones.
+func (h *wsHub) closeHub() []*wsClient {
 	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.closed = true
 	clients := make([]*wsClient, 0, len(h.clients))
 	for c := range h.clients {
 		clients = append(clients, c)
 	}
-	h.mu.Unlock()
-	for _, c := range clients {
-		c.stop()
-		_ = c.conn.CloseNow()
-	}
-	h.wg.Wait()
+	return clients
 }
 
 // serveWebSocket is _handle_websocket_connection: it accepts the WebSocket,
@@ -158,17 +172,13 @@ func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request, hub *wsH
 		return nil // Accept has answered the request
 	}
 	c := &wsClient{conn: conn, send: make(chan []byte, wsQueueSize), done: make(chan struct{})}
-
-	s.mu.Lock()
-	initial, err := encodeJSON(initialState())
-	if err != nil {
-		s.log.Error(fmt.Sprintf("Error sending initial state to %s client: %v", hub.connName, err))
-		initial = nil
-	}
-	added := hub.add(c, initial)
-	s.mu.Unlock()
-	if !added {
-		_ = conn.CloseNow()
+	joined := false
+	defer func() {
+		if !joined {
+			_ = conn.CloseNow() // also when initialState panicked
+		}
+	}()
+	if joined = s.joinHub(hub, c, initialState); !joined {
 		return nil
 	}
 	s.log.Info(fmt.Sprintf("New %s client connected. Total clients: %d", hub.connName, hub.count()))
@@ -202,6 +212,19 @@ func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request, hub *wsH
 			return nil
 		}
 	}
+}
+
+// joinHub takes the initial state and adds the client to the hub in one
+// step under mu (see broadcastLiveStats). It is false when the hub is closed.
+func (s *Server) joinHub(hub *wsHub, c *wsClient, initialState func() any) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock() // a panic in initialState must not leave mu locked
+	initial, err := encodeJSON(initialState())
+	if err != nil {
+		s.log.Error(fmt.Sprintf("Error sending initial state to %s client: %v", hub.connName, err))
+		initial = nil
+	}
+	return hub.add(c, initial)
 }
 
 // writeMessages sends the client's queued messages in order until the

@@ -1,16 +1,25 @@
 package testutil
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"log/slog"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/oduvan/webquiz-go/internal/pyval"
+	"github.com/oduvan/webquiz-go/internal/server"
 )
 
 // The YAML that tests write must read back (with PyYAML's rules) as the
@@ -151,6 +160,58 @@ func TestQuizzesAsRawText(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(ts.QuizzesDir, "raw.yaml"))
 	if !strings.Contains(string(data), "correct_answer: 1.0") {
 		t.Errorf("raw text changed: %s", data)
+	}
+}
+
+// ServerOptions reach server.New; Env still wins for the time limit values.
+func TestServerOptionsPassThrough(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	var mu sync.Mutex
+	ts := StartServer(t, Options{
+		ServerOptions: server.Options{
+			Logger:        slog.New(slog.NewTextHandler(&lockedBuffer{mu: &mu, buf: &logs}, nil)),
+			FlushInterval: 20 * time.Millisecond,
+			Now:           func() time.Time { return time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC) },
+		},
+		Env: map[string]string{"WEBQUIZ_TIME_LIMIT_GRACE_SECONDS": "0"},
+	})
+	ts.GetJSON(t, "/")
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.Contains(logs.String(), "Switched to quiz: test_quiz.yaml") {
+		t.Errorf("the given Logger got no log lines:\n%s", logs.String())
+	}
+}
+
+type lockedBuffer struct {
+	mu  *sync.Mutex
+	buf *bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+// Bodies go out through json.Marshal: a whole float loses its ".0", and
+// json.Number keeps the text as written (how a test sends 1.0).
+func TestJSONBodies(t *testing.T) {
+	t.Parallel()
+	echo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		w.Header().Set("X-Content-Type", r.Header.Get("Content-Type"))
+		_, _ = w.Write(body)
+	}))
+	defer echo.Close()
+	client := &Client{BaseURL: echo.URL, HTTP: echo.Client()}
+	res := client.PostJSON(t, "/", map[string]any{"float": 1.0, "number": json.Number("1.0")})
+	if res.Text() != `{"float":1,"number":1.0}` || res.Header.Get("X-Content-Type") != "application/json" {
+		t.Errorf("JSON body %s (%s)", res.Body, res.Header.Get("X-Content-Type"))
+	}
+	if res := client.PostJSON(t, "/", `{"raw": 1.0}`); res.Text() != `{"raw": 1.0}` || res.Header.Get("X-Content-Type") != "" {
+		t.Errorf("raw body %s (%s)", res.Body, res.Header.Get("X-Content-Type"))
 	}
 }
 

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -132,6 +134,15 @@ func TestRenderPageMissingEntryGivesTemplateError(t *testing.T) {
 	page, err = renderPage(broken, "index.html", "T", struct{}{}, false)
 	if err == nil || !strings.Contains(string(page), "Template Error") {
 		t.Errorf("a page without the markers must give the template error page, got %v:\n%s", err, page)
+	}
+}
+
+// The template error page is an unchanged copy of the Python file
+// webquiz/templates/template_error.html (sha256 of that file).
+func TestTemplateErrorPageIsPythonsFile(t *testing.T) {
+	sum := sha256.Sum256([]byte(templateErrorHTML))
+	if got := hex.EncodeToString(sum[:]); got != "c1e1c5752b143cf6fe14f227db237a9ce1ce017b791f5c0803d4e4e433c112bc" {
+		t.Errorf("templateErrorHTML differs from template_error.html of WebQuiz 1.19 (sha256 %s)", got)
 	}
 }
 

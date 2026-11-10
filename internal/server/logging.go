@@ -178,10 +178,19 @@ func generateLogPath(logsDir string) (string, error) {
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		return "", err
 	}
+	return firstFreeLogPath(logsDir, os.Lstat), nil
+}
+
+// firstFreeLogPath returns logsDir/NNNN.log for the first number that lstat
+// does not find. Only a file that lstat finds counts as taken: any error
+// counts as free, like Python's os.path.exists, so that opening the file
+// reports the real problem (no permission, a path that is too long) instead
+// of a search that never ends.
+func firstFreeLogPath(logsDir string, lstat func(string) (os.FileInfo, error)) string {
 	for suffix := 1; ; suffix++ {
 		path := filepath.Join(logsDir, fmt.Sprintf("%04d.log", suffix))
-		if _, err := os.Lstat(path); os.IsNotExist(err) {
-			return path, nil
+		if _, err := lstat(path); err != nil {
+			return path
 		}
 	}
 }
@@ -191,19 +200,22 @@ func generateLogPath(logsDir string) (string, error) {
 // like Python's StreamHandler).
 func openLog(logsDir string, extra *slog.Logger) (path string, out *lockedWriter, logger *slog.Logger, err error) {
 	var file *os.File
+	previous := ""
 	for {
 		path, err = generateLogPath(logsDir)
 		if err != nil {
 			return "", nil, nil, err
 		}
-		// O_EXCL: when another server took this number a moment ago, try the next one.
+		// O_EXCL: when another server took this number a moment ago, try the
+		// next one. The same number twice means the search is stuck: stop.
 		file, err = os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err == nil {
 			break
 		}
-		if !os.IsExist(err) {
+		if !os.IsExist(err) || path == previous {
 			return "", nil, nil, err
 		}
+		previous = path
 	}
 	out = &lockedWriter{w: file, closer: file}
 	handlers := fanoutHandler{newPyLogHandler(out, loggerServer)}

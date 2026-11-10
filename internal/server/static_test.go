@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/oduvan/webquiz-go/internal/testutil"
+	"github.com/oduvan/webquiz-go/internal/version"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -179,7 +180,7 @@ func TestAdminPagesBootData(t *testing.T) {
 	if got := jsonText(boot["network_info"]); !strings.HasPrefix(got, `{"urls":[`) {
 		t.Errorf("network_info %s", got)
 	}
-	if boot["repo_url"] != "https://github.com/oduvan/webquiz-go" || boot["pages_url"] != "https://oduvan.github.io/webquiz-go/" {
+	if boot["repo_url"] != version.RepoURL || boot["pages_url"] != version.PagesURL {
 		t.Errorf("admin boot URLs: %v %v", boot["repo_url"], boot["pages_url"])
 	}
 	if v, _ := boot["version"].(string); v == "" {

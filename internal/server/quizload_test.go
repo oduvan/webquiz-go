@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/oduvan/webquiz-go/internal/config"
 	"github.com/oduvan/webquiz-go/internal/timelimits"
@@ -184,5 +185,23 @@ func TestQuizPageTemplateError(t *testing.T) {
 	}
 	if !strings.Contains(logs.String(), "Failed to load template index.html") {
 		t.Errorf("the log must say why:\n%s", logs.String())
+	}
+}
+
+// Options: zero values give the defaults; given values are used.
+func TestOptionsDefaults(t *testing.T) {
+	s := newTestServer(t, map[string]string{"q.yaml": quizText("Q")}, nil)
+	if s.flushInterval != DefaultFlushInterval || s.checkInterval != time.Second || s.grace != 5*time.Second || s.now == nil {
+		t.Errorf("defaults: flush %v, check %v, grace %v", s.flushInterval, s.checkInterval, s.grace)
+	}
+	clock := time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
+	s = newTestServer(t, map[string]string{"q.yaml": quizText("Q")}, func(_ *config.Config, opts *Options) {
+		opts.FlushInterval = 20 * time.Millisecond
+		opts.CheckInterval = 30 * time.Millisecond
+		opts.Grace = NoGrace
+		opts.Now = func() time.Time { return clock }
+	})
+	if s.flushInterval != 20*time.Millisecond || s.checkInterval != 30*time.Millisecond || s.grace != 0 || !s.now().Equal(clock) {
+		t.Errorf("given: flush %v, check %v, grace %v, now %v", s.flushInterval, s.checkInterval, s.grace, s.now())
 	}
 }
