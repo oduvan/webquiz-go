@@ -847,13 +847,6 @@ func attachmentValue(question quiz.Question) any {
 	return value
 }
 
-// endWholeQuiz is endWholeQuizLocked with the lock.
-func (s *Server) endWholeQuiz(userID string, now time.Time, questionID int) map[string]any {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.endWholeQuizLocked(userID, now, questionID)
-}
-
 // endWholeQuizLocked is _end_whole_quiz: the whole-quiz time is up, so every
 // question the student has not answered is stored as timed out, in the
 // student's order. The open question keeps its real time; questions never

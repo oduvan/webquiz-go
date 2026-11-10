@@ -24,6 +24,13 @@ func wholeQuizServer(t *testing.T, n int) *Server {
 	return s
 }
 
+// endWholeQuiz is _end_whole_quiz as the Python tests called it: with the lock.
+func (s *Server) endWholeQuiz(userID string, now time.Time, questionID int) map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.endWholeQuizLocked(userID, now, questionID)
+}
+
 // Two whole-quiz ends at the same moment (the page's empty answer and the
 // background check) store every question once. Python needed this because a
 // live-stats send could pause one end in the middle; Go runs them in
