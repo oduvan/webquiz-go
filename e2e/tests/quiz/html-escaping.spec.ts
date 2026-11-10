@@ -78,9 +78,8 @@ test('the waiting form keeps quotes and tags in the name', async ({ page, launch
 });
 
 // py: tests/test_selenium_html_escaping.py::test_admin_pending_users_show_name_and_fields_as_text
-// The admin page is Task 15's work; this branch has only its placeholder, so the port
-// waits for it. It uses the old page's classes (.pending-user-item, .pending-user-name).
-test.fixme('the admin approval list shows the name and fields as text', async ({ page, request, launch }) => {
+// The admin page keeps the old page's classes (.pending-user-item, .pending-user-name).
+test('the admin approval list shows the name and fields as text', async ({ page, request, launch }) => {
   const groupValue = '<i>10-A</i>';
   const server = await launch({ config: { registration: { approve: true, fields: ['Group'] } }, quizzes: TAG_QUIZ });
   const response = await request.post(`${server.url}/api/register`, { data: { username: SCRIPT_USERNAME, group: groupValue } });
@@ -91,6 +90,9 @@ test.fixme('the admin approval list shows the name and fields as text', async ({
   await expect(name).toBeAttached({ timeout: 15000 });
   const item = page.locator('.pending-user-item', { has: page.locator('.pending-user-name') }).first();
 
+  // Selenium's .text reads only text on the screen, so the text must be visible too
+  await expect(name).toBeVisible();
+  await expect(item).toBeVisible();
   await expect(name).toContainText(SCRIPT_USERNAME);
   await expect(item).toContainText(`Group: ${groupValue}`);
   await expect(item.locator('img')).toHaveCount(0);
