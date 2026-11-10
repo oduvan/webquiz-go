@@ -8,10 +8,11 @@ import { constants, gzipSync } from 'node:zlib';
 import type { Logger, Plugin } from 'vite';
 
 // Text files that gzip makes much smaller. Pictures and fonts are packed already.
-const COMPRESSIBLE = new Set(['.js', '.css', '.svg', '.json', '.html']);
+// No .html: the server fills the HTML pages with boot data before sending them, so a copy would never be used.
+const COMPRESSIBLE = new Set(['.js', '.css', '.svg', '.json']);
 
 // writeGzipCopies writes name.gz (best compression) next to every script,
-// style, SVG, JSON and HTML file in dir and its folders. A file gets no copy
+// style, SVG and JSON file in dir and its folders. A file gets no copy
 // when gzip does not make it smaller. It returns the paths of the copies.
 export function writeGzipCopies(dir: string): string[] {
   const written: string[] = [];

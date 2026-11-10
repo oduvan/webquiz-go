@@ -25,13 +25,12 @@ function write(name: string, content: string | Buffer) {
 }
 
 describe('writeGzipCopies', () => {
-  it('writes a gzip copy of scripts, styles, SVG, JSON and HTML that unpacks to the same bytes', () => {
+  it('writes a gzip copy of scripts, styles, SVG and JSON that unpacks to the same bytes', () => {
     const files: Record<string, string> = {
       'assets/app-abc.js': SCRIPT,
       'assets/app-abc.css': 'body{margin:0;padding:0;color:#222}\n'.repeat(60),
       'assets/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>\n'.repeat(30),
       'assets/data.json': JSON.stringify(Array(200).fill({ question: 'What is 2 + 2?' })),
-      'index.html': '<!doctype html><html><head><title>Quiz</title></head><body></body></html>\n'.repeat(30),
     };
     for (const [name, content] of Object.entries(files)) {
       write(name, content);
@@ -57,7 +56,7 @@ describe('writeGzipCopies', () => {
   });
 
   it('leaves other kinds of files alone', () => {
-    const others = ['picture.png', 'readme.txt', 'app-abc.js.map', 'font.woff2', 'app-abc.js.gz'];
+    const others = ['picture.png', 'readme.txt', 'app-abc.js.map', 'font.woff2', 'app-abc.js.gz', 'index.html'];
     for (const name of others) {
       write('assets/' + name, SCRIPT);
     }
