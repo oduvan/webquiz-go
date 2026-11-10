@@ -121,3 +121,21 @@ export const TEXTS: Record<Language, StudentTexts> = {
     reload_page: '🔄 Reload page',
   },
 };
+
+/** Student texts that are new in 2.0: 1.19 has nothing like them. */
+export interface NewStudentTexts {
+  answer_verdict_correct: string;
+  answer_verdict_incorrect: string;
+}
+
+// internal/i18n/texts.go of the Go version ("new in 2.0")
+export const NEW_TEXTS: Record<Language, NewStudentTexts> = {
+  uk: {
+    answer_verdict_correct: '✓ Правильно',
+    answer_verdict_incorrect: '✗ Неправильно',
+  },
+  en: {
+    answer_verdict_correct: '✓ Correct',
+    answer_verdict_incorrect: '✗ Incorrect',
+  },
+};

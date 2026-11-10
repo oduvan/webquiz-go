@@ -4,14 +4,16 @@
 //
 // Each page gets a screenshot and checks: it loads without a JS error, follows the
 // theme, has no horizontal scroll on the phone, and shows a few things 1.19 shows.
+// Pages that are long enough are scrolled down too: the theme button must go with
+// the page, as in 1.19.
 
 import path from 'node:path';
 import type { BrowserContext, Page } from 'playwright';
 import { FIELDS, type Screen } from './matrix-cases';
-import { api, newSession, readStoredData, shoot, sleep, startServer, watchPage, type RunningServer } from './matrix-page';
+import { api, newSession, readStoredData, scrollAndMeasure, shoot, sleep, startServer, watchPage, type RunningServer } from './matrix-page';
 import { QUESTIONS, QUIZ_FILE, quizFile, type QuizSettings } from './matrix-quiz';
 import { RunRecord } from './matrix-report';
-import { same, truth, type CheckResult } from './matrix-rules';
+import { checkThemeButtonScroll, same, truth, type CheckResult } from './matrix-rules';
 import type { Language } from './matrix-texts';
 import type { MatrixEnv } from './matrix-student';
 import { apiAnswer } from './matrix-student';
@@ -120,6 +122,33 @@ async function tourShot(
 }
 
 /**
+ * Scroll the page down by up to 600 px (on a phone the screen then shows the middle of the
+ * admin panel, not the empty part of the quiz list) and check that the theme button goes up
+ * with the page; a screenshot shows the scrolled screen. A page too short to scroll only gets
+ * a note (live stats and the CSV table fill the window and scroll their tables inside a box,
+ * in 1.19 too). The page is left at the top.
+ */
+async function scrollTour(page: Page, env: MatrixEnv, record: RunRecord, folder: string, screen: string, caption: string, rule: string): Promise<void> {
+  await noMessages(page);
+  const seen = await scrollAndMeasure(page, 600);
+  if (seen.scrolled > 0) {
+    await tourShot(
+      page,
+      env,
+      record,
+      folder,
+      `${screen}-scrolled`,
+      `${caption} scrolled down by ${seen.scrolled} px (in 1.19 the theme button scrolls away with the page)`,
+      checkThemeButtonScroll(seen, rule),
+      { fullPage: false },
+    );
+  } else {
+    record.notes.push(`${caption}: the page itself does not scroll on this screen, so the theme button is not checked there`);
+  }
+  await page.evaluate('window.scrollTo(0, 0)');
+}
+
+/**
  * Choose the matrix quiz in the admin panel's list. Right after a switch the page reloads
  * the list and clears the choice (AdminApp.tsx confirmStartQuiz), so choose again until
  * the buttons that need one chosen quiz are enabled.
@@ -198,6 +227,7 @@ export async function runTeacherTour(env: MatrixEnv, tour: TourScreen): Promise<
       ...(await pageChecks(page, record, before, 'admin.html:1559-1566')),
       same('quiz list (sorted by file name)', 'server.py:915-937', [QUIZ_FILE, 'second.yaml'], values),
     ]);
+    await scrollTour(page, env, record, folder, 'admin-panel', 'Admin panel', 'admin.html:1169-1176, 1224-1226 (.top-right-controls: position absolute in the card)');
 
     // 3. The start pop-up
     record.where = 'start pop-up';
@@ -327,6 +357,7 @@ export async function runTeacherTour(env: MatrixEnv, tour: TourScreen): Promise<
       ...(await pageChecks(stats, record, before, 'live_stats.html:479-486')),
       same('group counts', 'live_stats.html:440-452, 928-930', { all: '2', inProgress: '1', completed: '1' }, await counts()),
     ]);
+    await scrollTour(stats, env, record, folder, 'live-stats', 'Live stats', 'live_stats.html:403-408, 432-434 (.top-right-controls: position absolute)');
     for (const [button, screen, caption] of [
       ['#filterInProgress', 'live-stats-in-progress', 'Live stats: the "in progress" group'],
       ['#filterCompleted', 'live-stats-completed', 'Live stats: the "completed" group'],
@@ -379,6 +410,7 @@ export async function runTeacherTour(env: MatrixEnv, tour: TourScreen): Promise<
       ...(await pageChecks(page, record, before, 'files.html:926-933')),
       same('form shows the config language', 'files.html:1276-1279', tour.language, language),
     ]);
+    await scrollTour(page, env, record, folder, 'files-config-form', 'File manager (config, form view)', 'files.html:528-535, 720-722 (.top-right-controls: position absolute in the card)');
     before = record.problems.length;
     await page.click('[data-view="yaml"]');
     await settled(page, 400);
@@ -404,6 +436,7 @@ export async function runTeacherTour(env: MatrixEnv, tour: TourScreen): Promise<
         same('title is the file name', 'csv_table.html:669', answersCsv, title),
         same('row count', 'csv_table.html:530-531', `Showing ${rows} of ${rows} rows`, count),
       ]);
+      await scrollTour(page, env, record, folder, 'csv-table', 'CSV table page', 'csv_table.html:291-295 (the button is in the page header)');
     } else {
       record.add('CSV table', [truth('an answers CSV to open', 'server.py:1368-1427', false, 'an answers CSV file', 'none written')]);
     }

@@ -13,16 +13,22 @@ import {
   checkCsvRows,
   checkFeedback,
   checkImageSizes,
+  checkNoVerdict,
+  checkNoVerdictWhenHidden,
   checkQuestion,
   checkResults,
+  checkThemeButtonScroll,
   checkTopControls,
+  checkVerdict,
   correctAnswerText,
   effectiveLimit,
   expectedResults,
+  expectedVerdict,
   explanationShown,
   feedbackClasses,
   formatPoints,
   judge,
+  newIn2,
   orderProblems,
   pointsBadge,
   progressText,
@@ -73,6 +79,7 @@ function emptySnap(): Snap {
     question: null,
     submit: button,
     cont: button,
+    verdict: null,
     explanation: { title: '', question: '', strong: [], listItems: 0, links: [], next: button },
     results: null,
   };
@@ -479,7 +486,91 @@ describe('check functions', () => {
     expect(checkImageSizes('desktop', snap).every((check) => check.pass)).toBe(true);
   });
 
+  it('checkImageSizes: with a radio circle (2.0) the picture fills the phone width beside the circle', () => {
+    const snap = emptySnap();
+    snap.viewportWidth = 390;
+    const option = { text: '', classes: [], label: '', circleEnd: 38, image: { src: 'imgs/red.png', loaded: true, width: 352, natural: 200 } };
+    snap.question = { image: null, options: [option, { ...option }] } as unknown as QuestionSnap;
+    const [check] = checkImageSizes('phone', snap);
+    expect(check.pass).toBe(true);
+    expect(check.expected).toBe('352px wide (the screen less the radio circle)');
+    // The picture at its own size does not fill the room beside the circle
+    option.image.width = 200;
+    expect(checkImageSizes('phone', snap)[0].pass).toBe(false);
+    // Without a circle (1.19) the whole screen width is wanted
+    snap.question.options = [{ ...option, circleEnd: 0, image: { ...option.image, width: 352 } }];
+    expect(checkImageSizes('phone', snap)[0].pass).toBe(false);
+  });
+
+  it('checkThemeButtonScroll: the theme button of a teacher page must scroll away with the page', () => {
+    expect(checkThemeButtonScroll({ scrolled: 260, badge: null, toggle: 0 }, 'admin.html')[0].pass).toBe(true);
+    expect(checkThemeButtonScroll({ scrolled: 260, badge: null, toggle: 260 }, 'admin.html')[0].pass).toBe(false);
+    expect(checkThemeButtonScroll({ scrolled: 0, badge: null, toggle: 0 }, 'admin.html')).toEqual([]);
+  });
+
   it('JSON keys may come in any order', () => {
     expect(canonical({ b: 1, a: { d: 2, c: 3 } })).toBe(canonical({ a: { c: 3, d: 2 }, b: 1 }));
+  });
+});
+
+describe('rules new in 2.0', () => {
+  it('newIn2: only a server of version 2 or later has the 2.0 features', () => {
+    expect(newIn2('2.0')).toBe(true);
+    expect(newIn2('2.1.3')).toBe(true);
+    expect(newIn2('10.0')).toBe(true);
+    expect(newIn2('2')).toBe(true);
+    expect(newIn2('1.19')).toBe(false);
+    expect(newIn2('1.0.0')).toBe(false); // what the 1.19 CLI's --version prints
+    expect(newIn2('unknown')).toBe(false);
+    expect(newIn2(null)).toBe(false);
+  });
+
+  it('expectedVerdict: the verdict follows the score, only while right answers are shown, never after a timeout', () => {
+    const shown = testCase();
+    expect(expectedVerdict(shown, questionById(1), { indices: [1] })).toBe('✓ Правильно');
+    expect(expectedVerdict(shown, questionById(1), { indices: [0] })).toBe('✗ Неправильно');
+    // A partly right answer with several answers counts as wrong; min_correct 2 lets two right ones count
+    expect(expectedVerdict(shown, questionById(2), { indices: [0] })).toBe('✗ Неправильно');
+    expect(expectedVerdict(shown, questionById(3), { indices: [0, 1] })).toBe('✓ Правильно');
+    // A wrong typed answer
+    expect(expectedVerdict(shown, questionById(4), { text: '25' })).toBe('✗ Неправильно');
+    expect(expectedVerdict(testCase({ language: 'en' }), questionById(1), { indices: [1] })).toBe('✓ Correct');
+    expect(expectedVerdict(testCase({ language: 'en' }), questionById(4), { text: '25' })).toBe('✗ Incorrect');
+    expect(expectedVerdict(shown, questionById(10), null)).toBeNull(); // a timeout
+    expect(expectedVerdict(testCase({}, { show_right_answer: false }), questionById(1), { indices: [1] })).toBeNull();
+  });
+
+  it('checkVerdict: the right words left of "Continue"; none after a timeout', () => {
+    const matrixCase = testCase();
+    const snap = emptySnap();
+    snap.cont = { visible: true, disabled: false, text: TEXTS.uk.continue_button, box: { left: 600, right: 720, top: 400, bottom: 440 } };
+    snap.verdict = { text: '✗ Неправильно', box: { left: 440, right: 588, top: 406, bottom: 434 } };
+    const wrong = { indices: [0, 1] }; // question 2: one right and one wrong option
+    expect(checkVerdict(matrixCase, questionById(2), wrong, snap).map((check) => check.pass)).toEqual([true, true]);
+    // The words do not match the score
+    expect(checkVerdict(matrixCase, questionById(2), questionById(2).right, snap)[0].pass).toBe(false);
+    // Right of "Continue" is the wrong place
+    snap.verdict.box = { left: 730, right: 878, top: 406, bottom: 434 };
+    expect(checkVerdict(matrixCase, questionById(2), wrong, snap).map((check) => check.pass)).toEqual([true, false]);
+    // No verdict shown although one is due
+    snap.verdict = null;
+    expect(checkVerdict(matrixCase, questionById(2), wrong, snap).map((check) => check.pass)).toEqual([false]);
+    // After a timeout there must be none
+    expect(checkVerdict(matrixCase, questionById(10), null, snap).map((check) => check.pass)).toEqual([true]);
+    snap.verdict = { text: '✗ Неправильно', box: null };
+    expect(checkVerdict(matrixCase, questionById(10), null, snap).map((check) => check.pass)).toEqual([false]);
+  });
+
+  it('checkNoVerdict and checkNoVerdictWhenHidden: no verdict on later screens or with right answers hidden', () => {
+    const snap = emptySnap();
+    expect(checkNoVerdict('the next question', snap).pass).toBe(true);
+    snap.verdict = { text: '✓ Правильно', box: null };
+    const left = checkNoVerdict('the next question', snap);
+    expect(left.pass).toBe(false);
+    expect(left.name).toBe('no verdict on the next question');
+    expect(left.rule).toMatch(/^new in 2\.0/);
+    const quiet = { advanced: true, sawContinue: false, sawMarks: false, sawExplanation: false, sawVerdict: false, millis: 300 };
+    expect(checkNoVerdictWhenHidden(quiet).pass).toBe(true);
+    expect(checkNoVerdictWhenHidden({ ...quiet, sawVerdict: true }).pass).toBe(false);
   });
 });
