@@ -17,6 +17,8 @@
 //   - MergeYAML puts a partial update from the config form into the file's
 //     text and keeps everything else of the file as it was: comments, blank
 //     lines, quotes, spacing (the Python version used ruamel.yaml for this).
+//     CheckMerge is the guard before the save writes that text: it must read
+//     back as the old values with the update in them, and nothing else.
 //   - ResolvePath makes a default path relative to the program's folder
 //     (WEBQUIZ_BINARY_DIR), EnsureDir makes a folder, ExampleConfig is the
 //     text of a new webquiz.yaml.

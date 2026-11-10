@@ -406,6 +406,66 @@ func TestConfigSavePartialKeepsCommentsAndBlankLines(t *testing.T) {
 	}
 }
 
+// The classroom harness found this: the config form saved to a file whose
+// last section is registration and that has no language line. The merge put
+// "language: en" between the section and its new keys, and the save failed
+// with "Invalid YAML syntax". Now the save works and keeps the comments.
+func TestConfigFormSaveWhenRegistrationIsTheLastSection(t *testing.T) {
+	t.Parallel()
+	ts := testutil.StartServer(t, testutil.Options{})
+	admin := ts.AdminClient(t, "test123")
+	text := "# WebQuiz config\n\nserver:\n  port: " + itoa(ts.Port) + "   # the port\n\n" +
+		"paths:\n  quizzes_dir: " + ts.QuizzesDir + "\n  logs_dir: " + ts.LogsDir + "\n  csv_dir: " + ts.CSVDir + "\n  static_dir: " + ts.StaticDir + "\n\n" +
+		"admin:\n  master_key: test123\n  trusted_ips: []\n\n" +
+		"# Registration form\nregistration:\n  fields:\n    - Клас\n    - Школа\n"
+	if err := os.WriteFile(ts.ConfigPath, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	body := okSave(t, savePartial(t, admin, map[string]any{
+		"language":                     "en",
+		"extra_answers_with_users_csv": false,
+		"registration": map[string]any{
+			"approve": false, "username_label": "", "fields": []any{"Клас"}, "disabled_fields": []any{"Школа"},
+		},
+	}))
+	const wantRegistration = `{"approve":false,"disabled_fields":["Школа"],"fields":["Клас"],"username_label":""}`
+
+	// The file reads back with the new values and keeps its comments.
+	saved := readFile(t, ts.ConfigPath)
+	parsed := loadYAML(t, saved)
+	if parsed["language"] != "en" || parsed["extra_answers_with_users_csv"] != false || jsonText(parsed["registration"]) != wantRegistration {
+		t.Errorf("saved values %v:\n%s", parsed, saved)
+	}
+	for _, want := range []string{"# WebQuiz config\n\nserver:", "port: " + itoa(ts.Port) + "   # the port\n", "\n\n# Registration form\nregistration:\n"} {
+		if !strings.Contains(saved, want) {
+			t.Errorf("the saved file lacks %q:\n%s", want, saved)
+		}
+	}
+
+	// The answer and the files page show the new values.
+	if body["config_content"] != saved {
+		t.Errorf("config_content %q, want the saved file", body["config_content"])
+	}
+	data := body["config_data"].(map[string]any)
+	if data["language"] != "en" || data["extra_answers_with_users_csv"] != false || jsonText(data["registration"]) != wantRegistration {
+		t.Errorf("config_data %v", data)
+	}
+	page := admin.Do(t, "GET", "/files/", nil)
+	if page.Status != 200 {
+		t.Fatalf("files page: status %d", page.Status)
+	}
+	data, _ = pageBoot(t, page.Text())["config_data"].(map[string]any)
+	if data["language"] != "en" || jsonText(data["registration"]) != wantRegistration {
+		t.Errorf("config_data of the files page %v", data)
+	}
+
+	// The new settings run: the quiz page speaks English.
+	if quiz := ts.Do(t, "GET", "/", nil); !strings.Contains(quiz.Text(), "Register to start the quiz") {
+		t.Errorf("the quiz page does not use English (status %d)", quiz.Status)
+	}
+}
+
 // py: tests/test_config_management.py::test_save_config_yaml_returns_both_formats
 func TestConfigSaveYAMLReturnsBothFormats(t *testing.T) {
 	t.Parallel()

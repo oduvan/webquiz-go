@@ -104,6 +104,41 @@ func TestConfigSaveRollsBackOnPanic(t *testing.T) {
 	}
 }
 
+// A merge that went wrong never reaches the file: the form save checks the
+// merged text first. The teacher gets a clear error, and the file and the
+// running settings stay as they were.
+func TestConfigFormSaveRefusesAWrongMerge(t *testing.T) {
+	const before = "# my config\nregistration:\n  fields:\n    - Клас\n"
+	const body = `{"data": {"language": "en", "registration": {"approve": false}}}`
+	for name, merged := range map[string]string{
+		// what the merge wrote before the fix of the last section
+		"text that does not read back": before + "language: en\n  approve: false\n",
+		"a value is missing":           before + "  approve: false\n",
+		"a value nobody sent changed":  "# my config\nregistration:\n  fields: []\n  approve: false\nlanguage: en\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, path := serverWithConfigFile(t, map[string]string{"q.yaml": quizText("Q")}, before, nil)
+			s.mergeHook = func([]byte, map[string]any) ([]byte, error) { return []byte(merged), nil }
+			status, reply := newAdminCall(t, s).json("PUT", "/api/admin/config", body)
+			if status != 500 || reply["success"] != false || reply["error"] != formMergeFailed {
+				t.Errorf("%d %v", status, reply)
+			}
+			if errs, _ := reply["errors"].([]any); len(errs) != 1 {
+				t.Errorf("errors %v: want the reason", reply["errors"])
+			}
+			if data, _ := os.ReadFile(path); string(data) != before {
+				t.Errorf("the file changed: %q", data)
+			}
+			if s.text("register_title") != "Зареєструйтеся для початку тесту" {
+				t.Error("the language changed although the save failed")
+			}
+		})
+	}
+	if !strings.Contains(formMergeFailed, "the file was not changed") {
+		t.Errorf("the message must say that the file stayed as it was: %q", formMergeFailed)
+	}
+}
+
 // Without a config file the answer is 400, and a body that is not an object
 // fails like the Python handler did.
 func TestConfigSaveWithoutConfigFileAndBadBodies(t *testing.T) {
