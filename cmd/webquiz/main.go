@@ -1,9 +1,7 @@
 // Command webquiz runs the WebQuiz server.
 //
-// This is the first, small version of the command: the start steps of the
-// Python binary (binary_entry.py) and the flags --config and --port of
-// cli.py, plus --version. Task 11 of the Go migration adds the other flags
-// of cli.py and the daemon mode.
+// It has the options of cli.py (flag accepts both -d and --daemon), the
+// start steps of binary_entry.py and the daemon mode (see daemon.go).
 //
 // Start steps: the base folder is WEBQUIZ_BINARY_DIR when it is set, else
 // the folder of the program; the program sets WEBQUIZ_BINARY_DIR to it and
@@ -27,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,14 +40,37 @@ func main() {
 
 func run(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("webquiz", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	configPath := flags.String("config", "", "Path to YAML configuration file")
-	port := flags.Int("port", 0, "Port to listen on (default: 8080)")
-	showVersion := flags.Bool("version", false, "Show the program's version and exit")
-	if err := flags.Parse(args); err != nil {
+	flags.SetOutput(io.Discard) // the messages are written below, like argparse does
+	flags.Usage = func() {}
+	var (
+		daemon     = flags.Bool("daemon", false, "")
+		stop       = flags.Bool("stop", false, "")
+		status     = flags.Bool("status", false, "")
+		configPath = flags.String("config", "", "")
+		port       = flags.Int("port", 0, "")
+		quizzesDir = flags.String("quizzes-dir", "", "")
+		masterKey  = flags.String("master-key", "", "")
+		logsDir    = flags.String("logs-dir", "", "")
+		csvDir     = flags.String("csv-dir", "", "")
+		staticDir  = flags.String("static", "", "")
+		urlFormat  = flags.String("url-format", "", "")
+		showVer    = flags.Bool("version", false, "")
+	)
+	flags.BoolVar(daemon, "d", false, "")
+	err := flags.Parse(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, helpText)
+		return 0
+	}
+	if err == nil && flags.NArg() > 0 {
+		err = fmt.Errorf("unrecognized arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if err != nil {
+		fmt.Fprint(stderr, usageLine)
+		fmt.Fprintf(stderr, "webquiz: error: %v\n", err)
 		return 2
 	}
-	if *showVersion {
+	if *showVer {
 		fmt.Fprintf(stdout, "webquiz %s\n", version.Version)
 		return 0
 	}
@@ -58,10 +80,24 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	// Only the options that were given override the config file.
 	var overrides config.Overrides
 	flags.Visit(func(f *flag.Flag) {
-		if f.Name == "port" {
+		switch f.Name {
+		case "port":
 			overrides.Port = port
+		case "quizzes-dir":
+			overrides.QuizzesDir = quizzesDir
+		case "master-key":
+			overrides.MasterKey = masterKey
+		case "logs-dir":
+			overrides.LogsDir = logsDir
+		case "csv-dir":
+			overrides.CSVDir = csvDir
+		case "static":
+			overrides.StaticDir = staticDir
+		case "url-format":
+			overrides.URLFormat = urlFormat
 		}
 	})
 	// Before the server makes its log file, only warnings and errors are
@@ -72,7 +108,30 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
 		return 1
 	}
+
+	// The order of cli.py: stop, status, daemon, then the server in front.
+	switch {
+	case *stop:
+		return stopDaemon(stdout)
+	case *status:
+		return daemonStatus(stdout)
+	case *daemon:
+		return startDaemon(stdout, daemonArgs(flags))
+	}
 	return runServer(cfg, stdout)
+}
+
+// daemonArgs are the options for the detached copy of the program: every
+// option that was given, except -d/--daemon.
+func daemonArgs(flags *flag.FlagSet) []string {
+	var args []string
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "d" || f.Name == "daemon" {
+			return
+		}
+		args = append(args, "--"+f.Name+"="+f.Value.String())
+	})
+	return args
 }
 
 // useBaseFolder does the start steps of binary_entry.py (see the package
@@ -121,6 +180,7 @@ func runServer(cfg *config.Config, stdout io.Writer) int {
 	}
 	fmt.Fprintln(stdout, "⏹️  Press Ctrl+C to stop")
 
+	defer removeOwnPIDFile()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
