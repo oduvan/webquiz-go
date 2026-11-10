@@ -1,0 +1,1528 @@
+{
+  "webquiz_version": "1.19",
+  "python_version": "3.13.18",
+  "setup": {
+    "room-a": {
+      "quizzes/geo.yaml": "# Geography quiz\ntitle: Geography\nquestions:\n- question: Where is Kyiv?\n  image: \"/imgs/map.png\"  # the main map\n  options: [\"/imgs/a.png\", \"Lviv\"]\n  correct_answer: 0\n  explanation: |\n    See ![map](</imgs/my map.png>) for the rivers.\n- question: Read the notes\n  file: \"нотатки 1.pdf\"\n  options: [\"yes\", \"no\"]\n  correct_answer: 0\n",
+      "quizzes/same.yaml": "title: Same\n",
+      "quizzes/diff.yaml": "title: From A\n",
+      "quizzes/active.yaml": "title: Active on A\n",
+      "quizzes/math.yaml": "title: Math\n",
+      "logs/0001.log": "log line\n",
+      "csv/results.csv": "a,b\r\n1,2\r\n",
+      "images/map.png": "image map of A",
+      "images/a.png": "image a",
+      "images/my map.png": "image my map",
+      "attachments/нотатки 1.pdf": "notes"
+    },
+    "room-b": {
+      "quizzes/same.yaml": "title: Same\n",
+      "quizzes/diff.yaml": "title: From B\n",
+      "quizzes/active.yaml": "title: Active on B\n",
+      "logs/room-a_0001.log": "older log\n",
+      "images/map.png": "image map of B"
+    }
+  },
+  "in_use": {
+    "room-b": [
+      "quizzes/active.yaml"
+    ]
+  },
+  "offered": [
+    {
+      "type": "quizzes",
+      "name": "geo.yaml"
+    },
+    {
+      "type": "quizzes",
+      "name": "same.yaml"
+    },
+    {
+      "type": "quizzes",
+      "name": "diff.yaml"
+    },
+    {
+      "type": "quizzes",
+      "name": "active.yaml"
+    },
+    {
+      "type": "logs",
+      "name": "0001.log"
+    },
+    {
+      "type": "csv",
+      "name": "results.csv"
+    }
+  ],
+  "choices": [
+    {
+      "type": "quizzes",
+      "name": "diff.yaml",
+      "action": "replace"
+    },
+    {
+      "type": "quizzes",
+      "name": "active.yaml",
+      "action": "rename",
+      "new_name": "Активний.yaml"
+    },
+    {
+      "type": "logs",
+      "name": "0001.log",
+      "action": "skip"
+    }
+  ],
+  "crafted_offer": {
+    "from": "room-a",
+    "token": "ttttttttttttttttttttttttttttttttttttttttttt",
+    "files": [
+      {
+        "type": "logs",
+        "name": "float.log",
+        "size": 12.0,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "type": "logs",
+        "name": "bool.log",
+        "size": true,
+        "sha256": "not a checksum"
+      },
+      {
+        "type": "logs",
+        "name": "negative.log",
+        "size": -5
+      },
+      {
+        "type": "csv",
+        "name": "big.csv",
+        "size": 123456789012345678901234567890
+      },
+      {
+        "type": "attachments",
+        "name": "README",
+        "size": 7,
+        "sha256": null
+      },
+      {
+        "type": "attachments",
+        "name": "README",
+        "size": 7
+      }
+    ]
+  },
+  "captures": {
+    "send_return": {
+      "id": "30e06d3fc007c863",
+      "to": "room-b",
+      "files": [
+        {
+          "type": "quizzes",
+          "name": "geo.yaml",
+          "size": 339,
+          "sha256": "fcc0809e00d97579aaddf2b3ef3c0c7722443529a14a79551041e8f2253e3c14"
+        },
+        {
+          "type": "quizzes",
+          "name": "same.yaml",
+          "size": 12,
+          "sha256": "075bfd573fffe99e7de3a022d5bba7947cadc958bdb80ff9567223878a690655"
+        },
+        {
+          "type": "quizzes",
+          "name": "diff.yaml",
+          "size": 14,
+          "sha256": "97ee686aa928529c61c1e8e070f3bca6d8ae591c68b095954c46472232c4a7b6"
+        },
+        {
+          "type": "quizzes",
+          "name": "active.yaml",
+          "size": 19,
+          "sha256": "990b7d41c4e8d0c1199c574deea9eda963d1fc3a92039309362d758af8b9d402"
+        },
+        {
+          "type": "logs",
+          "name": "0001.log",
+          "size": 9,
+          "sha256": "8e722e34af271ba626bdbdf618ebf1386eaad27b073b6421d329bf5ffca22637"
+        },
+        {
+          "type": "csv",
+          "name": "results.csv",
+          "size": 10,
+          "sha256": "ea14f99c47575613ab22111122c847728c61007f6bfd7b062d02fcb99df3feb0"
+        },
+        {
+          "type": "images",
+          "name": "map.png",
+          "size": 14,
+          "sha256": "b7635bbb60b8fa980c85009a665669351ade80e546f078a5de120ff8b1cb8636"
+        },
+        {
+          "type": "images",
+          "name": "a.png",
+          "size": 7,
+          "sha256": "a854f481d4cb2479ff869f3a33763e4c3e8d6b5727f909d774fdd5f37690baeb"
+        },
+        {
+          "type": "attachments",
+          "name": "нотатки 1.pdf",
+          "size": 5,
+          "sha256": "ab5aa97074c454a0632057e704220d9a6678fbf773a0a5806fc09b8173b07309"
+        },
+        {
+          "type": "images",
+          "name": "my map.png",
+          "size": 12,
+          "sha256": "d74debb8c0383b92fd3f22dcb38c7b7f010d023bd0a35fdaca41dbfb1a6e7ba2"
+        }
+      ],
+      "created": "2026-11-10T05:15:32.214966",
+      "status": "waiting"
+    },
+    "offer_http": {
+      "method": "POST",
+      "path": "/start/room-b/api/transfer/offer",
+      "content_type": "application/json",
+      "body": {
+        "json": {
+          "from": "room-a",
+          "token": "Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA",
+          "files": [
+            {
+              "type": "quizzes",
+              "name": "geo.yaml",
+              "size": 339,
+              "sha256": "fcc0809e00d97579aaddf2b3ef3c0c7722443529a14a79551041e8f2253e3c14"
+            },
+            {
+              "type": "quizzes",
+              "name": "same.yaml",
+              "size": 12,
+              "sha256": "075bfd573fffe99e7de3a022d5bba7947cadc958bdb80ff9567223878a690655"
+            },
+            {
+              "type": "quizzes",
+              "name": "diff.yaml",
+              "size": 14,
+              "sha256": "97ee686aa928529c61c1e8e070f3bca6d8ae591c68b095954c46472232c4a7b6"
+            },
+            {
+              "type": "quizzes",
+              "name": "active.yaml",
+              "size": 19,
+              "sha256": "990b7d41c4e8d0c1199c574deea9eda963d1fc3a92039309362d758af8b9d402"
+            },
+            {
+              "type": "logs",
+              "name": "0001.log",
+              "size": 9,
+              "sha256": "8e722e34af271ba626bdbdf618ebf1386eaad27b073b6421d329bf5ffca22637"
+            },
+            {
+              "type": "csv",
+              "name": "results.csv",
+              "size": 10,
+              "sha256": "ea14f99c47575613ab22111122c847728c61007f6bfd7b062d02fcb99df3feb0"
+            },
+            {
+              "type": "images",
+              "name": "map.png",
+              "size": 14,
+              "sha256": "b7635bbb60b8fa980c85009a665669351ade80e546f078a5de120ff8b1cb8636"
+            },
+            {
+              "type": "images",
+              "name": "a.png",
+              "size": 7,
+              "sha256": "a854f481d4cb2479ff869f3a33763e4c3e8d6b5727f909d774fdd5f37690baeb"
+            },
+            {
+              "type": "attachments",
+              "name": "нотатки 1.pdf",
+              "size": 5,
+              "sha256": "ab5aa97074c454a0632057e704220d9a6678fbf773a0a5806fc09b8173b07309"
+            },
+            {
+              "type": "images",
+              "name": "my map.png",
+              "size": 12,
+              "sha256": "d74debb8c0383b92fd3f22dcb38c7b7f010d023bd0a35fdaca41dbfb1a6e7ba2"
+            }
+          ]
+        }
+      },
+      "status": 202,
+      "response_content_type": "application/json; charset=utf-8",
+      "response": {
+        "json": {
+          "success": true
+        }
+      }
+    },
+    "receiver_request_message": {
+      "type": "transfer_request",
+      "request": {
+        "id": "d51cb5b81caa046e",
+        "from": "room-a",
+        "files": [
+          {
+            "type": "quizzes",
+            "name": "geo.yaml",
+            "size": 339,
+            "target": "geo.yaml",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_geo.yaml"
+          },
+          {
+            "type": "quizzes",
+            "name": "same.yaml",
+            "size": 12,
+            "target": "same.yaml",
+            "case": "same",
+            "actions": [
+              "replace",
+              "rename",
+              "skip"
+            ],
+            "default_action": "skip",
+            "suggested_name": "room-a_same.yaml"
+          },
+          {
+            "type": "quizzes",
+            "name": "diff.yaml",
+            "size": 14,
+            "target": "diff.yaml",
+            "case": "different",
+            "actions": [
+              "replace",
+              "rename",
+              "skip"
+            ],
+            "default_action": "rename",
+            "suggested_name": "room-a_diff.yaml"
+          },
+          {
+            "type": "quizzes",
+            "name": "active.yaml",
+            "size": 19,
+            "target": "active.yaml",
+            "case": "in_use",
+            "actions": [
+              "rename",
+              "skip"
+            ],
+            "default_action": "rename",
+            "suggested_name": "room-a_active.yaml"
+          },
+          {
+            "type": "logs",
+            "name": "0001.log",
+            "size": 9,
+            "target": "room-a_0001.log",
+            "case": "different",
+            "actions": [
+              "replace",
+              "rename",
+              "skip"
+            ],
+            "default_action": "rename",
+            "suggested_name": "room-a_0001_2.log"
+          },
+          {
+            "type": "csv",
+            "name": "results.csv",
+            "size": 10,
+            "target": "room-a_results.csv",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_results_2.csv"
+          },
+          {
+            "type": "images",
+            "name": "map.png",
+            "size": 14,
+            "target": "map.png",
+            "case": "different",
+            "actions": [
+              "replace",
+              "rename",
+              "skip"
+            ],
+            "default_action": "rename",
+            "suggested_name": "room-a_map.png"
+          },
+          {
+            "type": "images",
+            "name": "a.png",
+            "size": 7,
+            "target": "a.png",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_a.png"
+          },
+          {
+            "type": "attachments",
+            "name": "нотатки 1.pdf",
+            "size": 5,
+            "target": "нотатки 1.pdf",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_нотатки 1.pdf"
+          },
+          {
+            "type": "images",
+            "name": "my map.png",
+            "size": 12,
+            "target": "my map.png",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_my map.png"
+          }
+        ],
+        "received": "2026-11-10T05:15:32.476401",
+        "status": "pending"
+      }
+    },
+    "receiver_state": {
+      "available": true,
+      "name": "room-b",
+      "outgoing": [],
+      "incoming": [
+        {
+          "id": "d51cb5b81caa046e",
+          "from": "room-a",
+          "files": [
+            {
+              "type": "quizzes",
+              "name": "geo.yaml",
+              "size": 339,
+              "target": "geo.yaml",
+              "case": "new",
+              "actions": [
+                "save",
+                "rename",
+                "skip"
+              ],
+              "default_action": "save",
+              "suggested_name": "room-a_geo.yaml"
+            },
+            {
+              "type": "quizzes",
+              "name": "same.yaml",
+              "size": 12,
+              "target": "same.yaml",
+              "case": "same",
+              "actions": [
+                "replace",
+                "rename",
+                "skip"
+              ],
+              "default_action": "skip",
+              "suggested_name": "room-a_same.yaml"
+            },
+            {
+              "type": "quizzes",
+              "name": "diff.yaml",
+              "size": 14,
+              "target": "diff.yaml",
+              "case": "different",
+              "actions": [
+                "replace",
+                "rename",
+                "skip"
+              ],
+              "default_action": "rename",
+              "suggested_name": "room-a_diff.yaml"
+            },
+            {
+              "type": "quizzes",
+              "name": "active.yaml",
+              "size": 19,
+              "target": "active.yaml",
+              "case": "in_use",
+              "actions": [
+                "rename",
+                "skip"
+              ],
+              "default_action": "rename",
+              "suggested_name": "room-a_active.yaml"
+            },
+            {
+              "type": "logs",
+              "name": "0001.log",
+              "size": 9,
+              "target": "room-a_0001.log",
+              "case": "different",
+              "actions": [
+                "replace",
+                "rename",
+                "skip"
+              ],
+              "default_action": "rename",
+              "suggested_name": "room-a_0001_2.log"
+            },
+            {
+              "type": "csv",
+              "name": "results.csv",
+              "size": 10,
+              "target": "room-a_results.csv",
+              "case": "new",
+              "actions": [
+                "save",
+                "rename",
+                "skip"
+              ],
+              "default_action": "save",
+              "suggested_name": "room-a_results_2.csv"
+            },
+            {
+              "type": "images",
+              "name": "map.png",
+              "size": 14,
+              "target": "map.png",
+              "case": "different",
+              "actions": [
+                "replace",
+                "rename",
+                "skip"
+              ],
+              "default_action": "rename",
+              "suggested_name": "room-a_map.png"
+            },
+            {
+              "type": "images",
+              "name": "a.png",
+              "size": 7,
+              "target": "a.png",
+              "case": "new",
+              "actions": [
+                "save",
+                "rename",
+                "skip"
+              ],
+              "default_action": "save",
+              "suggested_name": "room-a_a.png"
+            },
+            {
+              "type": "attachments",
+              "name": "нотатки 1.pdf",
+              "size": 5,
+              "target": "нотатки 1.pdf",
+              "case": "new",
+              "actions": [
+                "save",
+                "rename",
+                "skip"
+              ],
+              "default_action": "save",
+              "suggested_name": "room-a_нотатки 1.pdf"
+            },
+            {
+              "type": "images",
+              "name": "my map.png",
+              "size": 12,
+              "target": "my map.png",
+              "case": "new",
+              "actions": [
+                "save",
+                "rename",
+                "skip"
+              ],
+              "default_action": "save",
+              "suggested_name": "room-a_my map.png"
+            }
+          ],
+          "received": "2026-11-10T05:15:32.476401",
+          "status": "pending"
+        }
+      ]
+    },
+    "sender_state_waiting": {
+      "available": true,
+      "name": "room-a",
+      "outgoing": [
+        {
+          "id": "30e06d3fc007c863",
+          "to": "room-b",
+          "files": [
+            {
+              "type": "quizzes",
+              "name": "geo.yaml",
+              "size": 339,
+              "sha256": "fcc0809e00d97579aaddf2b3ef3c0c7722443529a14a79551041e8f2253e3c14"
+            },
+            {
+              "type": "quizzes",
+              "name": "same.yaml",
+              "size": 12,
+              "sha256": "075bfd573fffe99e7de3a022d5bba7947cadc958bdb80ff9567223878a690655"
+            },
+            {
+              "type": "quizzes",
+              "name": "diff.yaml",
+              "size": 14,
+              "sha256": "97ee686aa928529c61c1e8e070f3bca6d8ae591c68b095954c46472232c4a7b6"
+            },
+            {
+              "type": "quizzes",
+              "name": "active.yaml",
+              "size": 19,
+              "sha256": "990b7d41c4e8d0c1199c574deea9eda963d1fc3a92039309362d758af8b9d402"
+            },
+            {
+              "type": "logs",
+              "name": "0001.log",
+              "size": 9,
+              "sha256": "8e722e34af271ba626bdbdf618ebf1386eaad27b073b6421d329bf5ffca22637"
+            },
+            {
+              "type": "csv",
+              "name": "results.csv",
+              "size": 10,
+              "sha256": "ea14f99c47575613ab22111122c847728c61007f6bfd7b062d02fcb99df3feb0"
+            },
+            {
+              "type": "images",
+              "name": "map.png",
+              "size": 14,
+              "sha256": "b7635bbb60b8fa980c85009a665669351ade80e546f078a5de120ff8b1cb8636"
+            },
+            {
+              "type": "images",
+              "name": "a.png",
+              "size": 7,
+              "sha256": "a854f481d4cb2479ff869f3a33763e4c3e8d6b5727f909d774fdd5f37690baeb"
+            },
+            {
+              "type": "attachments",
+              "name": "нотатки 1.pdf",
+              "size": 5,
+              "sha256": "ab5aa97074c454a0632057e704220d9a6678fbf773a0a5806fc09b8173b07309"
+            },
+            {
+              "type": "images",
+              "name": "my map.png",
+              "size": 12,
+              "sha256": "d74debb8c0383b92fd3f22dcb38c7b7f010d023bd0a35fdaca41dbfb1a6e7ba2"
+            }
+          ],
+          "created": "2026-11-10T05:15:32.214966",
+          "status": "waiting"
+        }
+      ],
+      "incoming": []
+    },
+    "accept_return": {
+      "from": "room-a",
+      "saved": [
+        {
+          "type": "images",
+          "name": "map.png",
+          "action": "rename",
+          "saved_as": "room-a_map.png"
+        },
+        {
+          "type": "images",
+          "name": "a.png",
+          "action": "save",
+          "saved_as": "a.png"
+        },
+        {
+          "type": "attachments",
+          "name": "нотатки 1.pdf",
+          "action": "save",
+          "saved_as": "нотатки 1.pdf"
+        },
+        {
+          "type": "images",
+          "name": "my map.png",
+          "action": "save",
+          "saved_as": "my map.png"
+        },
+        {
+          "type": "quizzes",
+          "name": "geo.yaml",
+          "action": "save",
+          "saved_as": "geo.yaml"
+        },
+        {
+          "type": "quizzes",
+          "name": "diff.yaml",
+          "action": "replace",
+          "saved_as": "diff.yaml"
+        },
+        {
+          "type": "quizzes",
+          "name": "active.yaml",
+          "action": "rename",
+          "saved_as": "Активний.yaml"
+        },
+        {
+          "type": "csv",
+          "name": "results.csv",
+          "action": "save",
+          "saved_as": "room-a_results.csv"
+        }
+      ],
+      "skipped": [
+        {
+          "type": "quizzes",
+          "name": "same.yaml",
+          "action": "skip"
+        },
+        {
+          "type": "logs",
+          "name": "0001.log",
+          "action": "skip"
+        }
+      ],
+      "failed": []
+    },
+    "accept_http": [
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/images/map.png",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/images/a.png",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/attachments/%D0%BD%D0%BE%D1%82%D0%B0%D1%82%D0%BA%D0%B8%201.pdf",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/images/my%20map.png",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/quizzes/geo.yaml",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/quizzes/diff.yaml",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/quizzes/active.yaml",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA/csv/results.csv",
+        "content_type": null,
+        "body": null,
+        "status": 200,
+        "response_content_type": "application/octet-stream"
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-a/api/transfer/result",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "token": "Zp2wYorcQkv-xMiVCkqVdwY6-2Cz-7U_h7W3jqYG_mA",
+            "status": "accepted"
+          }
+        },
+        "status": 200,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "receiver_removed_message": {
+      "type": "transfer_request_removed",
+      "id": "d51cb5b81caa046e"
+    },
+    "sender_result_message": {
+      "type": "transfer_result",
+      "offer": {
+        "id": "30e06d3fc007c863",
+        "to": "room-b",
+        "files": [
+          {
+            "type": "quizzes",
+            "name": "geo.yaml",
+            "size": 339,
+            "sha256": "fcc0809e00d97579aaddf2b3ef3c0c7722443529a14a79551041e8f2253e3c14"
+          },
+          {
+            "type": "quizzes",
+            "name": "same.yaml",
+            "size": 12,
+            "sha256": "075bfd573fffe99e7de3a022d5bba7947cadc958bdb80ff9567223878a690655"
+          },
+          {
+            "type": "quizzes",
+            "name": "diff.yaml",
+            "size": 14,
+            "sha256": "97ee686aa928529c61c1e8e070f3bca6d8ae591c68b095954c46472232c4a7b6"
+          },
+          {
+            "type": "quizzes",
+            "name": "active.yaml",
+            "size": 19,
+            "sha256": "990b7d41c4e8d0c1199c574deea9eda963d1fc3a92039309362d758af8b9d402"
+          },
+          {
+            "type": "logs",
+            "name": "0001.log",
+            "size": 9,
+            "sha256": "8e722e34af271ba626bdbdf618ebf1386eaad27b073b6421d329bf5ffca22637"
+          },
+          {
+            "type": "csv",
+            "name": "results.csv",
+            "size": 10,
+            "sha256": "ea14f99c47575613ab22111122c847728c61007f6bfd7b062d02fcb99df3feb0"
+          },
+          {
+            "type": "images",
+            "name": "map.png",
+            "size": 14,
+            "sha256": "b7635bbb60b8fa980c85009a665669351ade80e546f078a5de120ff8b1cb8636"
+          },
+          {
+            "type": "images",
+            "name": "a.png",
+            "size": 7,
+            "sha256": "a854f481d4cb2479ff869f3a33763e4c3e8d6b5727f909d774fdd5f37690baeb"
+          },
+          {
+            "type": "attachments",
+            "name": "нотатки 1.pdf",
+            "size": 5,
+            "sha256": "ab5aa97074c454a0632057e704220d9a6678fbf773a0a5806fc09b8173b07309"
+          },
+          {
+            "type": "images",
+            "name": "my map.png",
+            "size": 12,
+            "sha256": "d74debb8c0383b92fd3f22dcb38c7b7f010d023bd0a35fdaca41dbfb1a6e7ba2"
+          }
+        ],
+        "created": "2026-11-10T05:15:32.214966",
+        "status": "accepted"
+      }
+    },
+    "sender_state_accepted": {
+      "available": true,
+      "name": "room-a",
+      "outgoing": [
+        {
+          "id": "30e06d3fc007c863",
+          "to": "room-b",
+          "files": [
+            {
+              "type": "quizzes",
+              "name": "geo.yaml",
+              "size": 339,
+              "sha256": "fcc0809e00d97579aaddf2b3ef3c0c7722443529a14a79551041e8f2253e3c14"
+            },
+            {
+              "type": "quizzes",
+              "name": "same.yaml",
+              "size": 12,
+              "sha256": "075bfd573fffe99e7de3a022d5bba7947cadc958bdb80ff9567223878a690655"
+            },
+            {
+              "type": "quizzes",
+              "name": "diff.yaml",
+              "size": 14,
+              "sha256": "97ee686aa928529c61c1e8e070f3bca6d8ae591c68b095954c46472232c4a7b6"
+            },
+            {
+              "type": "quizzes",
+              "name": "active.yaml",
+              "size": 19,
+              "sha256": "990b7d41c4e8d0c1199c574deea9eda963d1fc3a92039309362d758af8b9d402"
+            },
+            {
+              "type": "logs",
+              "name": "0001.log",
+              "size": 9,
+              "sha256": "8e722e34af271ba626bdbdf618ebf1386eaad27b073b6421d329bf5ffca22637"
+            },
+            {
+              "type": "csv",
+              "name": "results.csv",
+              "size": 10,
+              "sha256": "ea14f99c47575613ab22111122c847728c61007f6bfd7b062d02fcb99df3feb0"
+            },
+            {
+              "type": "images",
+              "name": "map.png",
+              "size": 14,
+              "sha256": "b7635bbb60b8fa980c85009a665669351ade80e546f078a5de120ff8b1cb8636"
+            },
+            {
+              "type": "images",
+              "name": "a.png",
+              "size": 7,
+              "sha256": "a854f481d4cb2479ff869f3a33763e4c3e8d6b5727f909d774fdd5f37690baeb"
+            },
+            {
+              "type": "attachments",
+              "name": "нотатки 1.pdf",
+              "size": 5,
+              "sha256": "ab5aa97074c454a0632057e704220d9a6678fbf773a0a5806fc09b8173b07309"
+            },
+            {
+              "type": "images",
+              "name": "my map.png",
+              "size": 12,
+              "sha256": "d74debb8c0383b92fd3f22dcb38c7b7f010d023bd0a35fdaca41dbfb1a6e7ba2"
+            }
+          ],
+          "created": "2026-11-10T05:15:32.214966",
+          "status": "accepted"
+        }
+      ],
+      "incoming": []
+    },
+    "receiver_files": {
+      "quizzes/active.yaml": {
+        "yaml": {
+          "title": "Active on B"
+        }
+      },
+      "quizzes/diff.yaml": {
+        "yaml": {
+          "title": "From A"
+        }
+      },
+      "quizzes/geo.yaml": {
+        "yaml": {
+          "title": "Geography",
+          "questions": [
+            {
+              "question": "Where is Kyiv?",
+              "image": "/imgs/room-a_map.png",
+              "options": [
+                "/imgs/a.png",
+                "Lviv"
+              ],
+              "correct_answer": 0,
+              "explanation": "See ![map](</imgs/my map.png>) for the rivers.\n"
+            },
+            {
+              "question": "Read the notes",
+              "file": "нотатки 1.pdf",
+              "options": [
+                "yes",
+                "no"
+              ],
+              "correct_answer": 0
+            }
+          ]
+        }
+      },
+      "quizzes/same.yaml": {
+        "yaml": {
+          "title": "Same"
+        }
+      },
+      "quizzes/Активний.yaml": {
+        "yaml": {
+          "title": "Active on A"
+        }
+      },
+      "logs/room-a_0001.log": "older log\n",
+      "csv/room-a_results.csv": "a,b\r\n1,2\r\n",
+      "images/a.png": "image a",
+      "images/map.png": "image map of B",
+      "images/my map.png": "image my map",
+      "images/room-a_map.png": "image map of A",
+      "attachments/нотатки 1.pdf": "notes"
+    },
+    "reject_http": [
+      {
+        "method": "POST",
+        "path": "/start/room-a/api/transfer/result",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "token": "5DXMCUot6nK2EH9vuVJ3xCA2b8ubP-48wAauiz24Akc",
+            "status": "rejected"
+          }
+        },
+        "status": 200,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "reject_removed_message": {
+      "type": "transfer_request_removed",
+      "id": "f3106c3711d974a2"
+    },
+    "reject_result_message": {
+      "type": "transfer_result",
+      "offer": {
+        "id": "1bc6c5b276dd3b13",
+        "to": "room-b",
+        "files": [
+          {
+            "type": "quizzes",
+            "name": "math.yaml",
+            "size": 12,
+            "sha256": "67f96b6f301a1674d36ac446556b571fed7f216e9b35542266ef7546d05277a3"
+          }
+        ],
+        "created": "2026-11-10T05:15:32.523038",
+        "status": "rejected"
+      }
+    },
+    "crafted_offer_http": [
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "from": "room-a",
+            "token": "ttttttttttttttttttttttttttttttttttttttttttt",
+            "files": [
+              {
+                "type": "logs",
+                "name": "float.log",
+                "size": 12.0,
+                "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              {
+                "type": "logs",
+                "name": "bool.log",
+                "size": true,
+                "sha256": "not a checksum"
+              },
+              {
+                "type": "logs",
+                "name": "negative.log",
+                "size": -5
+              },
+              {
+                "type": "csv",
+                "name": "big.csv",
+                "size": 123456789012345678901234567890
+              },
+              {
+                "type": "attachments",
+                "name": "README",
+                "size": 7,
+                "sha256": null
+              },
+              {
+                "type": "attachments",
+                "name": "README",
+                "size": 7
+              }
+            ]
+          }
+        },
+        "status": 202,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "crafted_request_message": {
+      "type": "transfer_request",
+      "request": {
+        "id": "c02cb22fa07ec297",
+        "from": "room-a",
+        "files": [
+          {
+            "type": "logs",
+            "name": "float.log",
+            "size": 0,
+            "target": "room-a_float.log",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_float_2.log"
+          },
+          {
+            "type": "logs",
+            "name": "bool.log",
+            "size": 0,
+            "target": "room-a_bool.log",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_bool_2.log"
+          },
+          {
+            "type": "logs",
+            "name": "negative.log",
+            "size": 0,
+            "target": "room-a_negative.log",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_negative_2.log"
+          },
+          {
+            "type": "csv",
+            "name": "big.csv",
+            "size": 123456789012345678901234567890,
+            "target": "room-a_big.csv",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_big_2.csv"
+          },
+          {
+            "type": "attachments",
+            "name": "README",
+            "size": 7,
+            "target": "README",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_README"
+          },
+          {
+            "type": "attachments",
+            "name": "README",
+            "size": 7,
+            "target": "README",
+            "case": "new",
+            "actions": [
+              "save",
+              "rename",
+              "skip"
+            ],
+            "default_action": "save",
+            "suggested_name": "room-a_README"
+          }
+        ],
+        "received": "2026-11-10T05:15:32.565529",
+        "status": "pending"
+      }
+    },
+    "public_errors_http": [
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": null,
+        "body": {
+          "text": "not json"
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Invalid JSON"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": [
+            "not",
+            "a dict"
+          ]
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Invalid request"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "from": "../x",
+            "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "files": []
+          }
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Invalid sender name"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "from": "room-a",
+            "token": "short",
+            "files": []
+          }
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Invalid token"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "from": "room-a",
+            "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "files": []
+          }
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "No files selected"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "from": "room-a",
+            "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "files": [
+              {
+                "type": "logs",
+                "name": "../a.log"
+              }
+            ]
+          }
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "This file cannot be transferred: ../a.log"
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/start/room-a/api/transfer/download/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/quizzes/geo.yaml",
+        "content_type": null,
+        "body": null,
+        "status": 404,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Not found"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-a/api/transfer/result",
+        "content_type": null,
+        "body": {
+          "text": "not json"
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Invalid JSON"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-a/api/transfer/result",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "status": "hacked"
+          }
+        },
+        "status": 400,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Invalid status"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-a/api/transfer/result",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "status": "accepted"
+          }
+        },
+        "status": 404,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Not found"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-b/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "from": "room-a",
+            "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "files": [
+              {
+                "type": "logs",
+                "name": "a.log"
+              }
+            ]
+          }
+        },
+        "status": 409,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "SSH tunnel is not connected"
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/start/room-c/api/transfer/offer",
+        "content_type": "application/json",
+        "body": {
+          "json": {
+            "from": "room-a",
+            "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "files": [
+              {
+                "type": "logs",
+                "name": "a.log"
+              }
+            ]
+          }
+        },
+        "status": 429,
+        "response_content_type": "application/json; charset=utf-8",
+        "response": {
+          "json": {
+            "error": "Too many waiting requests on this server"
+          }
+        }
+      }
+    ],
+    "admin_errors": {
+      "offline": {
+        "status": 404,
+        "error": "Server 'room-x' is not online"
+      },
+      "refused": {
+        "status": 502,
+        "error": "Server 'room-b' refused the request: SSH tunnel is not connected"
+      },
+      "send_without_tunnel": {
+        "status": 409,
+        "error": "SSH tunnel is not connected"
+      },
+      "accept_unknown": {
+        "status": 404,
+        "error": "Request not found or expired"
+      },
+      "reject_unknown": {
+        "status": 404,
+        "error": "Request not found or expired"
+      }
+    },
+    "state_without_tunnel": {
+      "available": false,
+      "name": null,
+      "outgoing": [
+        {
+          "id": "1bc6c5b276dd3b13",
+          "to": "room-b",
+          "files": [
+            {
+              "type": "quizzes",
+              "name": "math.yaml",
+              "size": 12,
+              "sha256": "67f96b6f301a1674d36ac446556b571fed7f216e9b35542266ef7546d05277a3"
+            }
+          ],
+          "created": "2026-11-10T05:15:32.523038",
+          "status": "rejected"
+        },
+        {
+          "id": "30e06d3fc007c863",
+          "to": "room-b",
+          "files": [
+            {
+              "type": "quizzes",
+              "name": "geo.yaml",
+              "size": 339,
+              "sha256": "fcc0809e00d97579aaddf2b3ef3c0c7722443529a14a79551041e8f2253e3c14"
+            },
+            {
+              "type": "quizzes",
+              "name": "same.yaml",
+              "size": 12,
+              "sha256": "075bfd573fffe99e7de3a022d5bba7947cadc958bdb80ff9567223878a690655"
+            },
+            {
+              "type": "quizzes",
+              "name": "diff.yaml",
+              "size": 14,
+              "sha256": "97ee686aa928529c61c1e8e070f3bca6d8ae591c68b095954c46472232c4a7b6"
+            },
+            {
+              "type": "quizzes",
+              "name": "active.yaml",
+              "size": 19,
+              "sha256": "990b7d41c4e8d0c1199c574deea9eda963d1fc3a92039309362d758af8b9d402"
+            },
+            {
+              "type": "logs",
+              "name": "0001.log",
+              "size": 9,
+              "sha256": "8e722e34af271ba626bdbdf618ebf1386eaad27b073b6421d329bf5ffca22637"
+            },
+            {
+              "type": "csv",
+              "name": "results.csv",
+              "size": 10,
+              "sha256": "ea14f99c47575613ab22111122c847728c61007f6bfd7b062d02fcb99df3feb0"
+            },
+            {
+              "type": "images",
+              "name": "map.png",
+              "size": 14,
+              "sha256": "b7635bbb60b8fa980c85009a665669351ade80e546f078a5de120ff8b1cb8636"
+            },
+            {
+              "type": "images",
+              "name": "a.png",
+              "size": 7,
+              "sha256": "a854f481d4cb2479ff869f3a33763e4c3e8d6b5727f909d774fdd5f37690baeb"
+            },
+            {
+              "type": "attachments",
+              "name": "нотатки 1.pdf",
+              "size": 5,
+              "sha256": "ab5aa97074c454a0632057e704220d9a6678fbf773a0a5806fc09b8173b07309"
+            },
+            {
+              "type": "images",
+              "name": "my map.png",
+              "size": 12,
+              "sha256": "d74debb8c0383b92fd3f22dcb38c7b7f010d023bd0a35fdaca41dbfb1a6e7ba2"
+            }
+          ],
+          "created": "2026-11-10T05:15:32.214966",
+          "status": "accepted"
+        }
+      ],
+      "incoming": []
+    }
+  }
+}

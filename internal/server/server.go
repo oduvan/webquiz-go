@@ -19,6 +19,7 @@ import (
 	"github.com/oduvan/webquiz-go/internal/i18n"
 	"github.com/oduvan/webquiz-go/internal/quiz"
 	"github.com/oduvan/webquiz-go/internal/timelimits"
+	"github.com/oduvan/webquiz-go/internal/transfer"
 	"github.com/oduvan/webquiz-go/internal/tunnel"
 	"github.com/oduvan/webquiz-go/web"
 )
@@ -143,6 +144,14 @@ type Server struct {
 	// tunnel server. Its status callback must not take mu.
 	tunnel      *tunnel.Manager
 	tunnelNames atomic.Pointer[tunnelNames] // tunnel.server and socket_name for its status messages
+
+	// transfer sends files to other servers on the same tunnel server and
+	// receives theirs (TestingServer.transfer). It takes its own lock and
+	// then mu (see transfer_handlers.go): never call it while holding mu.
+	transfer *transfer.Manager
+	// endpointForTests replaces the tunnel's public address in tests of the
+	// transfer between two servers (export_test.go); nil otherwise.
+	endpointForTests atomic.Pointer[func() (string, string, bool)]
 
 	loops     sync.WaitGroup // the flush loop and the time limit watcher
 	startOnce sync.Once
@@ -278,6 +287,7 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 	s.log.Info(fmt.Sprintf("=== Server Started - New Log File Created: %s ===", s.logFile))
 	s.liveStatsClients = newWSHub("WebSocket", "live stats WebSocket", s.log)
 	s.adminClients = newWSHub("admin WebSocket", "admin WebSocket", s.log)
+	s.transfer = s.newTransferManager()
 	s.resetStateLocked()
 
 	s.logStartupEnvironment()
