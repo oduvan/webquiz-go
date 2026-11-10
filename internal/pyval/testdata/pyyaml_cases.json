@@ -1,0 +1,1052 @@
+[
+ {
+  "yaml": "yes",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "Yes",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "YES",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "no",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "No",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "NO",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "on",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "On",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "ON",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "off",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "Off",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "OFF",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "true",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "True",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "TRUE",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "false",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "False",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "FALSE",
+  "result": {
+   "type": "bool",
+   "value": false
+  }
+ },
+ {
+  "yaml": "y",
+  "result": {
+   "type": "str",
+   "value": "y"
+  }
+ },
+ {
+  "yaml": "n",
+  "result": {
+   "type": "str",
+   "value": "n"
+  }
+ },
+ {
+  "yaml": "Y",
+  "result": {
+   "type": "str",
+   "value": "Y"
+  }
+ },
+ {
+  "yaml": "N",
+  "result": {
+   "type": "str",
+   "value": "N"
+  }
+ },
+ {
+  "yaml": "yES",
+  "result": {
+   "type": "str",
+   "value": "yES"
+  }
+ },
+ {
+  "yaml": "tRUE",
+  "result": {
+   "type": "str",
+   "value": "tRUE"
+  }
+ },
+ {
+  "yaml": "0",
+  "result": {
+   "type": "int",
+   "value": "0"
+  }
+ },
+ {
+  "yaml": "-0",
+  "result": {
+   "type": "int",
+   "value": "0"
+  }
+ },
+ {
+  "yaml": "+5",
+  "result": {
+   "type": "int",
+   "value": "5"
+  }
+ },
+ {
+  "yaml": "12",
+  "result": {
+   "type": "int",
+   "value": "12"
+  }
+ },
+ {
+  "yaml": "1_000",
+  "result": {
+   "type": "int",
+   "value": "1000"
+  }
+ },
+ {
+  "yaml": "0777",
+  "result": {
+   "type": "int",
+   "value": "511"
+  }
+ },
+ {
+  "yaml": "0o17",
+  "result": {
+   "type": "str",
+   "value": "0o17"
+  }
+ },
+ {
+  "yaml": "0x1F",
+  "result": {
+   "type": "int",
+   "value": "31"
+  }
+ },
+ {
+  "yaml": "0X1F",
+  "result": {
+   "type": "str",
+   "value": "0X1F"
+  }
+ },
+ {
+  "yaml": "-0x1f",
+  "result": {
+   "type": "int",
+   "value": "-31"
+  }
+ },
+ {
+  "yaml": "0b101",
+  "result": {
+   "type": "int",
+   "value": "5"
+  }
+ },
+ {
+  "yaml": "0b1_0",
+  "result": {
+   "type": "int",
+   "value": "2"
+  }
+ },
+ {
+  "yaml": "08",
+  "result": {
+   "type": "str",
+   "value": "08"
+  }
+ },
+ {
+  "yaml": "1:30",
+  "result": {
+   "type": "int",
+   "value": "90"
+  }
+ },
+ {
+  "yaml": "-1:30",
+  "result": {
+   "type": "int",
+   "value": "-90"
+  }
+ },
+ {
+  "yaml": "190:20:30",
+  "result": {
+   "type": "int",
+   "value": "685230"
+  }
+ },
+ {
+  "yaml": "1:60",
+  "result": {
+   "type": "str",
+   "value": "1:60"
+  }
+ },
+ {
+  "yaml": "1:5",
+  "result": {
+   "type": "int",
+   "value": "65"
+  }
+ },
+ {
+  "yaml": "123456789012345678901234567890",
+  "result": {
+   "type": "int",
+   "value": "123456789012345678901234567890"
+  }
+ },
+ {
+  "yaml": "1.5",
+  "result": {
+   "type": "float",
+   "value": "1.5"
+  }
+ },
+ {
+  "yaml": ".5",
+  "result": {
+   "type": "float",
+   "value": "0.5"
+  }
+ },
+ {
+  "yaml": "1.",
+  "result": {
+   "type": "float",
+   "value": "1.0"
+  }
+ },
+ {
+  "yaml": "-1.5",
+  "result": {
+   "type": "float",
+   "value": "-1.5"
+  }
+ },
+ {
+  "yaml": "+1.5",
+  "result": {
+   "type": "float",
+   "value": "1.5"
+  }
+ },
+ {
+  "yaml": "1.5e+3",
+  "result": {
+   "type": "float",
+   "value": "1500.0"
+  }
+ },
+ {
+  "yaml": "1.5e3",
+  "result": {
+   "type": "str",
+   "value": "1.5e3"
+  }
+ },
+ {
+  "yaml": "1e3",
+  "result": {
+   "type": "str",
+   "value": "1e3"
+  }
+ },
+ {
+  "yaml": "1E+3",
+  "result": {
+   "type": "str",
+   "value": "1E+3"
+  }
+ },
+ {
+  "yaml": "1.0e-05",
+  "result": {
+   "type": "float",
+   "value": "1e-05"
+  }
+ },
+ {
+  "yaml": "0.1",
+  "result": {
+   "type": "float",
+   "value": "0.1"
+  }
+ },
+ {
+  "yaml": ".inf",
+  "result": {
+   "type": "float",
+   "value": "inf"
+  }
+ },
+ {
+  "yaml": "-.inf",
+  "result": {
+   "type": "float",
+   "value": "-inf"
+  }
+ },
+ {
+  "yaml": "+.Inf",
+  "result": {
+   "type": "float",
+   "value": "inf"
+  }
+ },
+ {
+  "yaml": ".INF",
+  "result": {
+   "type": "float",
+   "value": "inf"
+  }
+ },
+ {
+  "yaml": ".nan",
+  "result": {
+   "type": "float",
+   "value": "nan"
+  }
+ },
+ {
+  "yaml": ".NaN",
+  "result": {
+   "type": "float",
+   "value": "nan"
+  }
+ },
+ {
+  "yaml": ".NAN",
+  "result": {
+   "type": "float",
+   "value": "nan"
+  }
+ },
+ {
+  "yaml": "1:30.5",
+  "result": {
+   "type": "float",
+   "value": "90.5"
+  }
+ },
+ {
+  "yaml": "1_0.5",
+  "result": {
+   "type": "float",
+   "value": "10.5"
+  }
+ },
+ {
+  "yaml": "0.1_5",
+  "result": {
+   "type": "float",
+   "value": "0.15"
+  }
+ },
+ {
+  "yaml": "09.5",
+  "result": {
+   "type": "float",
+   "value": "9.5"
+  }
+ },
+ {
+  "yaml": "1e400",
+  "result": {
+   "type": "str",
+   "value": "1e400"
+  }
+ },
+ {
+  "yaml": "1.0e+400",
+  "result": {
+   "type": "float",
+   "value": "inf"
+  }
+ },
+ {
+  "yaml": "~",
+  "result": {
+   "type": "null"
+  }
+ },
+ {
+  "yaml": "null",
+  "result": {
+   "type": "null"
+  }
+ },
+ {
+  "yaml": "Null",
+  "result": {
+   "type": "null"
+  }
+ },
+ {
+  "yaml": "NULL",
+  "result": {
+   "type": "null"
+  }
+ },
+ {
+  "yaml": "",
+  "result": {
+   "type": "null"
+  }
+ },
+ {
+  "yaml": "nUll",
+  "result": {
+   "type": "str",
+   "value": "nUll"
+  }
+ },
+ {
+  "yaml": "2024-01-15",
+  "result": {
+   "type": "timestamp"
+  }
+ },
+ {
+  "yaml": "2024-1-5 10:00:00",
+  "result": {
+   "type": "timestamp"
+  }
+ },
+ {
+  "yaml": "2001-12-14t21:59:43.10-05:00",
+  "result": {
+   "type": "timestamp"
+  }
+ },
+ {
+  "yaml": "2001-12-14 21:59:43.10 Z",
+  "result": {
+   "type": "timestamp"
+  }
+ },
+ {
+  "yaml": "2024-01-15x",
+  "result": {
+   "type": "str",
+   "value": "2024-01-15x"
+  }
+ },
+ {
+  "yaml": "'yes'",
+  "result": {
+   "type": "str",
+   "value": "yes"
+  }
+ },
+ {
+  "yaml": "\"no\"",
+  "result": {
+   "type": "str",
+   "value": "no"
+  }
+ },
+ {
+  "yaml": "'5'",
+  "result": {
+   "type": "str",
+   "value": "5"
+  }
+ },
+ {
+  "yaml": "\"1.5\"",
+  "result": {
+   "type": "str",
+   "value": "1.5"
+  }
+ },
+ {
+  "yaml": "|\n  yes\n",
+  "result": {
+   "type": "str",
+   "value": "yes\n"
+  }
+ },
+ {
+  "yaml": ">\n  5\n",
+  "result": {
+   "type": "str",
+   "value": "5\n"
+  }
+ },
+ {
+  "yaml": "!!str 5",
+  "result": {
+   "type": "str",
+   "value": "5"
+  }
+ },
+ {
+  "yaml": "!!str yes",
+  "result": {
+   "type": "str",
+   "value": "yes"
+  }
+ },
+ {
+  "yaml": "!!int '7'",
+  "result": {
+   "type": "int",
+   "value": "7"
+  }
+ },
+ {
+  "yaml": "!!int 0x10",
+  "result": {
+   "type": "int",
+   "value": "16"
+  }
+ },
+ {
+  "yaml": "!!float '1'",
+  "result": {
+   "type": "float",
+   "value": "1.0"
+  }
+ },
+ {
+  "yaml": "!!float 5",
+  "result": {
+   "type": "float",
+   "value": "5.0"
+  }
+ },
+ {
+  "yaml": "!!bool 'yes'",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "!!bool 'On'",
+  "result": {
+   "type": "bool",
+   "value": true
+  }
+ },
+ {
+  "yaml": "!!null 'x'",
+  "result": {
+   "type": "null"
+  }
+ },
+ {
+  "yaml": "!!foo bar",
+  "error": "ConstructorError"
+ },
+ {
+  "yaml": "!!int abc",
+  "error": "ValueError"
+ },
+ {
+  "yaml": "!!bool maybe",
+  "error": "KeyError"
+ },
+ {
+  "yaml": "! foo",
+  "result": {
+   "type": "str",
+   "value": "foo"
+  }
+ },
+ {
+  "yaml": "=",
+  "error": "ConstructorError"
+ },
+ {
+  "yaml": "- =",
+  "error": "ConstructorError"
+ },
+ {
+  "yaml": "=: x",
+  "result": {
+   "type": "dict",
+   "items": {
+    "=": {
+     "type": "str",
+     "value": "x"
+    }
+   }
+  }
+ },
+ {
+  "yaml": "<<",
+  "error": "ConstructorError"
+ },
+ {
+  "yaml": "- a\n- yes\n- 1:30\n",
+  "result": {
+   "type": "list",
+   "items": [
+    {
+     "type": "str",
+     "value": "a"
+    },
+    {
+     "type": "bool",
+     "value": true
+    },
+    {
+     "type": "int",
+     "value": "90"
+    }
+   ]
+  }
+ },
+ {
+  "yaml": "a: 1\na: 2\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "int",
+     "value": "2"
+    }
+   }
+  }
+ },
+ {
+  "yaml": "base: &b {x: 1, y: 2}\nderived:\n  <<: *b\n  y: 3\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "base": {
+     "type": "dict",
+     "items": {
+      "x": {
+       "type": "int",
+       "value": "1"
+      },
+      "y": {
+       "type": "int",
+       "value": "2"
+      }
+     }
+    },
+    "derived": {
+     "type": "dict",
+     "items": {
+      "x": {
+       "type": "int",
+       "value": "1"
+      },
+      "y": {
+       "type": "int",
+       "value": "3"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "yaml": "a: &a {x: 1}\nb: &b {x: 2, z: 3}\nc:\n  <<: [*a, *b]\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "dict",
+     "items": {
+      "x": {
+       "type": "int",
+       "value": "1"
+      }
+     }
+    },
+    "b": {
+     "type": "dict",
+     "items": {
+      "x": {
+       "type": "int",
+       "value": "2"
+      },
+      "z": {
+       "type": "int",
+       "value": "3"
+      }
+     }
+    },
+    "c": {
+     "type": "dict",
+     "items": {
+      "x": {
+       "type": "int",
+       "value": "1"
+      },
+      "z": {
+       "type": "int",
+       "value": "3"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "yaml": "a: &a {x: 1}\nc:\n  <<: *a\n  <<: {x: 5, w: 6}\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "dict",
+     "items": {
+      "x": {
+       "type": "int",
+       "value": "1"
+      }
+     }
+    },
+    "c": {
+     "type": "dict",
+     "items": {
+      "x": {
+       "type": "int",
+       "value": "5"
+      },
+      "w": {
+       "type": "int",
+       "value": "6"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "yaml": "1: one\nfalse: f\nnull: n\n1.5: x\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "1": {
+     "type": "str",
+     "value": "one"
+    },
+    "false": {
+     "type": "str",
+     "value": "f"
+    },
+    "null": {
+     "type": "str",
+     "value": "n"
+    },
+    "1.5": {
+     "type": "str",
+     "value": "x"
+    }
+   }
+  }
+ },
+ {
+  "yaml": "? [1, 2]\n: x\n",
+  "error": "ConstructorError"
+ },
+ {
+  "yaml": "x: &x 1\ny: *x\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "x": {
+     "type": "int",
+     "value": "1"
+    },
+    "y": {
+     "type": "int",
+     "value": "1"
+    }
+   }
+  }
+ },
+ {
+  "yaml": "questions:\n  - question: Q\n    options: [Yes, No]\n    correct_answer: 0\n    points: 1.5\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "questions": {
+     "type": "list",
+     "items": [
+      {
+       "type": "dict",
+       "items": {
+        "question": {
+         "type": "str",
+         "value": "Q"
+        },
+        "options": {
+         "type": "list",
+         "items": [
+          {
+           "type": "bool",
+           "value": true
+          },
+          {
+           "type": "bool",
+           "value": false
+          }
+         ]
+        },
+        "correct_answer": {
+         "type": "int",
+         "value": "0"
+        },
+        "points": {
+         "type": "float",
+         "value": "1.5"
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "yaml": "registration:\n  approve: yes\n  fields:\n    - Клас\n    - on\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "registration": {
+     "type": "dict",
+     "items": {
+      "approve": {
+       "type": "bool",
+       "value": true
+      },
+      "fields": {
+       "type": "list",
+       "items": [
+        {
+         "type": "str",
+         "value": "Клас"
+        },
+        {
+         "type": "bool",
+         "value": true
+        }
+       ]
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "yaml": "time_limit: {whole_quiz: 15:00}\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "time_limit": {
+     "type": "dict",
+     "items": {
+      "whole_quiz": {
+       "type": "int",
+       "value": "900"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "yaml": "--- a\n--- b\n",
+  "error": "ComposerError"
+ },
+ {
+  "yaml": "--- a\n",
+  "result": {
+   "type": "str",
+   "value": "a"
+  }
+ },
+ {
+  "yaml": "a: [1, 2",
+  "error": "ParserError"
+ },
+ {
+  "yaml": "﻿a: 1\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "int",
+     "value": "1"
+    }
+   }
+  }
+ },
+ {
+  "yaml": "a: b\r\nc: d\r\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "str",
+     "value": "b"
+    },
+    "c": {
+     "type": "str",
+     "value": "d"
+    }
+   }
+  }
+ },
+ {
+  "yaml": "# only a comment\n",
+  "result": {
+   "type": "null"
+  }
+ },
+ {
+  "yaml": "a:\n  - b\n  -\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "list",
+     "items": [
+      {
+       "type": "str",
+       "value": "b"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "yaml": "a: 'it''s'\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "str",
+     "value": "it's"
+    }
+   }
+  }
+ },
+ {
+  "yaml": "a: \"tab\\there\"\n",
+  "result": {
+   "type": "dict",
+   "items": {
+    "a": {
+     "type": "str",
+     "value": "tab\there"
+    }
+   }
+  }
+ }
+]

@@ -1,0 +1,13 @@
+{
+  "name": "webquiz-screenshots",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "screenshots": "node --experimental-strip-types screenshots.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22"
+  }
+}

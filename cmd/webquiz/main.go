@@ -1,0 +1,273 @@
+// Command webquiz runs the WebQuiz server.
+//
+// It has the options of cli.py (flag accepts both -d and --daemon), the
+// start steps of binary_entry.py and the daemon mode (see daemon.go).
+//
+// Start steps: the base folder is WEBQUIZ_BINARY_DIR when it is set, else
+// the folder of the program; the program sets WEBQUIZ_BINARY_DIR to it and
+// changes into it, so webquiz.yaml, quizzes/, data/, logs/ and static/ live
+// next to the program. WEBQUIZ_IS_BINARY is set to 1 when it is not set;
+// with 1 the admin page opens in a browser after the start (tests set 0).
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/oduvan/webquiz-go/internal/config"
+	"github.com/oduvan/webquiz-go/internal/server"
+	"github.com/oduvan/webquiz-go/internal/version"
+)
+
+func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("webquiz", flag.ContinueOnError)
+	flags.SetOutput(io.Discard) // the messages are written below, like argparse does
+	flags.Usage = func() {}
+	var (
+		daemon     = flags.Bool("daemon", false, "")
+		stop       = flags.Bool("stop", false, "")
+		status     = flags.Bool("status", false, "")
+		configPath = flags.String("config", "", "")
+		port       = flags.Int("port", 0, "")
+		quizzesDir = flags.String("quizzes-dir", "", "")
+		masterKey  = flags.String("master-key", "", "")
+		logsDir    = flags.String("logs-dir", "", "")
+		csvDir     = flags.String("csv-dir", "", "")
+		staticDir  = flags.String("static", "", "")
+		urlFormat  = flags.String("url-format", "", "")
+		showVer    = flags.Bool("version", false, "")
+	)
+	flags.BoolVar(daemon, "d", false, "")
+	err := flags.Parse(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, helpText)
+		return 0
+	}
+	if err == nil && flags.NArg() > 0 {
+		err = fmt.Errorf("unrecognized arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if err != nil {
+		fmt.Fprint(stderr, usageLine)
+		fmt.Fprintf(stderr, "webquiz: error: %v\n", err)
+		return 2
+	}
+	if *showVer {
+		fmt.Fprintf(stdout, "webquiz %s\n", version.Version)
+		return 0
+	}
+
+	if err := useBaseFolder(); err != nil {
+		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
+		return 1
+	}
+
+	// Only the options that were given override the config file.
+	var overrides config.Overrides
+	flags.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "port":
+			overrides.Port = port
+		case "quizzes-dir":
+			overrides.QuizzesDir = quizzesDir
+		case "master-key":
+			overrides.MasterKey = masterKey
+		case "logs-dir":
+			overrides.LogsDir = logsDir
+		case "csv-dir":
+			overrides.CSVDir = csvDir
+		case "static":
+			overrides.StaticDir = staticDir
+		case "url-format":
+			overrides.URLFormat = urlFormat
+		}
+	})
+	// Before the server makes its log file, only warnings and errors are
+	// shown (on the console), as Python's logging did before its setup.
+	console := slog.New(&messageHandler{out: stderr, level: slog.LevelWarn})
+	cfg, err := config.LoadWithOverrides(*configPath, overrides, console)
+	if err != nil {
+		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
+		return 1
+	}
+
+	// The order of cli.py: stop, status, daemon, then the server in front.
+	switch {
+	case *stop:
+		return stopDaemon(stdout)
+	case *status:
+		return daemonStatus(stdout)
+	case *daemon:
+		return startDaemon(stdout, daemonArgs(flags))
+	}
+	return runServer(cfg, stdout)
+}
+
+// daemonArgs are the options for the detached copy of the program: every
+// option that was given, except -d/--daemon.
+func daemonArgs(flags *flag.FlagSet) []string {
+	var args []string
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "d" || f.Name == "daemon" {
+			return
+		}
+		args = append(args, "--"+f.Name+"="+f.Value.String())
+	})
+	return args
+}
+
+// useBaseFolder does the start steps of binary_entry.py (see the package
+// comment).
+func useBaseFolder() error {
+	dir := os.Getenv("WEBQUIZ_BINARY_DIR")
+	if dir == "" {
+		exe, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		dir = filepath.Dir(exe)
+		if err := os.Setenv("WEBQUIZ_BINARY_DIR", dir); err != nil {
+			return err
+		}
+	}
+	if err := os.Chdir(dir); err != nil {
+		return err
+	}
+	if _, ok := os.LookupEnv("WEBQUIZ_IS_BINARY"); !ok {
+		return os.Setenv("WEBQUIZ_IS_BINARY", "1")
+	}
+	return nil
+}
+
+// runServer is run_server of cli.py: it starts the server and serves until
+// SIGINT or SIGTERM.
+func runServer(cfg *config.Config, stdout io.Writer) int {
+	address := fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)
+	fmt.Fprintln(stdout, "🚀 Starting WebQuiz Testing System...")
+	fmt.Fprintf(stdout, "📁 Quizzes directory: %s\n", cfg.Paths.QuizzesDir)
+	fmt.Fprintf(stdout, "📝 Logs directory: %s\n", cfg.Paths.LogsDir)
+	fmt.Fprintf(stdout, "📊 CSV directory: %s\n", cfg.Paths.CSVDir)
+	fmt.Fprintf(stdout, "📂 Static directory: %s\n", cfg.Paths.StaticDir)
+	if cfg.Admin.MasterKey != "" {
+		fmt.Fprintln(stdout, "🔑 Master key: Set")
+	} else {
+		fmt.Fprintln(stdout, "🔑 Master key: Not set (admin disabled)")
+	}
+	fmt.Fprintf(stdout, "🌐 Server will be available at: %s (accessible on network)\n", address)
+	if cfg.Admin.MasterKey != "" {
+		fmt.Fprintf(stdout, "🔧 Admin panel: %s/admin\n", address)
+	}
+	fmt.Fprintln(stdout, "⏹️  Press Ctrl+C to stop")
+
+	defer removeOwnPIDFile()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	srv, err := server.New(cfg, server.Options{})
+	if err != nil {
+		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
+		return 1
+	}
+	defer srv.Close()
+
+	listener, err := listen(cfg.Server.Host, cfg.Server.Port)
+	if err != nil {
+		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
+		return 1
+	}
+	httpServer := &http.Server{Handler: srv.Handler(), ReadHeaderTimeout: 30 * time.Second}
+	served := make(chan error, 1)
+	go func() { served <- httpServer.Serve(listener) }()
+	srv.Start(ctx)
+	fmt.Fprintln(stdout, "✅ Server started successfully")
+
+	if os.Getenv("WEBQUIZ_IS_BINARY") == "1" {
+		adminURL := fmt.Sprintf("http://127.0.0.1:%d/admin/", cfg.Server.Port)
+		fmt.Fprintf(stdout, "🌐 Opening admin interface: %s\n", adminURL)
+		if err := openBrowser(adminURL); err != nil {
+			fmt.Fprintf(stdout, "⚠️  Could not open browser: %v\n", err)
+		}
+	}
+
+	select {
+	case <-ctx.Done():
+	case err := <-served:
+		if !errors.Is(err, http.ErrServerClosed) {
+			fmt.Fprintf(stdout, "❌ Error: %v\n", err)
+			return 1
+		}
+	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = httpServer.Shutdown(shutdownCtx)
+	srv.Close()
+	fmt.Fprintln(stdout, "✅ Server stopped")
+	return 0
+}
+
+// listen opens the port like aiohttp's TCPSite: an IPv4 address (the default
+// 0.0.0.0) listens on IPv4 only.
+func listen(host string, port int) (net.Listener, error) {
+	network := "tcp"
+	if ip := net.ParseIP(host); ip != nil && ip.To4() != nil {
+		network = "tcp4"
+	}
+	return net.Listen(network, net.JoinHostPort(host, strconv.Itoa(port)))
+}
+
+// openBrowser opens url in the default browser, like Python's webbrowser.open.
+func openBrowser(url string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
+}
+
+// messageHandler writes only the message of each record, like Python's
+// logging before basicConfig (its "last resort" handler).
+type messageHandler struct {
+	out   io.Writer
+	level slog.Level
+}
+
+func (h *messageHandler) Enabled(_ context.Context, level slog.Level) bool { return level >= h.level }
+
+func (h *messageHandler) Handle(_ context.Context, r slog.Record) error {
+	_, err := fmt.Fprintln(h.out, r.Message)
+	return err
+}
+
+func (h *messageHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *messageHandler) WithGroup(string) slog.Handler { return h }

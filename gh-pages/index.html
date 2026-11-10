@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz - Download</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --accent-color: #2563eb;
+            --accent-hover: #1d4ed8;
+            --border-color: #e5e7eb;
+            --section-bg: #f9fafb;
+            --secondary-text: #666666;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a2e;
+            --card-bg: #16213e;
+            --text-color: #e4e4e7;
+            --accent-color: #60a5fa;
+            --accent-hover: #93c5fd;
+            --border-color: #374151;
+            --section-bg: #1e293b;
+            --secondary-text: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background-color: var(--accent-color);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .description {
+            color: var(--secondary-text);
+            margin-top: 15px;
+            font-size: 1.1rem;
+        }
+
+        .section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .download-item {
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            background: var(--section-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .download-item:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+        }
+
+        .download-item .platform {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .download-item .arch {
+            font-size: 0.85rem;
+            color: var(--secondary-text);
+            margin-bottom: 12px;
+        }
+
+        .download-item a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .download-item a:hover {
+            text-decoration: underline;
+        }
+
+        .doc-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .doc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--section-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .doc-item .doc-name {
+            font-weight: 500;
+        }
+
+        .doc-item a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .doc-item a:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--secondary-text);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .download-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .doc-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span id="theme-icon">&#9790;</span>
+    </button>
+    <div class="container">
+        <header>
+            <h1>WebQuiz</h1>
+            <span class="version-badge">v{{VERSION}}</span>
+            <p class="description">Quiz system with real-time stats and admin panel</p>
+        </header>
+
+        <section class="section">
+            <h2>Pre-built Binaries</h2>
+            <div class="download-grid">
+                <div class="download-item">
+                    <span class="platform">Linux</span>
+                    <span class="arch">x86_64</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-linux.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Linux ARM64</span>
+                    <span class="arch">Raspberry Pi 3/4/5 (64-bit OS)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-linux-arm64.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Linux ARM</span>
+                    <span class="arch">32-bit (Raspberry Pi Zero, 1, 2, older OS)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-linux-arm.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">macOS Intel</span>
+                    <span class="arch">x86_64 (macOS 12+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-macos-intel.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">macOS Apple Silicon</span>
+                    <span class="arch">ARM64 (M1-M5, macOS 12+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-macos-apple-silicon.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Windows</span>
+                    <span class="arch">x86_64 (Windows 10+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows-setup.exe">
+                        Download Installer
+                    </a>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows.exe.zip" style="margin-top: 4px; font-size: 0.8rem;">
+                        Portable .zip
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Documentation</h2>
+            <div class="download-grid">
+                <div class="download-item">
+                    <span class="platform">English</span>
+                    <span class="arch">Online documentation</span>
+                    <a href="docs/en/">Read Online</a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Ukrainian</span>
+                    <span class="arch">Online documentation</span>
+                    <a href="docs/uk/">Read Online</a>
+                </div>
+            </div>
+            <div class="doc-list" style="margin-top: 16px;">
+                <div class="doc-item">
+                    <span class="doc-name">PDF (English)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-documentation-en.pdf">Download</a>
+                </div>
+                <div class="doc-item">
+                    <span class="doc-name">PDF (Ukrainian)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-documentation-uk.pdf">Download</a>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>
+                <a href="https://github.com/oduvan/webquiz-go">GitHub Repository</a> |
+                <a href="https://github.com/oduvan/webquiz-go/releases">All Releases</a> |
+                <a href="https://github.com/oduvan/webquiz-go/issues/new/choose">Report Issue</a>
+            </p>
+        </footer>
+    </div>
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('theme-icon');
+            icon.innerHTML = theme === 'dark' ? '&#9788;' : '&#9790;';
+        }
+
+        (function() {
+            const savedTheme = localStorage.getItem('theme') ||
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (savedTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            updateThemeIcon(savedTheme);
+        })();
+    </script>
+</body>
+</html>
