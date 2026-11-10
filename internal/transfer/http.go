@@ -59,7 +59,8 @@ func (m *Manager) postJSON(ctx context.Context, url string, value any) (int, []b
 		return 0, nil, err
 	}
 	defer response.Body.Close()
-	answer, err := io.ReadAll(idleLimit(response.Body, stop))
+	// The answer is only read for its error text: at most 1 MiB of it.
+	answer, err := io.ReadAll(io.LimitReader(idleLimit(response.Body, stop), maxBodySize))
 	if err != nil {
 		return 0, nil, err
 	}
@@ -200,16 +201,17 @@ func (m *Manager) HandleOffer(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return writeError(w, http.StatusBadRequest, "Invalid JSON")
 	}
-	m.mu.Lock()
-	incoming, err := m.addIncomingLocked(data)
-	var view RequestView
-	if err == nil {
+	m.locked(func() {
+		var incoming *request
+		if incoming, err = m.addIncomingLocked(data); err != nil {
+			return
+		}
 		m.log.Info(fmt.Sprintf("File transfer request from '%s': %d file(s)", incoming.from, len(incoming.files)))
+		var view RequestView
 		if view, err = m.requestViewLocked(incoming); err == nil {
 			m.notifyLocked(map[string]any{"type": "transfer_request", "request": view})
 		}
-	}
-	m.mu.Unlock()
+	})
 	var transferError *Error
 	if errors.As(err, &transferError) {
 		return writeError(w, transferError.Status, transferError.Message)
@@ -224,17 +226,16 @@ func (m *Manager) HandleOffer(w http.ResponseWriter, r *http.Request) error {
 // it serves one offered file to the receiver (handle_download).
 func (m *Manager) HandleDownload(w http.ResponseWriter, r *http.Request) error {
 	fileType, filename := r.PathValue("type"), r.PathValue("filename")
-	m.mu.Lock()
-	o := m.findWaitingOfferLocked(r.PathValue("token"))
 	offered := false
-	if o != nil {
-		for _, f := range o.files {
-			if f.Type == fileType && f.Name == filename {
-				offered = true
+	m.locked(func() {
+		if o := m.findWaitingOfferLocked(r.PathValue("token")); o != nil {
+			for _, f := range o.files {
+				if f.Type == fileType && f.Name == filename {
+					offered = true
+				}
 			}
 		}
-	}
-	m.mu.Unlock()
+	})
 	if !offered || !isAllowedFile(fileType, filename) {
 		return writeError(w, http.StatusNotFound, "Not found")
 	}
@@ -269,15 +270,18 @@ func (m *Manager) HandleResult(w http.ResponseWriter, r *http.Request) error {
 		return writeError(w, http.StatusBadRequest, "Invalid status")
 	}
 
-	m.mu.Lock()
-	o := m.findWaitingOfferLocked(fields["token"])
-	if o != nil {
+	found := false
+	m.locked(func() {
+		o := m.findWaitingOfferLocked(fields["token"])
+		if o == nil {
+			return
+		}
+		found = true
 		o.status = status
 		m.log.Info(fmt.Sprintf("File transfer to '%s': %s", o.to, o.status))
 		m.notifyLocked(map[string]any{"type": "transfer_result", "offer": o.view()})
-	}
-	m.mu.Unlock()
-	if o == nil {
+	})
+	if !found {
 		return writeError(w, http.StatusNotFound, "Not found")
 	}
 	return writeJSON(w, http.StatusOK, map[string]any{"success": true})

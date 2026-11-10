@@ -269,9 +269,11 @@ func (s *Server) filesSaveQuiz(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	// The full paths are compared: a running quiz in a subfolder
+	// (sub/a.yaml) is another file than the top-level a.yaml saved here.
 	var running string
 	s.withLock(func() { running = s.currentQuizFile })
-	if running != "" && filepath.Base(running) == filename {
+	if running != "" && running == quizPath {
 		s.log.Info(fmt.Sprintf("Reloading active quiz after edit: %s", filename))
 		if err := s.SwitchQuiz(filename, nil); err != nil {
 			return err
