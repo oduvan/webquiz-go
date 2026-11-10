@@ -52,8 +52,11 @@
 
 /* ---- Top bar: the student's name next to the theme button ---- */
 
+/* Both sit at the top of the page and scroll away with it, as in 1.19
+   (index.html:51-66, 886-891). Fixed on the screen, they covered the text
+   under them on a phone. */
 .user-info {
-  position: fixed;
+  position: absolute;
   top: 10px;
   right: 60px;
   z-index: 40;
@@ -355,6 +358,29 @@
     border-left: none;
     border-right: none;
     border-radius: 0;
+  }
+
+  /* A picture fills the option beside its radio circle, up to the right edge of
+     the screen. 1.19 made it as wide as the screen (index.html:501-514); the
+     radio circle is new in 2.0 and stays. */
+  .quiz-option.image-option {
+    padding: 8px 0 8px 10px;
+  }
+
+  /* The picture takes the whole row beside the circle (the circle and its gap
+     are 28 px; 2 px more for rounding), so a feedback label goes to the next
+     line and does not make the picture smaller */
+  .quiz-option.image-option .option-content {
+    flex-basis: calc(100% - 30px);
+  }
+
+  .option-image {
+    width: 100%;
+  }
+
+  .quiz-option.image-option .feedback-label {
+    margin-top: 6px;
+    margin-right: 10px;
   }
 }
 

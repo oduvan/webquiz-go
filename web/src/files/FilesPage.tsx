@@ -166,7 +166,8 @@ export function FilesPage() {
 
   return (
     <div className="container mx-auto box-border w-full max-w-5xl p-4 max-md:p-3">
-      <h1 className="mb-4 mt-8 text-2xl font-bold max-md:text-xl">{T.title}</h1>
+      {/* mr-14: the title keeps clear of the theme button at the top right */}
+      <h1 className="mb-4 mr-14 mt-8 text-2xl font-bold max-md:text-xl">{T.title}</h1>
 
       {!authed && (
         <div id="auth-section" className="max-w-md">
