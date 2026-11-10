@@ -29,7 +29,9 @@ func (e *loadError) Error() string { return e.err.Error() }
 // (explanation: |). The file is written again by the YAML library, so the
 // indentation of lists may change and blank lines between entries are not
 // kept. A file that is not valid YAML is left alone and the error is a
-// *loadError.
+// *loadError. Unlike ruamel.yaml, which refused a file with a repeated key
+// (PyYAML reads the last one), every repeated "image", "file", "options"
+// or "explanation" key is updated.
 func rewriteQuizMedia(quizPath string, renamed map[mediaFile]string) (bool, error) {
 	data, err := os.ReadFile(quizPath)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -31,6 +32,7 @@ type machine struct {
 	connected  bool // its own tunnel is connected (Endpoint)
 	messages   []map[string]any
 	filesInUse []string
+	log        bytes.Buffer // the manager's log lines
 }
 
 func newMachine(t *testing.T, root, name string, tunnel *fakeTunnel) *machine {
@@ -68,9 +70,24 @@ func newMachine(t *testing.T, root, name string, tunnel *fakeTunnel) *machine {
 			defer m.mu.Unlock()
 			return slices.Clone(m.filesInUse)
 		},
-		Logger: testLogger(t),
+		Logger: slog.New(slog.NewTextHandler(io.MultiWriter(testWriter{t}, lockedWriter{m}), nil)),
 	})
 	return m
+}
+
+// lockedWriter adds log lines to the machine's log.
+type lockedWriter struct{ m *machine }
+
+func (w lockedWriter) Write(p []byte) (int, error) {
+	w.m.mu.Lock()
+	defer w.m.mu.Unlock()
+	return w.m.log.Write(p)
+}
+
+func (m *machine) logText() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.log.String()
 }
 
 // setOnline is Python's machine.online: the tunnel reaches the machine and

@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,11 +13,7 @@ import (
 	"time"
 )
 
-// testLogger writes the manager's log to the test log.
-func testLogger(t *testing.T) *slog.Logger {
-	return slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
-}
-
+// testWriter writes the manager's log to the test log.
 type testWriter struct{ t *testing.T }
 
 func (w testWriter) Write(p []byte) (int, error) {
