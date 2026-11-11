@@ -10,11 +10,18 @@ import (
 	"testing"
 )
 
+// program is one version of the program that the tests build once.
+type program struct {
+	tags string // the build tags: "" for the console version
+	once sync.Once
+	dir  string // the temp folder it is built into
+	path string
+	err  string
+}
+
 var (
-	buildOnce sync.Once
-	buildDir  string
-	buildPath string
-	buildErr  string
+	consoleProgram = &program{}
+	desktopProgram = &program{tags: "desktop"}
 )
 
 // BuildBinary builds cmd/webquiz once per test binary (CGO_ENABLED=0, like a
@@ -26,45 +33,60 @@ var (
 // BuildBinary can remove it at the end with RemoveBinary from TestMain.
 func BuildBinary(t testing.TB) string {
 	t.Helper()
-	buildOnce.Do(build)
-	if buildErr != "" {
-		t.Fatal(buildErr)
-	}
-	return buildPath
+	return consoleProgram.build(t)
 }
 
-// RemoveBinary deletes the program that BuildBinary built, if any. Call it
-// from TestMain after m.Run.
+// BuildDesktopBinary is BuildBinary for the desktop version (-tags desktop).
+// With CGO_ENABLED=0 it builds for Linux and Windows only: the tray library
+// needs cgo on macOS.
+func BuildDesktopBinary(t testing.TB) string {
+	t.Helper()
+	return desktopProgram.build(t)
+}
+
+// RemoveBinary deletes the programs that BuildBinary and BuildDesktopBinary
+// built, if any. Call it from TestMain after m.Run.
 func RemoveBinary() {
-	if buildDir != "" {
-		os.RemoveAll(buildDir)
+	for _, p := range []*program{consoleProgram, desktopProgram} {
+		if p.dir != "" {
+			os.RemoveAll(p.dir)
+		}
 	}
 }
 
-func build() {
+func (p *program) build(t testing.TB) string {
+	t.Helper()
+	p.once.Do(p.compile)
+	if p.err != "" {
+		t.Fatal(p.err)
+	}
+	return p.path
+}
+
+func (p *program) compile() {
 	root, err := moduleRoot()
 	if err != nil {
-		buildErr = "BuildBinary: " + err.Error()
+		p.err = "BuildBinary: " + err.Error()
 		return
 	}
-	buildDir, err = os.MkdirTemp("", "webquiz-test-bin-")
+	p.dir, err = os.MkdirTemp("", "webquiz-test-bin-")
 	if err != nil {
-		buildErr = "BuildBinary: " + err.Error()
+		p.err = "BuildBinary: " + err.Error()
 		return
 	}
 	name := "webquiz"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	path := filepath.Join(buildDir, name)
-	cmd := exec.Command(goTool(), "build", "-o", path, "./cmd/webquiz")
+	path := filepath.Join(p.dir, name)
+	cmd := exec.Command(goTool(), "build", "-tags", p.tags, "-o", path, "./cmd/webquiz")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if output, err := cmd.CombinedOutput(); err != nil {
-		buildErr = "BuildBinary: go build ./cmd/webquiz failed (did you run \"make web\"?): " + err.Error() + "\n" + string(output)
+		p.err = "BuildBinary: go build ./cmd/webquiz (tags \"" + p.tags + "\") failed (did you run \"make web\"?): " + err.Error() + "\n" + string(output)
 		return
 	}
-	buildPath = path
+	p.path = path
 }
 
 // moduleRoot is the folder of go.mod.

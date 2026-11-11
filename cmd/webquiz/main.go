@@ -8,6 +8,12 @@
 // changes into it, so webquiz.yaml, quizzes/, data/, logs/ and static/ live
 // next to the program. WEBQUIZ_IS_BINARY is set to 1 when it is not set;
 // with 1 the admin page opens in a browser after the start (tests set 0).
+//
+// The program comes in two versions from the same code (new in 2.0). The
+// console version (no build tag, main_console.go) is this program as it
+// always was. The desktop version ("go build -tags desktop",
+// main_desktop.go) runs the same server with an icon in the system tray
+// instead of the console: see desktop.go and internal/desktop.
 package main
 
 import (
@@ -26,6 +32,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -34,11 +41,51 @@ import (
 	"github.com/oduvan/webquiz-go/internal/version"
 )
 
-func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+// run is the console version: the command line of cli.py.
+func run(args []string, stdout, stderr io.Writer) int {
+	opts, code, done := parseArgs(args, stdout, stderr)
+	if done {
+		return code
+	}
+
+	if err := useBaseFolder(); err != nil {
+		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
+		return 1
+	}
+
+	// Before the server makes its log file, only warnings and errors are
+	// shown (on the console), as Python's logging did before its setup.
+	console := slog.New(&messageHandler{out: stderr, level: slog.LevelWarn})
+	cfg, err := config.LoadWithOverrides(opts.configPath, opts.overrides, console)
+	if err != nil {
+		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
+		return 1
+	}
+
+	// The order of cli.py: stop, status, daemon, then the server in front.
+	switch {
+	case opts.stop:
+		return stopDaemon(stdout)
+	case opts.status:
+		return daemonStatus(stdout)
+	case opts.daemon:
+		return startDaemon(stdout, opts.daemonArgs)
+	}
+	return runServer(cfg, stdout)
 }
 
-func run(args []string, stdout, stderr io.Writer) int {
+// options are the parsed command line.
+type options struct {
+	daemon, stop, status bool
+	configPath           string
+	overrides            config.Overrides // only the options that were given override the config file
+	daemonArgs           []string         // the options for the detached copy of -d
+}
+
+// parseArgs reads the command line like argparse in cli.py. It writes the
+// help, the version and option errors itself; then done is true and code is
+// the exit code.
+func parseArgs(args []string, stdout, stderr io.Writer) (opts options, code int, done bool) {
 	flags := flag.NewFlagSet("webquiz", flag.ContinueOnError)
 	flags.SetOutput(io.Discard) // the messages are written below, like argparse does
 	flags.Usage = func() {}
@@ -60,7 +107,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	err := flags.Parse(args)
 	if errors.Is(err, flag.ErrHelp) {
 		fmt.Fprint(stdout, helpText)
-		return 0
+		return opts, 0, true
 	}
 	if err == nil && flags.NArg() > 0 {
 		err = fmt.Errorf("unrecognized arguments: %s", strings.Join(flags.Args(), " "))
@@ -68,57 +115,33 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprint(stderr, usageLine)
 		fmt.Fprintf(stderr, "webquiz: error: %v\n", err)
-		return 2
+		return opts, 2, true
 	}
 	if *showVer {
 		fmt.Fprintf(stdout, "webquiz %s\n", version.Version)
-		return 0
+		return opts, 0, true
 	}
 
-	if err := useBaseFolder(); err != nil {
-		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
-		return 1
-	}
-
-	// Only the options that were given override the config file.
-	var overrides config.Overrides
+	opts = options{daemon: *daemon, stop: *stop, status: *status, configPath: *configPath, daemonArgs: daemonArgs(flags)}
 	flags.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "port":
-			overrides.Port = port
+			opts.overrides.Port = port
 		case "quizzes-dir":
-			overrides.QuizzesDir = quizzesDir
+			opts.overrides.QuizzesDir = quizzesDir
 		case "master-key":
-			overrides.MasterKey = masterKey
+			opts.overrides.MasterKey = masterKey
 		case "logs-dir":
-			overrides.LogsDir = logsDir
+			opts.overrides.LogsDir = logsDir
 		case "csv-dir":
-			overrides.CSVDir = csvDir
+			opts.overrides.CSVDir = csvDir
 		case "static":
-			overrides.StaticDir = staticDir
+			opts.overrides.StaticDir = staticDir
 		case "url-format":
-			overrides.URLFormat = urlFormat
+			opts.overrides.URLFormat = urlFormat
 		}
 	})
-	// Before the server makes its log file, only warnings and errors are
-	// shown (on the console), as Python's logging did before its setup.
-	console := slog.New(&messageHandler{out: stderr, level: slog.LevelWarn})
-	cfg, err := config.LoadWithOverrides(*configPath, overrides, console)
-	if err != nil {
-		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
-		return 1
-	}
-
-	// The order of cli.py: stop, status, daemon, then the server in front.
-	switch {
-	case *stop:
-		return stopDaemon(stdout)
-	case *status:
-		return daemonStatus(stdout)
-	case *daemon:
-		return startDaemon(stdout, daemonArgs(flags))
-	}
-	return runServer(cfg, stdout)
+	return opts, 0, false
 }
 
 // daemonArgs are the options for the detached copy of the program: every
@@ -139,17 +162,33 @@ func daemonArgs(flags *flag.FlagSet) []string {
 func useBaseFolder() error {
 	dir := os.Getenv("WEBQUIZ_BINARY_DIR")
 	if dir == "" {
-		exe, err := os.Executable()
+		exe, err := programFile()
 		if err != nil {
 			return err
 		}
-		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = resolved
-		}
 		dir = filepath.Dir(exe)
-		if err := os.Setenv("WEBQUIZ_BINARY_DIR", dir); err != nil {
-			return err
-		}
+	}
+	return useFolder(dir)
+}
+
+// programFile is the path of the running program, with symbolic links
+// resolved.
+func programFile() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return exe, nil
+}
+
+// useFolder makes dir the base folder: WEBQUIZ_BINARY_DIR names it, the
+// program works in it, and WEBQUIZ_IS_BINARY is 1 unless it is set.
+func useFolder(dir string) error {
+	if err := os.Setenv("WEBQUIZ_BINARY_DIR", dir); err != nil {
+		return err
 	}
 	if err := os.Chdir(dir); err != nil {
 		return err
@@ -184,22 +223,17 @@ func runServer(cfg *config.Config, stdout io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv, err := server.New(cfg, server.Options{})
+	running, err := newServing(cfg, server.Options{})
 	if err != nil {
 		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
 		return 1
 	}
-	defer srv.Close()
+	defer running.stop()
 
-	listener, err := listen(cfg.Server.Host, cfg.Server.Port)
-	if err != nil {
+	if err := running.serve(ctx); err != nil {
 		fmt.Fprintf(stdout, "❌ Error: %v\n", err)
 		return 1
 	}
-	httpServer := &http.Server{Handler: srv.Handler(), ReadHeaderTimeout: 30 * time.Second}
-	served := make(chan error, 1)
-	go func() { served <- httpServer.Serve(listener) }()
-	srv.Start(ctx)
 	fmt.Fprintln(stdout, "✅ Server started successfully")
 
 	if os.Getenv("WEBQUIZ_IS_BINARY") == "1" {
@@ -212,18 +246,66 @@ func runServer(cfg *config.Config, stdout io.Writer) int {
 
 	select {
 	case <-ctx.Done():
-	case err := <-served:
+	case err := <-running.served:
 		if !errors.Is(err, http.ErrServerClosed) {
 			fmt.Fprintf(stdout, "❌ Error: %v\n", err)
 			return 1
 		}
 	}
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_ = httpServer.Shutdown(shutdownCtx)
-	srv.Close()
+	running.stop()
 	fmt.Fprintln(stdout, "✅ Server stopped")
 	return 0
+}
+
+// serving is the running server of the program: the WebQuiz server and the
+// HTTP server in front of it. The console and the desktop version start it
+// and stop it the same way.
+type serving struct {
+	cfg      *config.Config
+	srv      *server.Server
+	http     *http.Server
+	served   chan error // gets the error that ends the HTTP server
+	stopOnce sync.Once
+}
+
+// newServing makes the server: its log file, the quiz. Nothing listens yet.
+func newServing(cfg *config.Config, opts server.Options) (*serving, error) {
+	srv, err := server.New(cfg, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &serving{
+		cfg:    cfg,
+		srv:    srv,
+		http:   &http.Server{Handler: srv.Handler(), ReadHeaderTimeout: 30 * time.Second},
+		served: make(chan error, 1),
+	}, nil
+}
+
+// serve opens the port of the config, serves it in a goroutine and starts
+// the background work of the server (the CSV flush and the time limit
+// watcher), which ends with ctx.
+func (s *serving) serve(ctx context.Context) error {
+	listener, err := listen(s.cfg.Server.Host, s.cfg.Server.Port)
+	if err != nil {
+		return err
+	}
+	go func() { s.served <- s.http.Serve(listener) }()
+	s.srv.Start(ctx)
+	return nil
+}
+
+// stop is what Ctrl+C does: the HTTP server stops taking requests and lets
+// the running ones finish (up to 5 seconds), then the server writes the
+// answers that wait for the CSV flush and closes its log file. A second
+// call waits for the first one and does nothing.
+func (s *serving) stop() {
+	s.stopOnce.Do(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = s.http.Shutdown(shutdownCtx)
+		s.srv.Close()
+	})
 }
 
 // listen opens the port like aiohttp's TCPSite: an IPv4 address (the default
