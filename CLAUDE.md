@@ -164,7 +164,7 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 - Config (`webquiz.yaml`): all sections optional, editable in `/files/`, hot-reloaded on save. Options are documented in `docs/en/040_config.md`
 - Questions use **0-indexed** `correct_answer` and optional `points`; text questions are detected by `checker` (no `type`, `options` or `correct_answer`)
 - Usernames are unique per quiz session
-- Release notes: if `.github/release-notes/vX.Y.md` exists at the release tag, the workflow puts it at the top of the GitHub release notes
+- Release notes: if `.github/release-notes/v<version>.md` (for example `v2.0.1.md`) exists at the release tag, the workflow puts it at the top of the GitHub release notes
 
 ## Release
 **Trigger**: GitHub Actions -> "Release" -> enter version (X.Y.Z); tick "pre-release" for a test build that is not shown as the latest release
