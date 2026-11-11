@@ -489,8 +489,14 @@ func TestDesktopShowsABrokenConfig(t *testing.T) {
 	writeFile(t, filepath.Join(run.dir, "webquiz.yaml"), "server: [port\n")
 	run.start(t)
 	items := run.tray.menu(t)
-	if !strings.HasPrefix(items[0].Title, "WebQuiz "+version.Version+" — Помилка: Error loading config from "+filepath.Join(run.dir, "webquiz.yaml")) {
-		t.Errorf("first line %q", items[0].Title)
+	// The menu cuts a long error and ends it with "…". The path of the temp
+	// folder can be long enough for that (it is on macOS), so the line may
+	// end inside the path.
+	want := "WebQuiz " + version.Version + " — Помилка: Error loading config from " + filepath.Join(run.dir, "webquiz.yaml")
+	first := items[0].Title
+	cut, isCut := strings.CutSuffix(first, "…")
+	if !strings.HasPrefix(first, want) && !(isCut && strings.HasPrefix(want, cut) && strings.Contains(cut, "Error loading config from ")) {
+		t.Errorf("first line %q, want it to start with %q", first, want)
 	}
 	for _, item := range items {
 		if item.URL != "" && item.Disabled {
