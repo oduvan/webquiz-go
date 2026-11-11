@@ -88,6 +88,11 @@
             border-bottom: 1px solid var(--border-color);
         }
 
+        .section-note {
+            color: var(--secondary-text);
+            margin-bottom: 16px;
+        }
+
         .download-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -235,7 +240,35 @@
         </header>
 
         <section class="section">
-            <h2>Pre-built Binaries</h2>
+            <h2>Desktop version</h2>
+            <p class="section-note">For a teacher's computer. WebQuiz shows an icon in the system tray (the menu bar on macOS) with a menu to open the admin pages and to quit. The console version below runs in a terminal: take it for servers, a Raspberry Pi without a screen and the command line.</p>
+            <div class="download-grid">
+                <div class="download-item">
+                    <span class="platform">Windows</span>
+                    <span class="arch">Installer, x86_64 (Windows 10+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows-setup.exe">
+                        Download Installer
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">macOS</span>
+                    <span class="arch">WebQuiz.app, Apple Silicon and Intel (macOS 12+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-macos-app.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Linux</span>
+                    <span class="arch">x86_64, a desktop with a system tray</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-linux-desktop.zip">
+                        Download .zip
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Console version: for servers and the command line</h2>
             <div class="download-grid">
                 <div class="download-item">
                     <span class="platform">Linux</span>
@@ -274,12 +307,9 @@
                 </div>
                 <div class="download-item">
                     <span class="platform">Windows</span>
-                    <span class="arch">x86_64 (Windows 10+)</span>
-                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows-setup.exe">
-                        Download Installer
-                    </a>
-                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows.exe.zip" style="margin-top: 4px; font-size: 0.8rem;">
-                        Portable .zip
+                    <span class="arch">Portable, x86_64 (Windows 10+)</span>
+                    <a href="https://github.com/oduvan/webquiz-go/releases/download/v{{VERSION}}/webquiz-windows.exe.zip">
+                        Download .zip
                     </a>
                 </div>
             </div>
