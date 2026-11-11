@@ -5,4 +5,8 @@
 // Get gives the texts of one language; an unknown language gives
 // the Ukrainian texts, as in the Python version. Languages lists the language
 // codes the config may use, and Default is the language when none is set.
+//
+// Tray gives the texts of the tray menu of the desktop version (new in 2.0,
+// tray.go). They are kept apart from the page texts, so the quiz page does
+// not get them.
 package i18n
