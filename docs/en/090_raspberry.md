@@ -95,6 +95,8 @@ WebQuiz 2.0 is one ready-made program file for the Raspberry Pi. It does not nee
 - `webquiz-linux-arm64.zip` — for a 64-bit system on Raspberry Pi 3, 4 and 5;
 - `webquiz-linux-arm.zip` — for a 32-bit system and for older or smaller boards (Zero, 1, 2).
 
+These are the console version of WebQuiz: it runs without a screen and is controlled from the command line. The desktop version with a tray icon is for a teacher's computer (see [First Run](020_first.md)).
+
 The ready-made image switches from the Python version to this program in its next update. Until then, the image keeps working as described in this chapter.
 
 If you want to run the program yourself (for example, on a Raspberry Pi with your own system), copy the file to the Raspberry Pi, unzip it and start it:
