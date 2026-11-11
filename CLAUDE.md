@@ -14,32 +14,35 @@
 WebQuiz 2.0 is the Go rewrite of the Python/aiohttp WebQuiz 1.19 (<https://github.com/oduvan/webquiz>): a quiz system with multi-quiz management, real-time WebSocket stats, admin approval workflow and question randomization. One static binary per platform, no Python. Same HTTP API, config keys, quiz format, CSV files and folders as 1.19, except what `docs` and `.github/release-notes/v2.0.md` list as differences.
 
 ## Architecture
-- **Backend**: Go 1.26, `net/http` (Go 1.22 route patterns), middleware, `github.com/coder/websocket`. Module `github.com/oduvan/webquiz-go`, built with `CGO_ENABLED=0`
+- **Backend**: Go 1.26, `net/http` (Go 1.22 route patterns), middleware, `github.com/coder/websocket`. Module `github.com/oduvan/webquiz-go`, built with `CGO_ENABLED=0` (except the macOS desktop app, which needs cgo)
+- **Two versions from the same code** (new in 2.0): the console version (no build tag, `main_console.go`) and the desktop version (`-tags desktop`, `main_desktop.go`): the same server with a tray icon instead of the console. Only files with the `desktop` tag import the tray library; `cmd/webquiz/versions_test.go` checks that the console version does not link it
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v3 (not v4) in `web/`, built to `web/dist` and embedded in the binary (`web/embed.go`). Mobile layout at <=768px. Vite `base: './'`, `build.target: ['es2019', 'safari13']`
 - **Storage**: In-memory -> CSV (5s flush), YAML configs, quiz state resets on switch
 - **Auth**: Session cookies for admin (master key at login), automatic local network restriction
-- **Runtime dependencies** (only these): `gopkg.in/yaml.v3`, `github.com/coder/websocket`, `github.com/yuin/goldmark`, `go.starlark.net`, `golang.org/x/crypto`. Anything else needs a reason in the commit message
+- **Runtime dependencies** (only these): `gopkg.in/yaml.v3`, `github.com/coder/websocket`, `github.com/yuin/goldmark`, `go.starlark.net`, `golang.org/x/crypto`; `fyne.io/systray`, desktop version only (it brings `github.com/godbus/dbus/v5` on Linux), and `golang.org/x/sys/windows` for its Windows message box. Anything else needs a reason in the commit message
 - **Testing**: Go unit and integration tests (in-process servers), Vitest, Playwright
 
 ## Key Files and Packages
-- `cmd/webquiz/` - CLI (flags, `--help` text of 1.19), daemon mode (not on Windows), start steps (base folder, browser opening)
+- `cmd/webquiz/` - CLI (flags, `--help` text of 1.19), daemon mode (not on Windows), start steps (base folder, browser opening); `serving` is the start and the graceful stop both versions share; `desktop.go` is the flow of the desktop version (no build tag: the tests run it with a fake tray)
+- `internal/desktop/` - desktop version: the menu as a function of the state, the `Tray` interface, the data folder rule of `WebQuiz.app`, the icons; only `systray.go` and `message_windows.go` need the `desktop` tag. Read its `doc.go`
 - `internal/server/` - HTTP server. Read its `doc.go` first: file map and the rules for handlers
 - `internal/quiz/` - read, check and score quizzes
 - `internal/checker/` - checker code of text questions with Starlark. Its `doc.go` has the exact rules and differences from Python
 - `internal/config/` - config structs and loading (`webquiz.yaml`)
 - `internal/pyval/` - Python/PyYAML value rules (`LoadYAML`, `Equal`, `Str`, `Truthy`)
-- `internal/i18n/` - student texts and API error texts (uk/en)
+- `internal/i18n/` - student texts and API error texts (uk/en); `i18n.Tray` has the desktop menu texts, apart from the page texts
 - `internal/timelimits/` - quiz time limit rules
 - `internal/explanations/` - question explanations: Markdown -> safe HTML (goldmark)
 - `internal/tunnel/` - SSH tunnel manager; `internal/transfer/` - file transfer between servers
 - `internal/netinfo/`, `internal/version/` - network addresses; version and repository address (`RepoURL`, `PagesURL` live only here)
-- `internal/testutil/` - `StartServer` (in-process server on a free port, temp folders), `BuildBinary`
+- `internal/testutil/` - `StartServer` (in-process server on a free port, temp folders), `BuildBinary`, `BuildDesktopBinary`
 - `web/` - five pages: `index.html` (quiz), `admin.html`, `files.html`, `live-stats.html`, `csv-table.html`; sources in `web/src/{quiz,admin,files,livestats,csvtable,shared}`; `web/build/gzip.ts` is the Vite plugin that writes the gzip copies
 - `e2e/` - Playwright tests; `e2e/fixtures/server.ts` starts the built binary in a temp folder
-- `scripts/screenshots.ts` - takes the screenshots of `docs/imgs` from the real binary
+- `scripts/screenshots.ts` - takes the screenshots of `docs/imgs` from the real binary; `scripts/icons` draws the desktop icons (`go run ./scripts/icons`; a test checks the committed files)
 - `migration/` - `python-tests.txt` (911 ids of the 1.19 tests) and the check that every id is ported (a normal Go test)
 - `harness/` - classroom test harness in TypeScript: a real server, real browsers, a scripted teacher, scripted and AI agent students, and teacher scenarios where an AI agent teacher uses `harness/teacher.ts` and starts automatic students (`npx tsx harness/run.ts <scenario>`, ports 8199 and 8198). `harness/matrix.ts` takes scripted students through all pairs of quiz settings and config and checks every screen against 1.19 (free ports, output in `harness/runs/<stamp>-matrix/`); checks of features new in 2.0 (the answer verdict) say "new in 2.0" and are skipped against a 1.19 server. Only the `harness/*.test.ts` files run as tests (`npm --prefix harness test`). See `harness/README.md`
-- `installer/webquiz.iss` - Inno Setup script for the Windows installer
+- `installer/webquiz.iss` - Inno Setup script for the Windows installer (installs the desktop version as `webquiz.exe`)
+- `packaging/macos/` - `Info.plist` template and icon set of `WebQuiz.app`
 - `docs/uk/`, `docs/en/`, `docs/imgs/` - user guide (compiled to PDF with the version)
 - `gh-pages/index.html` - download page template (version placeholder: `{{VERSION}}`); `gh-pages/docs/` - Docsify config (en/, uk/)
 - `VERSION` - the version; `Makefile` - build, test, dist
@@ -83,7 +86,9 @@ make build        # web + bin/webquiz
 make test         # go vet + go test -race ./...
 make test-web     # tsc --noEmit + Vitest
 make e2e          # Playwright against the built binary (e2e/.bin/webquiz)
+make build-desktop   # the desktop version for this computer: bin/webquiz-desktop
 make dist         # all release binaries and zips in dist/
+make dist-macos-app  # dist/WebQuiz.app and webquiz-macos-app.zip (only on a Mac: cgo)
 make release-check
 go test ./migration/   # only the check that every Python test id is ported (make test runs it too)
 gofmt -l .        # must print nothing (CI checks it)
@@ -102,6 +107,7 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 ## Testing
 - **Ports**: no test uses a fixed port. `testutil.StartServer` and the Playwright fixture pick a free port. CLI tests that run the real binary also use a free port
 - **Go**: in-process servers with `internal/testutil` (temp folders, `ServerOptions.FlushInterval` instead of sleeping 5 s for CSV). Run with `-race`
+- **Desktop version**: the flow runs with a fake tray and a fake browser (`cmd/webquiz/desktop_test.go`); `testutil.BuildDesktopBinary` builds the real one for Linux, tested without a tray (no D-Bus session). The real tray cannot run in CI; the `macos-app` job builds `WebQuiz.app` on a Mac
 - **`py:` tags**: a test that ports a Python 1.19 test has `// py: <id>` right above it (or a `py:` field in a table case), with the id copied exactly from `migration/python-tests.txt`. It checks what the Python test checked; where the new UI makes that impossible, it checks the same behavior another way and a comment says why. TypeScript tests use the same comment. `migration/ported_test.go` fails when an id has no tag
 - **Playwright** (`e2e/`): each test starts its own server through `fixtures/server.ts` (`WEBQUIZ_BINARY_DIR` = a temp folder, `WEBQUIZ_IS_BINARY=0`), so tests run in parallel. `@playwright/test` is pinned to 1.63.0
 - Tests must not depend on the developer's shell: the fixture removes `WEBQUIZ_MASTER_KEY` and the time limit variables
@@ -111,7 +117,8 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 - **Retries are safe**: a student's request can arrive twice at once. One user per `registration_token`, one stored answer per question, identical replies (tests: `TestConcurrentSubmitSameAnswer`, `TestConcurrentRegisterSameToken`)
 - **Python-compatible values**: request JSON is decoded with `UseNumber` so `1` and `1.0` differ like in Python; YAML is read with `pyval.LoadYAML` (PyYAML / YAML 1.1 rules); quiz files are written like PyYAML's `yaml.dump`; a config value of the wrong type is read as the intended text or number
 - **Checker code runs in Starlark** (`go.starlark.net`) after a rewrite step that turns Python-only syntax into Starlark (`assert` with message, f-strings with format specs, `**`, chained comparisons). Not supported: `try`, `raise`, `class`, `import`, `with`, `global`; `len()` and indexing of text count bytes (use `list(s)`). A checker stops after 2 seconds or when it uses too much memory, and the answer is then wrong. Loading a quiz logs a warning for each checker that does not compile. Helpers: `to_int`, `distance`, `direction_angle`, `math`. Rules: `internal/checker/doc.go`
-- **Base folder**: `WEBQUIZ_BINARY_DIR` if set, else the folder of the executable. The binary sets `WEBQUIZ_BINARY_DIR`, changes into it, and sets `WEBQUIZ_IS_BINARY=1` when unset (then the browser opens `/admin/` after start). Config, quizzes, logs, CSV and `static/` live there
+- **Base folder**: `WEBQUIZ_BINARY_DIR` if set, else the folder of the executable. The binary sets `WEBQUIZ_BINARY_DIR`, changes into it, and sets `WEBQUIZ_IS_BINARY=1` when unset (then the browser opens `/admin/` after start). Config, quizzes, logs, CSV and `static/` live there. `WebQuiz.app`: the folder that holds the app, or `~/Documents/WebQuiz` when macOS runs a read-only copy (App Translocation), the folder cannot be written, or the app is in `/Applications` or `~/Applications` (`desktop.DataFolder`; the menu then shows the folder)
+- **Desktop version** (new in 2.0) - the menu: "WebQuiz <version> — <student address>" (the first address of the admin page's list, looked up again every 30 s) or the start error (a busy port gets a plain text; a broken `webquiz.yaml` is shown while the server runs with the defaults, as in the console version), the folder line, open admin panel / live stats / file manager at `http://127.0.0.1:<port>/`, Quit. Texts: `i18n.Tray` (uk/en by `language`). Quit, Ctrl+C, SIGTERM and the end of the session all call the same stop (`serving.stop`), which writes the waiting CSV rows. Nothing goes to stdout/stderr (Windows GUI program, `-H windowsgui`): log lines from before the log file are kept and written to it, Go's standard log (the tray library) goes to it too, and Windows also shows a message box. `-d` is not supported (a log line). macOS: `runtime.LockOSThread` in `init`, the tray runs on the main thread. Linux: StatusNotifierItem over D-Bus; without a tray the server still runs
 - **Middleware-based error handling**: handlers return an error; the error text becomes `{"error": text}` like 1.19
 - **Configuration**: `internal/config`, all sections optional, validated before save. Quiz-wide on/off settings must be real booleans
 - **6 digits user ID** stored by user_id as key
@@ -162,6 +169,6 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 ## Release
 **Trigger**: GitHub Actions -> "Release" -> enter version (X.Y.Z); tick "pre-release" for a test build that is not shown as the latest release
 
-**Process**: write `VERSION` and tag -> build the web pages once -> `make dist-binaries` (Linux amd64/arm64/arm, macOS Intel/Apple Silicon, Windows) -> Windows installer (Inno Setup) -> PDFs of the docs (pandoc + xelatex, uk/en) -> GitHub release with the zips, the installer and the PDFs -> deploy GitHub Pages
+**Process**: write `VERSION` and tag -> build the web pages once -> `make dist-binaries` (console: Linux amd64/arm64/arm, macOS Intel/Apple Silicon, Windows; desktop: Linux amd64 zip and the Windows GUI exe) -> on a macOS runner `make dist-macos-app` (universal `WebQuiz.app`, ad hoc signed, `webquiz-macos-app.zip`) -> Windows installer (Inno Setup) from the desktop exe -> PDFs of the docs (pandoc + xelatex, uk/en) -> GitHub release with the zips, the installer, the macOS app and the PDFs -> deploy GitHub Pages
 
 **GitHub Pages**: https://oduvan.github.io/webquiz-go/ - download page and Docsify docs (no build step). `deploy-pages.yml` is manual or called by the release workflow
