@@ -44,6 +44,66 @@ jobs:
     - name: go test -race
       run: go test -race ./...
 
+    # The desktop version (tray icon, -tags desktop) of Linux and Windows
+    # builds without cgo. The macOS app needs a Mac: see the macos-app job.
+    - name: Desktop version (vet, test, cross-compile)
+      run: |
+        CGO_ENABLED=0 go vet -tags desktop ./...
+        GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go vet -tags desktop ./...
+        go test -race -tags desktop ./internal/desktop/ ./cmd/webquiz/
+        GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags desktop -o /dev/null ./cmd/webquiz
+        GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags desktop -ldflags "-H windowsgui" -o /dev/null ./cmd/webquiz
+
+  # The macOS desktop app (WebQuiz.app) needs cgo, so it is built on a Mac.
+  # The zip is kept for 7 days, to try the app before a release.
+  macos-app:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+
+    - name: Build web app
+      run: |
+        npm --prefix web ci
+        npm --prefix web run build
+
+    # The tray code with cgo, and the desktop flow with a fake tray.
+    - name: Desktop tests
+      run: |
+        go test -tags desktop ./internal/desktop/ ./packaging/macos/
+        go test -tags desktop -run 'TestDesktop|TestOnlyTheDesktopVersion' ./cmd/webquiz/
+
+    - name: Build WebQuiz.app
+      run: make dist-macos-app
+
+    - name: Check WebQuiz.app
+      run: |
+        app=dist/WebQuiz.app
+        archs="$(lipo -archs "$app/Contents/MacOS/webquiz")"
+        echo "architectures: $archs"
+        case " $archs " in *" x86_64 "*) ;; *) echo "no Intel (x86_64) part"; exit 1 ;; esac
+        case " $archs " in *" arm64 "*) ;; *) echo "no Apple Silicon (arm64) part"; exit 1 ;; esac
+        plutil -lint "$app/Contents/Info.plist"
+        codesign --verify --deep --strict "$app"
+        test -f "$app/Contents/Resources/WebQuiz.icns"
+        "$app/Contents/MacOS/webquiz" --version
+
+    - name: Upload WebQuiz.app
+      uses: actions/upload-artifact@v4
+      with:
+        name: webquiz-macos-app
+        path: dist/webquiz-macos-app.zip
+        retention-days: 7
+
   web:
     runs-on: ubuntu-latest
     steps:

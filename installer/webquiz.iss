@@ -1,3 +1,9 @@
+; The Windows installer of WebQuiz. It installs the desktop version: a
+; Windows program with a tray icon and no console window. The release
+; workflow copies dist\webquiz-windows-desktop.exe to installer\webquiz.exe
+; before it runs ISCC. The portable zip (webquiz-windows.exe.zip) is the
+; console version.
+
 #define MyAppName "WebQuiz"
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
@@ -5,6 +11,7 @@
 #define MyAppPublisher "WebQuiz"
 #define MyAppURL "https://github.com/oduvan/webquiz-go"
 #define MyAppExeName "webquiz.exe"
+#define MyAppIcon "webquiz.ico"
 
 [Setup]
 AppId={{B8F3D2A1-7C4E-4F9B-A1D6-3E8C5F2B9D4A}
@@ -24,6 +31,7 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+UninstallDisplayIcon={app}\{#MyAppIcon}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -33,7 +41,9 @@ Name: "{app}"; Permissions: users-modify
 
 [Files]
 Source: "{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; The icon is drawn by scripts/icons; the program itself has no icon resource.
+Source: "..\internal\desktop\icons\{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppIcon}"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
