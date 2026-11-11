@@ -52,6 +52,8 @@
 //     ZIP archives (with the token rules) and /attach/ files.
 //   - admin_auth.go: the admin login (session cookie) and the session check.
 //   - logging.go: the log file logs_dir/NNNN.log in Python's log format.
+//     Logger gives the desktop version the server's logger; OpenLogFile
+//     makes a log file when the server could not start.
 //     startup_log.go: the environment lines the log starts with.
 //   - files.go: the file manager API (list, view, download, save a quiz).
 //   - transfer_handlers.go: file transfer between servers (internal/transfer).

@@ -348,6 +348,11 @@ func (s *Server) Handler() http.Handler { return s.handler }
 // LogFile is the path of this server's log file.
 func (s *Server) LogFile() string { return s.logFile }
 
+// Logger is the server's logger: its lines go to the log file (and to
+// Options.Logger). The desktop version writes its own lines with it, under
+// its own name: Logger().With("logger", "webquiz.desktop").
+func (s *Server) Logger() *slog.Logger { return s.log }
+
 // Start runs the background work of create_app: the CSV flush every
 // Options.FlushInterval (periodic_flush) and the time limit watcher
 // (time_limit_watcher).

@@ -226,3 +226,25 @@ func openLog(logsDir string, extra *slog.Logger) (path string, out *lockedWriter
 	}
 	return path, out, slog.New(handlers), nil
 }
+
+// LogFile is a log file that belongs to no server: see OpenLogFile.
+type LogFile struct {
+	Path   string       // logs_dir/NNNN.log
+	Logger *slog.Logger // writes to the file in the server's format
+	out    *lockedWriter
+}
+
+// Close closes the file. Lines logged after Close are dropped.
+func (f *LogFile) Close() error { return f.out.close() }
+
+// OpenLogFile makes a new log file in logsDir, with the next free number
+// and the format of a server's log file, and writes nothing to the console.
+// The desktop version uses it to write why the server could not start when
+// the server has no log file of its own.
+func OpenLogFile(logsDir string) (*LogFile, error) {
+	path, out, logger, err := openLog(logsDir, slog.New(slog.DiscardHandler))
+	if err != nil {
+		return nil, err
+	}
+	return &LogFile{Path: path, Logger: logger, out: out}, nil
+}
