@@ -11,7 +11,8 @@ export interface LiveQuestion {
   [key: string]: unknown;
 }
 
-// One cell: "think", "ok", "fail" or "timeout", and the seconds the answer took.
+// One cell: "think", "ok", "fail", "timeout" or "pending" (the answer waits for the
+// teacher's check), and the seconds the answer took.
 export interface CellState {
   state: string;
   time_taken: number | null;
@@ -32,9 +33,10 @@ export interface QuestionStatistics {
   total_attempts: number;
 }
 
-// A question is answered when it is right, wrong, or its time ran out ("timeout" counts as wrong).
+// A question is answered when it is right, wrong, its time ran out ("timeout" counts as wrong),
+// or the answer waits for the teacher's check ("pending": not right until the teacher says so).
 export function isAnsweredState(state: unknown): boolean {
-  return state === 'ok' || state === 'fail' || state === 'timeout';
+  return state === 'ok' || state === 'fail' || state === 'timeout' || state === 'pending';
 }
 
 // Old servers sent only the state text; it becomes {state, time_taken: null}.
@@ -154,6 +156,8 @@ export function stateIcon(state: string): string {
       return '🔴';
     case 'timeout':
       return '⏱';
+    case 'pending':
+      return '✍️';
     default:
       return '⚪';
   }

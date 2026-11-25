@@ -9,6 +9,7 @@ import {
   generateRequestToken,
   isImagePath,
   makeRelativePath,
+  pendingReviewNotice,
   pointsBadgeText,
   progressPercent,
   questionDisplay,
@@ -125,5 +126,19 @@ describe('generateRequestToken', () => {
     const a = generateRequestToken();
     expect(a).toMatch(/^[0-9a-f]{32}$/);
     expect(generateRequestToken()).not.toBe(a);
+  });
+});
+
+describe('pendingReviewNotice', () => {
+  const texts = { pending_review_notice: 'Not checked yet: {n}.', pending_review_done: 'All checked.' } as Translations;
+
+  it('counts the waiting answers', () => {
+    expect(pendingReviewNotice(2, false, texts)).toEqual({ kind: 'waiting', text: 'Not checked yet: 2.' });
+  });
+
+  it('says "all checked" only after a waiting answer was seen', () => {
+    expect(pendingReviewNotice(0, true, texts)).toEqual({ kind: 'done', text: 'All checked.' });
+    expect(pendingReviewNotice(0, false, texts)).toBeNull();
+    expect(pendingReviewNotice(undefined, false, texts)).toBeNull();
   });
 });

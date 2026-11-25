@@ -28,12 +28,14 @@ const checkerNotAvailable = "the checker is not available"
 //   - a multiple choice question (correct_answer is a list) needs a list of
 //     valid option indexes without wrong ones, with at least min_correct
 //     right ones (all of them when min_correct is not set);
-//   - a text question (it has "checker") runs the checker code with
+//   - a text question (IsText) runs the checker code with
 //     RunChecker; without code, the answer must equal correct_value, apart
 //     from spaces around it. checkerError is the checker's message.
 //
 // Where Python raised an error (a list inside the answer list, a
-// min_correct that is not a number), the answer is wrong.
+// min_correct that is not a number), the answer is wrong. An answer to a
+// question the teacher checks by hand (IsManual) is never checked here: the
+// server keeps it until the teacher decides.
 func CheckAnswer(q Question, answer any) (correct bool, checkerError string) {
 	if q.IsText() {
 		return checkText(q, answer)

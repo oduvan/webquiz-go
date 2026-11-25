@@ -14,7 +14,7 @@ export function readBoot<T>(devFallback: T): T {
 
 // The boot data of each page. These types mirror the Go structs in
 // internal/server/pages.go (QuizBoot, AdminBoot, FilesBoot, LiveStatsBoot,
-// CSVTableBoot); change both together. Values marked "as written in the
+// CSVTableBoot, ReviewBoot); change both together. Values marked "as written in the
 // quiz file" come straight from YAML: show them with plain(), never as HTML.
 
 export type Translations = Record<string, string>;
@@ -114,3 +114,12 @@ export type LiveStatsBoot = Record<string, never>;
 
 // The CSV table page (/files/csv/<name>): it reads the file name from its address.
 export type CsvTableBoot = Record<string, never>;
+
+// The review page (/review/), where teachers mark answers to manual_check
+// questions right or wrong. The answers come over its WebSocket.
+export interface ReviewBoot {
+  is_trusted_ip: boolean; // no master key needed
+  language: 'uk' | 'en';
+  translations: Translations; // the review_* texts and the others
+  version: string;
+}

@@ -49,11 +49,28 @@ func Validate(data any) []string {
 			add("Question %d must be a dictionary", n)
 			continue
 		}
-		_, isText := q["checker"]
+		isText := Question(q).IsText()
 
 		// Either question text or an image must be given, for every question type.
 		if !pyval.Truthy(q["question"]) && !pyval.Truthy(q["image"]) {
 			add("Question %d must have either question text or image", n)
+		}
+
+		// manual_check: true = the teacher checks the typed answer, so no
+		// checker code and no options.
+		if manual, ok := q["manual_check"]; ok {
+			if !pyval.IsBool(manual) {
+				add("Question %d 'manual_check' must be a boolean (true or false)", n)
+			} else if manual.(bool) {
+				if code, isString := q["checker"].(string); isString && pyval.Strip(code) != "" {
+					add("Question %d cannot have both 'manual_check: true' and checker code", n)
+				}
+				_, hasOptions := q["options"]
+				_, hasCorrect := q["correct_answer"]
+				if hasOptions || hasCorrect {
+					add("Question %d with 'manual_check: true' cannot have options or correct_answer", n)
+				}
+			}
 		}
 
 		if isText {

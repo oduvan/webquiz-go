@@ -28,6 +28,8 @@ export interface QuestionView {
   checkerError: string | null; // shown under a wrong text answer
   correctValue: string | null; // shown under a wrong text answer
   timeUp: boolean; // shows "Time is up"
+  // The teacher checks this answer by hand (manual_check): "the teacher will check it"
+  pendingReview: boolean;
   timer: QuestionTimer;
 }
 
@@ -38,12 +40,13 @@ export interface ServerTestResult {
   file?: unknown;
   selected_answer?: unknown;
   correct_answer?: unknown; // left out while the right answers are hidden
-  is_correct?: boolean; // left out while the right answers are hidden
+  is_correct?: boolean | null; // left out while the right answers are hidden; null while the teacher checks it
   time_taken?: number;
   points?: number;
   earned_points?: number;
   checker_error?: string;
   timed_out?: boolean;
+  pending_review?: boolean; // the teacher has not checked this answer yet (manual_check)
 }
 
 export interface FinalResults {
@@ -55,6 +58,7 @@ export interface FinalResults {
   total_points?: number;
   points_percentage?: number;
   total_time?: number;
+  pending_count?: number; // answers the teacher has not checked yet
   all_completed?: boolean;
   show_answers_on_completion?: boolean;
 }
@@ -74,9 +78,14 @@ export interface ClientTestResult {
   checkerError: unknown;
   correctValue: unknown;
   timedOut: boolean;
+  pendingReview: boolean; // the teacher checks it by hand
 }
 
-export type ResultsContent = { kind: 'server'; final: FinalResults } | { kind: 'client'; results: ClientTestResult[] };
+// sawPendingReview: some answer waited for the teacher while this screen was open,
+// so "the teacher has checked all your answers" can be said once they are done.
+export type ResultsContent =
+  | { kind: 'server'; final: FinalResults; sawPendingReview: boolean }
+  | { kind: 'client'; results: ClientTestResult[] };
 
 export interface MessageView {
   text: string;

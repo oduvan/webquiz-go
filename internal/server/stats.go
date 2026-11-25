@@ -10,19 +10,23 @@ import (
 
 // answerRecord is an entry of Python's user_answers: one stored answer (or
 // timeout) of a student, for the statistics and the results screen. Records
-// are never changed after they are stored.
+// are not changed after they are stored, except by the teacher's verdict on
+// an answer that waits for it (applyReviewVerdictLocked).
 type answerRecord struct {
 	Question       any     // question.get("question", ""): the text as written
 	Image          any     // question.get("image"): nil when the question has none
 	File           any     // the attachment address "/attach/<name>", or the value as written when empty
 	SelectedAnswer string  // "" for a timeout
 	CorrectAnswer  any     // the option text(s) of a choice question, correct_value of a text question
-	IsCorrect      bool    //
+	IsCorrect      bool    // false while the answer waits for the teacher
 	TimeTaken      seconds //
 	Points         float64 // the question's points (normalized)
 	EarnedPoints   float64 // Points when correct, else 0
 	CheckerError   string  // the checker's message; "" when there is none
 	TimedOut       bool    // time ran out (shown on the results screen, not written to the CSV)
+	// PendingReview: an answer to a manual_check question that the teacher
+	// has not decided yet. Its is_correct is null on the results screen.
+	PendingReview bool
 }
 
 // result is the record as the results screen gets it. Without showAnswers
@@ -39,7 +43,14 @@ func (a *answerRecord) result(showAnswers bool) map[string]any {
 	}
 	if showAnswers {
 		result["correct_answer"] = a.CorrectAnswer
-		result["is_correct"] = a.IsCorrect
+		if a.PendingReview {
+			result["is_correct"] = nil
+		} else {
+			result["is_correct"] = a.IsCorrect
+		}
+	}
+	if a.PendingReview {
+		result["pending_review"] = true // kept when the correctness is hidden
 	}
 	if a.CheckerError != "" {
 		result["checker_error"] = a.CheckerError
@@ -50,8 +61,8 @@ func (a *answerRecord) result(showAnswers bool) map[string]any {
 	return result
 }
 
-// answerRow is an entry of Python's user_responses: an answer that waits for
-// the next CSV flush.
+// answerRow is an entry of Python's user_responses (an answer that waits for
+// the next CSV flush) and of all_responses (every answer row of the run).
 type answerRow struct {
 	UserID         string
 	Username       string
@@ -59,7 +70,17 @@ type answerRow struct {
 	SelectedAnswer string
 	CorrectAnswer  any
 	IsCorrect      bool
+	PendingReview  bool // waits for the teacher: is_correct is empty in the CSV
 	TimeTaken      seconds
+}
+
+// isCorrectField is the is_correct column: True or False, empty while the
+// answer waits for the teacher.
+func (r *answerRow) isCorrectField() string {
+	if r.PendingReview {
+		return ""
+	}
+	return csvField(r.IsCorrect)
 }
 
 // userStats is an entry of Python's user_stats: the final results of a
@@ -73,6 +94,7 @@ type userStats struct {
 	TotalPoints      float64
 	PointsPercentage int
 	TotalTime        seconds
+	PendingCount     int    // answers to manual_check questions the teacher has not decided yet
 	CompletedAt      string // isoformat
 }
 
@@ -84,14 +106,18 @@ type answerTotals struct {
 	earnedPoints float64 // normalized
 	totalPoints  float64 // normalized
 	time         seconds
+	pending      int // answers that wait for the teacher
 }
 
 func totalsOf(answers []*answerRecord) answerTotals {
 	totals := answerTotals{count: len(answers)}
 	earned, total := 0.0, 0.0
 	for _, answer := range answers {
-		if answer.IsCorrect {
+		if answer.IsCorrect && !answer.PendingReview { // a waiting answer is not counted yet
 			totals.correct++
+		}
+		if answer.PendingReview {
+			totals.pending++
 		}
 		earned += answer.EarnedPoints
 		total += answer.Points
@@ -131,6 +157,7 @@ func (s *Server) calculateAndStoreUserStatsLocked(userID string) {
 		TotalPoints:      totals.totalPoints,
 		PointsPercentage: pointsPercentage,
 		TotalTime:        totals.time,
+		PendingCount:     totals.pending,
 		CompletedAt:      isoformat(s.now()),
 	}
 	s.log.Info(fmt.Sprintf("Stored final stats for user %s: %d/%d (%d%%), points: %s/%s (%d%%) using user_answers",
@@ -175,6 +202,7 @@ func (s *Server) userFinalResultsLocked(userID string) map[string]any {
 			"total_points":               0,
 			"points_percentage":          0,
 			"total_time":                 0,
+			"pending_count":              0,
 			"all_completed":              false,
 			"show_answers_on_completion": false,
 		}
@@ -194,6 +222,7 @@ func (s *Server) userFinalResultsLocked(userID string) map[string]any {
 		"total_points":               points(stats.TotalPoints),
 		"points_percentage":          stats.PointsPercentage,
 		"total_time":                 stats.TotalTime,
+		"pending_count":              stats.PendingCount,
 		"all_completed":              allCompleted,
 		"show_answers_on_completion": s.quiz.ShowAnswersOnCompletion,
 	}

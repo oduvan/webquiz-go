@@ -1,7 +1,7 @@
 import type { Translations } from '../shared/boot';
 import { formatPoints } from '../shared/points';
 import { Button } from '../shared/ui';
-import { answerParts, fileName, questionDisplay } from './format';
+import { answerParts, fileName, pendingReviewNotice, questionDisplay } from './format';
 import type { ClientTestResult, FinalResults, ResultsContent, ServerTestResult } from './types';
 
 // The results screen: the score, the points (when some question is not worth 1 point),
@@ -66,8 +66,25 @@ function Mark({ isCorrect }: { isCorrect: boolean }) {
   );
 }
 
+// The answer waits for the teacher (manual_check): shown under the answer.
+function PendingLabel({ T }: { T: Translations }) {
+  return <div className="pending-review-label">{T.pending_review_row}</div>;
+}
+
 // Results from the server (verify-user's final_results), the same after a reload.
-function ServerResults({ final, T, showFinalList, showRightAnswer }: { final: FinalResults; T: Translations; showFinalList: boolean; showRightAnswer: boolean }) {
+function ServerResults({
+  final,
+  sawPendingReview,
+  T,
+  showFinalList,
+  showRightAnswer,
+}: {
+  final: FinalResults;
+  sawPendingReview: boolean;
+  T: Translations;
+  showFinalList: boolean;
+  showRightAnswer: boolean;
+}) {
   const results: ServerTestResult[] = final.test_results || [];
   const totalCount = final.total_count;
   const percentage = final.percentage;
@@ -78,6 +95,7 @@ function ServerResults({ final, T, showFinalList, showRightAnswer }: { final: Fi
   const showWaitingMessage = (final.show_answers_on_completion || false) && !(final.all_completed || false);
   const hasCorrectAnswers = results.length > 0 && results[0].is_correct !== undefined;
   const hasCustomPoints = results.some((result) => (result.points || 1) !== 1);
+  const pendingNotice = pendingReviewNotice(final.pending_count, sawPendingReview, T);
 
   return (
     <>
@@ -88,6 +106,15 @@ function ServerResults({ final, T, showFinalList, showRightAnswer }: { final: Fi
         <p className="mb-1">
           <strong>{T.points_label}</strong> {formatPoints(earnedPoints)}/{formatPoints(totalPoints)} ({pointsPercentage}%)
         </p>
+      ) : null}
+      {pendingNotice ? (
+        <div
+          className={pendingNotice.kind === 'waiting' ? 'pending-review-notice' : 'pending-review-done'}
+          id={pendingNotice.kind === 'waiting' ? 'pending-review-notice' : 'pending-review-done'}
+          role="status"
+        >
+          {pendingNotice.text}
+        </div>
       ) : null}
       {showWaitingMessage ? (
         <div className="answers-later">
@@ -112,7 +139,7 @@ function ServerResults({ final, T, showFinalList, showRightAnswer }: { final: Fi
           </thead>
           <tbody>
             {results.map((result, index) => (
-              <tr key={index}>
+              <tr key={index} className={result.pending_review ? 'pending-review-row' : undefined}>
                 <td data-label={T.question_header}>
                   <QuestionCell question={result.question} image={result.image} file={result.file} T={T} />
                 </td>
@@ -124,6 +151,7 @@ function ServerResults({ final, T, showFinalList, showRightAnswer }: { final: Fi
                       <AnswerText answer={result.selected_answer} />
                     </span>
                   )}
+                  {result.pending_review ? <PendingLabel T={T} /> : null}
                   {result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? (
                     <div className="correct-answer-hint">
                       {T.result_correct_header}
@@ -133,12 +161,21 @@ function ServerResults({ final, T, showFinalList, showRightAnswer }: { final: Fi
                 </td>
                 {hasCorrectAnswers ? (
                   <td data-label={T.correct_header_alt} style={{ textAlign: 'center' }}>
-                    {result.is_correct !== undefined ? <Mark isCorrect={result.is_correct} /> : <span className="muted">{T.unknown}</span>}
+                    {result.pending_review ? (
+                      <span style={{ fontSize: 18 }}>⏳</span>
+                    ) : result.is_correct !== undefined && result.is_correct !== null ? (
+                      <Mark isCorrect={result.is_correct} />
+                    ) : (
+                      <span className="muted">{T.unknown}</span>
+                    )}
                   </td>
                 ) : null}
                 {hasCustomPoints ? (
                   <td data-label={T.points_header} style={{ textAlign: 'center' }}>
-                    {formatPoints(result.earned_points !== undefined ? result.earned_points : result.is_correct ? result.points || 1 : 0)}/
+                    {result.pending_review
+                      ? '?'
+                      : formatPoints(result.earned_points !== undefined ? result.earned_points : result.is_correct ? result.points || 1 : 0)}
+                    /
                     {formatPoints(result.points || 1)}
                   </td>
                 ) : null}
@@ -174,7 +211,7 @@ function ClientResults({ results, T, showFinalList }: { results: ClientTestResul
           </thead>
           <tbody>
             {results.map((result, index) => (
-              <tr key={index}>
+              <tr key={index} className={result.pendingReview ? 'pending-review-row' : undefined}>
                 <td data-label={T.question_header}>
                   <QuestionCell question={result.question} image={result.image} file={result.file} T={T} />
                 </td>
@@ -186,6 +223,7 @@ function ClientResults({ results, T, showFinalList }: { results: ClientTestResul
                       <AnswerText answer={result.selectedAnswer} />
                     </span>
                   )}
+                  {result.pendingReview ? <PendingLabel T={T} /> : null}
                 </td>
                 {hasCorrectness ? (
                   <td data-label={T.correct_header_alt} style={{ textAlign: 'center' }}>
@@ -203,7 +241,15 @@ function ClientResults({ results, T, showFinalList }: { results: ClientTestResul
 
 export function Results({ content, T, showFinalList, showRightAnswer }: { content: ResultsContent; T: Translations; showFinalList: boolean; showRightAnswer: boolean }) {
   if (content.kind === 'server') {
-    return <ServerResults final={content.final} T={T} showFinalList={showFinalList} showRightAnswer={showRightAnswer} />;
+    return (
+      <ServerResults
+        final={content.final}
+        sawPendingReview={content.sawPendingReview}
+        T={T}
+        showFinalList={showFinalList}
+        showRightAnswer={showRightAnswer}
+      />
+    );
   }
   return <ClientResults results={content.results} T={T} showFinalList={showFinalList} />;
 }

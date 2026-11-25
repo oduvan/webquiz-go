@@ -672,6 +672,63 @@
   background: var(--quiz-question-bg);
 }
 
+/* ---- Manual check by the teacher: the answer waits for a verdict ---- */
+
+.pending-review-message,
+.pending-review-notice {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-left: 4px solid #ffc107;
+  color: #856404;
+  padding: 10px 12px;
+  border-radius: 5px;
+  margin: 10px 0;
+}
+
+.pending-review-done {
+  background: #d4edda;
+  border: 1px solid #28a745;
+  border-left: 4px solid #28a745;
+  color: #155724;
+  padding: 10px 12px;
+  border-radius: 5px;
+  margin: 10px 0;
+}
+
+[data-theme='dark'] .pending-review-message,
+[data-theme='dark'] .pending-review-notice {
+  background: #3d3a1a;
+  border-color: #ffc107;
+  color: #f0d68a;
+}
+
+[data-theme='dark'] .pending-review-done {
+  background: #1a3a1a;
+  color: #a5d6a7;
+}
+
+.results-table tr.pending-review-row,
+.results-table tr.pending-review-row:nth-child(even) {
+  background-color: #fff8e1;
+  box-shadow: inset 4px 0 0 #ffc107;
+}
+
+[data-theme='dark'] .results-table tr.pending-review-row,
+[data-theme='dark'] .results-table tr.pending-review-row:nth-child(even) {
+  background-color: #3d3a1a;
+}
+
+.pending-review-label {
+  display: inline-block;
+  margin-top: 4px;
+  font-weight: bold;
+  color: #856404;
+}
+
+[data-theme='dark'] .pending-review-label {
+  color: #f0d68a;
+}
+
 /* On a phone every row is a card; the column name comes from data-label */
 @media (max-width: 768px) {
   .results-table,

@@ -17,7 +17,10 @@ import (
 // flush_users_to_csv). Each run of a quiz writes to csv_dir:
 //
 //   - <quiz>_NNNN.csv: one row per answer, appended at every flush
-//     (Options.FlushInterval, 5 seconds);
+//     (Options.FlushInterval, 5 seconds). An answer that waits for the
+//     teacher (manual_check) has an empty is_correct; after the teacher's
+//     verdict the next flush writes the whole file again from memory
+//     (through a temporary file), so the row keeps its place;
 //   - <quiz>_NNNN.users.csv: one row per student with the statistics,
 //     written again at every flush;
 //   - <quiz>_NNNN.answers_with_users.csv (extra_answers_with_users_csv only):
@@ -156,25 +159,35 @@ type responsesSnapshot struct {
 	answerRows           []string
 	fieldNames           []string // the registration field columns of answers_with_users
 	answersWithUsersRows []string
+	// rewrite: a teacher's verdict changed a row that may be in the file
+	// already, so the rows are every answer of the run and the files are
+	// written again in full (manual check).
+	rewrite bool
 }
 
 // takeResponsesLocked takes the answers that wait for the CSV files (and
-// clears the list, as Python did before writing). ok is false when there is
-// nothing to write. The caller holds mu.
+// clears the list, as Python did before writing). After a teacher's verdict
+// it takes every answer row of the run instead, for a rewrite of the files.
+// ok is false when there is nothing to write. The caller holds mu.
 func (s *Server) takeResponsesLocked() (responsesSnapshot, bool) {
-	if len(s.userResponses) == 0 {
+	rows := s.userResponses
+	rewrite := s.csvRewriteNeeded && s.csvFile != ""
+	if rewrite {
+		rows = s.allResponses
+		s.csvRewriteNeeded = false
+	} else if len(s.userResponses) == 0 {
 		return responsesSnapshot{}, false
 	}
-	snapshot := responsesSnapshot{answersFile: s.csvFile, answersWithUsersFile: s.answersWithUsersCSVFile}
-	for _, row := range s.userResponses {
+	snapshot := responsesSnapshot{answersFile: s.csvFile, answersWithUsersFile: s.answersWithUsersCSVFile, rewrite: rewrite}
+	for _, row := range rows {
 		snapshot.answerRows = append(snapshot.answerRows, csvLine(row.UserID, csvField(row.Question), row.SelectedAnswer,
-			csvField(row.CorrectAnswer), csvField(row.IsCorrect), row.TimeTaken.String()))
+			csvField(row.CorrectAnswer), row.isCorrectField(), row.TimeTaken.String()))
 	}
 	if snapshot.answersWithUsersFile != "" {
 		for _, label := range s.cfg.Registration.Fields {
 			snapshot.fieldNames = append(snapshot.fieldNames, registrationFieldName(label))
 		}
-		for _, row := range s.userResponses {
+		for _, row := range rows {
 			// The student as now known: a student of an earlier run is gone,
 			// then the name stored with the answer is used.
 			username := row.Username
@@ -191,7 +204,7 @@ func (s *Server) takeResponsesLocked() (responsesSnapshot, bool) {
 				fields = append(fields, value)
 			}
 			fields = append(fields, csvField(row.Question), row.SelectedAnswer, csvField(row.CorrectAnswer),
-				csvField(row.IsCorrect), row.TimeTaken.String())
+				row.isCorrectField(), row.TimeTaken.String())
 			snapshot.answersWithUsersRows = append(snapshot.answersWithUsersRows, csvLine(fields...))
 		}
 	}
@@ -200,8 +213,9 @@ func (s *Server) takeResponsesLocked() (responsesSnapshot, bool) {
 }
 
 // flushResponsesToCSV is flush_responses_to_csv: it appends the answers that
-// wait in memory to the answers CSV (and to the answers_with_users CSV). The
-// flush loop calls it every s.flushInterval (5 s) and Close once more.
+// wait in memory to the answers CSV (and to the answers_with_users CSV), or
+// writes both files again after a teacher's verdict. The flush loop calls it
+// every s.flushInterval (5 s) and Close once more.
 func (s *Server) flushResponsesToCSV() error {
 	s.csvMu.Lock()
 	defer s.csvMu.Unlock()
@@ -209,13 +223,34 @@ func (s *Server) flushResponsesToCSV() error {
 	if !ok {
 		return nil
 	}
-	return s.writeResponses(snapshot)
+	err := s.writeResponses(snapshot)
+	if err != nil && snapshot.rewrite {
+		// Try the rewrite again at the next flush, if the run is the same
+		s.withLock(func() {
+			if s.csvFile == snapshot.answersFile {
+				s.csvRewriteNeeded = true
+			}
+		})
+	}
+	return err
 }
 
-// writeResponses appends taken answers to their CSV files. The caller holds
-// csvMu (not mu).
+// writeResponses appends taken answers to their CSV files, or writes the
+// files again for a rewrite. The caller holds csvMu (not mu).
 func (s *Server) writeResponses(snapshot responsesSnapshot) error {
 	header := append([]string{"user_id"}, answerColumns...)
+	withUsersHeader := append(append([]string{"user_id", "username"}, snapshot.fieldNames...), answerColumns...)
+	if snapshot.rewrite {
+		if err := replaceCSV(snapshot.answersFile, header, snapshot.answerRows); err != nil {
+			return err
+		}
+		s.log.Info(fmt.Sprintf("Rewrote CSV file with %d responses after a teacher's verdict: %s", len(snapshot.answerRows), snapshot.answersFile))
+		if snapshot.answersWithUsersFile == "" {
+			return nil
+		}
+		return replaceCSV(snapshot.answersWithUsersFile, withUsersHeader, snapshot.answersWithUsersRows)
+	}
+
 	created, err := appendCSV(snapshot.answersFile, header, snapshot.answerRows)
 	if err != nil {
 		return err
@@ -225,14 +260,29 @@ func (s *Server) writeResponses(snapshot responsesSnapshot) error {
 	if snapshot.answersWithUsersFile == "" {
 		return nil
 	}
-	header = append(append([]string{"user_id", "username"}, snapshot.fieldNames...), answerColumns...)
-	created, err = appendCSV(snapshot.answersWithUsersFile, header, snapshot.answersWithUsersRows)
+	created, err = appendCSV(snapshot.answersWithUsersFile, withUsersHeader, snapshot.answersWithUsersRows)
 	if err != nil {
 		return err
 	}
 	s.log.Info(fmt.Sprintf("%s answers_with_users CSV file with %d rows: %s",
 		createdOrUpdated(created), len(snapshot.answersWithUsersRows), snapshot.answersWithUsersFile))
 	return nil
+}
+
+// replaceCSV writes a whole CSV file (header and rows) through a temporary
+// file: the text goes to <path>.tmp (synced), which then replaces the file,
+// so a power cut leaves either the old file or the new one.
+func replaceCSV(path string, header []string, rows []string) error {
+	var text strings.Builder
+	text.WriteString(csvLine(header...))
+	for _, row := range rows {
+		text.WriteString(row)
+	}
+	temp := path + ".tmp"
+	if err := writeSynced(temp, text.String(), os.O_CREATE|os.O_TRUNC); err != nil {
+		return err
+	}
+	return os.Rename(temp, path)
 }
 
 // takeResponses is takeResponsesLocked with the lock.

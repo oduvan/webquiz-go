@@ -13,8 +13,8 @@ import (
 )
 
 // The WebSocket routes. Each handler builds its initial state under s.mu and
-// calls serveWebSocket: websocketLiveStats (livestats.go) and websocketAdmin
-// (admin_socket.go).
+// calls serveWebSocket: websocketLiveStats (livestats.go), websocketAdmin
+// (admin_socket.go) and websocketReview (review_socket.go).
 
 // broadcastLiveStats sends a message to every live stats page
 // (broadcast_to_websockets). Call it while holding s.mu, right after the
@@ -174,6 +174,23 @@ func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request, hub *wsH
 // the client to the hub with its initial message (see joinHub) and tells
 // whether it did.
 func (s *Server) serveWebSocketJoin(w http.ResponseWriter, r *http.Request, hub *wsHub, join func(c *wsClient) bool) error {
+	return s.serveWebSocketWith(w, r, hub, join, socketHooks{})
+}
+
+// socketHooks change what serveWebSocketWith does with a client. The zero
+// value is the plain hub client: it only answers pings.
+type socketHooks struct {
+	// message handles every text message instead of the ping answer.
+	message func(c *wsClient, data []byte)
+	// leave runs after the client has left the hub.
+	leave func(c *wsClient)
+	// heartbeat > 0 pings the client that often. A client that does not
+	// answer within half of it is dropped (aiohttp's heartbeat).
+	heartbeat time.Duration
+}
+
+// serveWebSocketWith is serveWebSocketJoin with hooks.
+func (s *Server) serveWebSocketWith(w http.ResponseWriter, r *http.Request, hub *wsHub, join func(c *wsClient) bool, hooks socketHooks) error {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		return nil // Accept has answered the request
@@ -193,12 +210,18 @@ func (s *Server) serveWebSocketJoin(w http.ResponseWriter, r *http.Request, hub 
 	ctx, cancel := context.WithCancel(s.ctx)
 	var writer sync.WaitGroup
 	writer.Go(func() { s.writeMessages(ctx, c, hub) })
+	if hooks.heartbeat > 0 {
+		writer.Go(func() { s.pingClient(ctx, c, hub, hooks.heartbeat) })
+	}
 	defer func() {
 		c.stop()
 		_ = conn.CloseNow()
 		cancel()
 		writer.Wait()
 		hub.done(c)
+		if hooks.leave != nil {
+			hooks.leave(c)
+		}
 		s.log.Info(fmt.Sprintf("%s client disconnected. Total clients: %d", hub.connName, hub.count()))
 	}()
 
@@ -210,6 +233,10 @@ func (s *Server) serveWebSocketJoin(w http.ResponseWriter, r *http.Request, hub 
 		if kind != websocket.MessageText {
 			continue
 		}
+		if hooks.message != nil {
+			hooks.message(c, data)
+			continue
+		}
 		var message map[string]any
 		if err := json.Unmarshal(data, &message); err != nil {
 			s.log.Warn(fmt.Sprintf("Error processing %s message: %v", hub.connName, err))
@@ -217,6 +244,33 @@ func (s *Server) serveWebSocketJoin(w http.ResponseWriter, r *http.Request, hub 
 		}
 		if message["type"] == "ping" && !c.queue([]byte(`{"type":"pong"}`)) {
 			return nil
+		}
+	}
+}
+
+// pingClient sends a WebSocket ping every interval and drops the client
+// when the pong does not come within half of the interval.
+func (s *Server) pingClient(ctx context.Context, c *wsClient, hub *wsHub, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			pingCtx, cancel := context.WithTimeout(ctx, interval/2)
+			err := c.conn.Ping(pingCtx)
+			cancel()
+			if err != nil {
+				if ctx.Err() == nil {
+					s.log.Info(fmt.Sprintf("%s client did not answer the heartbeat, closing it", hub.connName))
+				}
+				c.stop()
+				_ = c.conn.CloseNow()
+				return
+			}
 		}
 	}
 }

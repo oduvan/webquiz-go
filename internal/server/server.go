@@ -18,6 +18,7 @@ import (
 	"github.com/oduvan/webquiz-go/internal/config"
 	"github.com/oduvan/webquiz-go/internal/i18n"
 	"github.com/oduvan/webquiz-go/internal/quiz"
+	"github.com/oduvan/webquiz-go/internal/review"
 	"github.com/oduvan/webquiz-go/internal/timelimits"
 	"github.com/oduvan/webquiz-go/internal/transfer"
 	"github.com/oduvan/webquiz-go/internal/tunnel"
@@ -47,6 +48,11 @@ const NoGrace time.Duration = -1
 // CSV files (periodic_flush).
 const DefaultFlushInterval = 5 * time.Second
 
+// DefaultReviewHeartbeat is how often the server pings a review page
+// (aiohttp's heartbeat=30). A page that does not answer within half of it is
+// dropped, so the answer it showed goes to another teacher.
+const DefaultReviewHeartbeat = 30 * time.Second
+
 // Options are settings of a server that do not come from webquiz.yaml.
 type Options struct {
 	// Grace is how long after a time limit an answer still counts. Zero means
@@ -61,6 +67,9 @@ type Options struct {
 	// the CSV files. Zero means DefaultFlushInterval (5 s, as in Python);
 	// tests make it short so they need not wait.
 	FlushInterval time.Duration
+	// ReviewHeartbeat is how often a review page (/ws/review) is pinged.
+	// Zero means DefaultReviewHeartbeat (30 s); tests make it short.
+	ReviewHeartbeat time.Duration
 	// Executable is the program file whose version the version check compares
 	// with the running version (it is run with --version). Empty means the
 	// file of this program, found when the server is made. Tests use a small
@@ -99,8 +108,8 @@ type answerResult struct {
 }
 
 // liveState is the state of one question of one student on the live stats
-// page: "think", "ok", "fail" or "timeout", and the seconds it took (null
-// while the student thinks).
+// page: "think", "ok", "fail", "timeout" or "pending" (the answer waits for
+// the teacher), and the seconds it took (null while the student thinks).
 type liveState struct {
 	State     string   `json:"state"`
 	TimeTaken *seconds `json:"time_taken"`
@@ -117,6 +126,7 @@ type Server struct {
 	grace         time.Duration
 	checkInterval time.Duration
 	flushInterval time.Duration
+	heartbeat     time.Duration // the ping interval of review pages
 	now           func() time.Time
 	pages         fs.FS
 	interfaces    func(includeIPv6 bool) []string
@@ -139,6 +149,7 @@ type Server struct {
 
 	liveStatsClients *wsHub // websocket_clients: the live stats pages
 	adminClients     *wsHub // admin_websocket_clients: the admin pages
+	reviewClients    *wsHub // the review pages (/ws/review); their answers are in reviewQueue
 
 	// tunnel is the SSH tunnel (tunnel_manager); nil when the config has no
 	// tunnel server. Its status callback must not take mu.
@@ -206,6 +217,15 @@ type Server struct {
 	liveStats          map[string]map[int]liveState     // live_stats: user_id -> question id -> state
 	forceAllCompleted  bool                             // force_all_completed: the admin pressed "Show answers"
 
+	// Manual check (manual_check: true). reviewQueue holds the answers that
+	// wait for a teacher and the open review pages; a quiz switch clears the
+	// answers but keeps the pages. allResponses is every answers CSV row of
+	// the run, in order: a verdict changes a row that may be in the file
+	// already, so csvRewriteNeeded makes the next flush write the whole file.
+	reviewQueue      *review.Queue[*wsClient, reviewRefs]
+	allResponses     []*answerRow
+	csvRewriteNeeded bool
+
 	// answersBeingChecked counts, per user_id, the answers whose checker runs
 	// right now without the lock (see submitAnswer). The time limit watcher
 	// leaves those students alone until their answer is stored, as Python's
@@ -234,6 +254,7 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 		grace:         opts.Grace,
 		checkInterval: opts.CheckInterval,
 		flushInterval: opts.FlushInterval,
+		heartbeat:     opts.ReviewHeartbeat,
 		now:           opts.Now,
 		pages:         opts.Pages,
 		interfaces:    opts.NetworkInterfaces,
@@ -247,6 +268,7 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 		adminSessions: map[string]time.Time{},
 		quiz:          emptyQuiz(),
 		startSettings: map[string]any{},
+		reviewQueue:   review.New[*wsClient, reviewRefs](),
 
 		answersBeingChecked: map[string]int{},
 	}
@@ -265,6 +287,9 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 	}
 	if s.flushInterval <= 0 {
 		s.flushInterval = DefaultFlushInterval
+	}
+	if s.heartbeat <= 0 {
+		s.heartbeat = DefaultReviewHeartbeat
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -290,6 +315,7 @@ func New(cfg *config.Config, opts Options) (*Server, error) {
 	s.log.Info(fmt.Sprintf("=== Server Started - New Log File Created: %s ===", s.logFile))
 	s.liveStatsClients = newWSHub("WebSocket", "live stats WebSocket", s.log)
 	s.adminClients = newWSHub("admin WebSocket", "admin WebSocket", s.log)
+	s.reviewClients = newWSHub("review WebSocket", "review WebSocket", s.log)
 	s.transfer = s.newTransferManager()
 	s.resetStateLocked()
 
@@ -426,6 +452,9 @@ func (s *Server) shutdown() {
 	if s.adminClients != nil {
 		s.adminClients.closeAll()
 	}
+	if s.reviewClients != nil {
+		s.reviewClients.closeAll()
+	}
 	if s.tunnel != nil {
 		s.tunnel.Close()
 	}
@@ -460,6 +489,11 @@ func (s *Server) resetStateLocked() {
 	s.registrationTokens = map[string]string{}
 	s.liveStats = map[string]map[int]liveState{}
 	s.forceAllCompleted = false
+	if s.reviewQueue != nil {
+		s.reviewQueue.Clear() // the review pages stay connected
+	}
+	s.allResponses = nil
+	s.csvRewriteNeeded = false
 }
 
 // pyBool writes a boolean like Python's str(): True or False.

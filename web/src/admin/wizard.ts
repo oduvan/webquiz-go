@@ -33,6 +33,8 @@ export interface QuestionDraft {
   defaultValue: string;
   correctValue: string;
   checker: string;
+  // The teacher checks the answer by hand (manual_check: true): no checker code is saved
+  manualCheck: boolean;
   points: string;
   timeLimit: string;
   explanation: string;
@@ -108,6 +110,7 @@ export function newQuestion(): QuestionDraft {
     defaultValue: T.newDefaultValue,
     correctValue: T.newCorrectValue,
     checker: T.newChecker,
+    manualCheck: false,
     points: '1',
     timeLimit: '',
     explanation: '',
@@ -148,7 +151,8 @@ function timeLimitOf(quizData: Dict): { mode: TimeLimitMode; seconds: string } {
 
 function questionFromFile(value: unknown): QuestionDraft {
   const question = isDict(value) ? value : {};
-  const isText = 'checker' in question;
+  // A text question has a checker, or the teacher checks it by hand
+  const isText = 'checker' in question || question.manual_check === true;
   const isMultiple = !isText && Array.isArray(question.correct_answer);
   const correctAnswers: unknown[] = isMultiple ? (question.correct_answer as unknown[]) : [question.correct_answer || 0];
 
@@ -177,6 +181,7 @@ function questionFromFile(value: unknown): QuestionDraft {
     defaultValue: text(question.default_value),
     correctValue: text(question.correct_value),
     checker: question.checker === null || question.checker === undefined ? '' : String(question.checker),
+    manualCheck: question.manual_check === true,
     points: numberValue(question.points || 1),
     timeLimit: timeLimit === undefined || timeLimit === null ? '' : numberValue(timeLimit),
     explanation,
@@ -279,6 +284,7 @@ const QUESTION_KEYS = [
   'explanation',
   'time_limit',
   'checker',
+  'manual_check',
   'correct_value',
   'default_value',
 ];
@@ -324,7 +330,12 @@ function questionData(question: QuestionDraft): Dict | null {
     data = {};
     if (question.defaultValue) data.default_value = question.defaultValue;
     if (question.correctValue) data.correct_value = question.correctValue;
-    if (question.checker.trim()) data.checker = question.checker;
+    if (question.manualCheck) {
+      // The teacher checks the answer by hand: no checker code
+      data.manual_check = true;
+    } else if (question.checker.trim()) {
+      data.checker = question.checker;
+    }
   } else {
     const options = question.options.map((option) => option.text.trim());
     // A choice question with an empty option is left out

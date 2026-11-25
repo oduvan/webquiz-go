@@ -241,6 +241,8 @@ func (s *Server) startRun(filename, path string, loaded *quiz.Quiz, settings map
 		"total_questions": len(loaded.Questions),
 		"message":         "Quiz switched to: " + filename,
 	})
+	// Review pages drop the answers of the old run and learn whether this quiz has manual questions
+	s.reviewChangedLocked(nil)
 	return oldRows, pageErr
 }
 

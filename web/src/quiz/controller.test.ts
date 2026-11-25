@@ -271,7 +271,7 @@ describe('answers', () => {
     await vi.advanceTimersByTimeAsync(450);
     expect(state().test.visible).toBe(false);
     expect(state().results.visible).toBe(true);
-    expect(state().results.content).toEqual({ kind: 'server', final });
+    expect(state().results.content).toEqual({ kind: 'server', final, sawPendingReview: false });
   });
 
   it("the page's own results are shown when the server's cannot be read", async () => {
@@ -679,7 +679,7 @@ describe('a stored student', () => {
     const controller = new QuizController(makeBoot());
     controller.start();
     await flush();
-    expect(controller.getSnapshot().results).toEqual({ visible: true, content: { kind: 'server', final } });
+    expect(controller.getSnapshot().results).toEqual({ visible: true, content: { kind: 'server', final, sawPendingReview: false } });
     expect(controller.getSnapshot().loading).toBe(false);
   });
 
@@ -708,5 +708,95 @@ describe('image preloading', () => {
     const boot = makeBoot({ questions: [choice(1, { image: '/imgs/q.png' }), choice(2, { options: ['/imgs/a.png', 'B'] })] });
     new QuizController(boot).start();
     expect(sources).toEqual(['imgs/q.png', 'imgs/a.png']);
+  });
+});
+
+describe('manual check by the teacher', () => {
+  const manual = { id: 1, points: 2, time_limit: 0, question: 'Why?', type: 'text', default_value: '' } as ClientQuestion;
+
+  it('says the teacher will check the answer and shows Continue, without right or wrong', async () => {
+    const { controller, state } = await registered(makeBoot({ questions: [manual, choice(2)] }), {
+      'api/submit-answer': () => ({ json: { pending_review: true, is_text_question: true, test_completed: false, time_taken: 3 } }),
+    });
+    controller.setTextAnswer('Because');
+    controller.submitClicked();
+    await flush();
+    const view = state().test.question!;
+    expect(view.pendingReview).toBe(true);
+    expect(view.textDisabled).toBe(true);
+    expect(view.textFeedback).toBe('');
+    expect(view.correctValue).toBeNull();
+    expect(state().test.verdict).toBeNull();
+    expect(state().test.submit.hidden).toBe(true);
+    expect(state().test.continueButton).toEqual({ hidden: false, disabled: false });
+  });
+
+  it('moves on by itself when right answers are hidden', async () => {
+    const { controller, state } = await registered(makeBoot({ show_right_answer: false, questions: [manual, choice(2)] }), {
+      'api/submit-answer': () => ({ json: { pending_review: true, test_completed: false } }),
+    });
+    controller.setTextAnswer('Because');
+    controller.submitClicked();
+    await flush();
+    expect(state().test.question!.pendingReview).toBe(true);
+    expect(state().test.continueButton.hidden).toBe(true);
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(state().test.question!.question.id).toBe(1);
+    await vi.advanceTimersByTimeAsync(1 + 450);
+    expect(state().test.question!.question.id).toBe(2);
+  });
+
+  it('the results screen asks again every 5 seconds until the teacher has checked everything', async () => {
+    document.cookie = 'user_id=123456;path=/';
+    const waiting = {
+      test_results: [{ question: 'Why?', selected_answer: 'Because', is_correct: null, pending_review: true, points: 2, earned_points: 0 }],
+      correct_count: 0,
+      total_count: 1,
+      percentage: 0,
+      pending_count: 1,
+    };
+    const checked = {
+      test_results: [{ question: 'Why?', selected_answer: 'Because', is_correct: true, points: 2, earned_points: 2 }],
+      correct_count: 1,
+      total_count: 1,
+      percentage: 100,
+      pending_count: 0,
+    };
+    let final: Record<string, unknown> = waiting;
+    const calls = fakeServer({
+      'api/verify-user/123456': () => ({ json: { valid: true, user_id: '123456', username: 'Anna', approved: true, test_completed: true, final_results: final } }),
+    });
+    const verifyCount = () => calls.filter((call) => call.url === 'api/verify-user/123456').length;
+    const controller = new QuizController(makeBoot());
+    controller.start();
+    await flush();
+    expect(controller.getSnapshot().results.content).toEqual({ kind: 'server', final: waiting, sawPendingReview: true });
+    expect(verifyCount()).toBe(1);
+
+    // Nothing new: the page asks again, the screen stays as it was
+    const shown = controller.getSnapshot().results;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(verifyCount()).toBe(2);
+    expect(controller.getSnapshot().results).toBe(shown);
+
+    // The teacher decided: the new results are drawn and the page stops asking
+    final = checked;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(verifyCount()).toBe(3);
+    expect(controller.getSnapshot().results.content).toEqual({ kind: 'server', final: checked, sawPendingReview: true });
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(verifyCount()).toBe(3);
+  });
+
+  it('results without waiting answers are not asked for again', async () => {
+    document.cookie = 'user_id=123456;path=/';
+    const final = { test_results: [], correct_count: 1, total_count: 1, percentage: 100, pending_count: 0 };
+    const calls = fakeServer({
+      'api/verify-user/123456': () => ({ json: { valid: true, user_id: '123456', username: 'Anna', approved: true, test_completed: true, final_results: final } }),
+    });
+    new QuizController(makeBoot()).start();
+    await flush();
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(calls.filter((call) => call.url.indexOf('api/verify-user/') === 0).length).toBe(1);
   });
 });

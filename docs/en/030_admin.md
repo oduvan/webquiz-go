@@ -275,6 +275,7 @@ The main area displays a grid with:
 Each cell shows the participant's answer status:
 - **Red circle** — incorrect answer
 - **Stopwatch ⏱** — the time limit ran out, so there is no answer (counts as incorrect)
+- **Hand ✍️** — the answer waits for the teacher's check (see "Answer Review")
 - **Green background** — correct answer
 - **Yellow background** — currently answering this question
 - **Empty/white** — not yet answered
@@ -282,6 +283,27 @@ Each cell shows the participant's answer status:
 Each answered cell also displays the time taken to answer that question.
 
 This view allows you to monitor quiz progress in real-time and identify participants who may be struggling or need assistance.
+
+### Answer Review
+
+![Answer review page](../imgs/review.png)
+
+Answers to questions with `manual_check: true` are checked by the teacher on the review page, `/review/`. The page is made for a phone. The phone must be on the same network as the server.
+
+**When you start such a quiz**, the start pop-up says how many questions you check by hand and shows the review page addresses. While the quiz runs, the admin panel shows the **"✍️ Ручна перевірка"** (Manual check) block: how many answers wait and how many review pages are open. If nobody is checking, it warns you and shows the addresses again. The **"✍️ Перевірка відповідей"** (Answer review) link at the bottom of the admin panel opens the page too.
+
+**How to check:**
+1. Open the review page on the phone and log in with the master key (once; the phone remembers the session). A computer whose address is in `admin.trusted_ips` needs no key.
+2. The page shows one answer: the question, the student's answer and the sample answer (`correct_value`), if the question has one. The student's name is never shown.
+3. Tap **✓ Right** or **✗ Wrong**. The page shows the next answer at once, or waits until a new one arrives.
+
+**Several teachers:** each open review page gets a different answer, so you can share the work. When every waiting answer is already open on another teacher's page, your page waits and offers **🤝 Help check**. With it you see the same answer as your colleague, and the first verdict counts; the other page moves on by itself. This helps when a colleague's phone is lying on the desk with an answer on it.
+
+**A phone that goes to sleep:** the server checks every 30 seconds that each review page is still there. A page that does not answer is closed, and its answer goes to another teacher.
+
+**After a verdict** the student's results screen updates within a few seconds, live statistics show ✓ or ✗ instead of ✍️, and the CSV file gets `True` or `False` in the `is_correct` column. Until then that column is empty.
+
+Waiting answers are kept in memory. Restarting the quiz or the server drops them, like all other progress of the run.
 
 ---
 
@@ -291,6 +313,7 @@ At the bottom of each admin interface page, there are convenient links:
 - **← Back to Quiz** — return to the main quiz page.
 - **Quiz Home** — go to the participant interface.
 - **Live Stats** — page with live statistics (number of users, quiz status, active sessions).
+- **✍️ Перевірка відповідей** (Answer review) — the review page for answers that the teacher checks by hand (admin panel only).
 
 ---
 

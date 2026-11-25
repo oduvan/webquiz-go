@@ -451,3 +451,29 @@ describe('other helpers', () => {
     expect(formatFileSize(1048576)).toBe('1 MB');
   });
 });
+
+describe('manual check in the editor', () => {
+  it('reads manual_check: true as a text question checked by the teacher', () => {
+    const draft = draftFromQuiz({
+      questions: [
+        { question: 'By hand', manual_check: true, correct_value: 'Sample' },
+        { question: 'Code', checker: 'assert x' },
+      ],
+    });
+    expect(draft.questions[0].type).toBe('text');
+    expect(draft.questions[0].manualCheck).toBe(true);
+    expect(draft.questions[0].correctValue).toBe('Sample');
+    expect(draft.questions[1].manualCheck).toBe(false);
+  });
+
+  it('saves manual_check instead of the checker code, and drops it when turned off', () => {
+    const draft = draftFromQuiz({ questions: [{ question: 'Type it', correct_value: 'x', checker: "assert user_answer == 'x'" }] });
+    draft.questions[0].manualCheck = true;
+    expect(wizardData(draft).questions).toEqual([{ question: 'Type it', correct_value: 'x', manual_check: true }]);
+
+    const back = draftFromQuiz({ questions: [{ question: 'By hand', manual_check: true }] });
+    back.questions[0].manualCheck = false;
+    back.questions[0].checker = 'assert True';
+    expect(wizardData(back).questions).toEqual([{ question: 'By hand', checker: 'assert True' }]);
+  });
+});

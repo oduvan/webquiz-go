@@ -93,6 +93,15 @@ describe('LiveStatsClient', () => {
     expect(view.completionTimes['123456']).toBe('2026-11-10T10:00:00');
   });
 
+  it('shows a waiting answer as pending, then the verdict of the teacher', () => {
+    const client = startClient();
+    sockets[0].receive({ type: 'initial_state', users: { u1: 'Anna' }, live_stats: {}, questions, total_points: 3 });
+    sockets[0].receive({ type: 'state_update', user_id: 'u1', question_id: 1, state: 'pending', time_taken: 5, completed: false });
+    expect(client.getSnapshot().liveStats.u1[1]).toEqual({ state: 'pending', time_taken: 5 });
+    sockets[0].receive({ type: 'state_update', user_id: 'u1', question_id: 1, state: 'fail', time_taken: 5, completed: false });
+    expect(client.getSnapshot().liveStats.u1[1]).toEqual({ state: 'fail', time_taken: 5 });
+  });
+
   it('empties the table on a quiz switch and takes the new questions', () => {
     const client = startClient();
     sockets[0].receive({ type: 'initial_state', users: { u1: 'Anna' }, live_stats: {}, questions, total_points: 3 });

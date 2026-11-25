@@ -31,6 +31,9 @@ type MessageKind = 'registration' | 'waiting' | 'test';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
+// How often the results screen asks for new results while the teacher still checks answers.
+export const PENDING_REVIEW_REFRESH_MS = 5000;
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -59,6 +62,10 @@ export class QuizController {
   private selectedAnswers: number[] = []; // in click order
   private textAnswer = '';
   private testResults: ClientTestResult[] = [];
+  // The results screen while the teacher checks answers (manual_check)
+  private pendingReviewTimer: Timer | undefined;
+  private sawPendingReview = false;
+  private lastFinalResultsJson: string | null = null;
   private answerLocked = false; // the answer is being sent and must not change
   private questionCountdown: { questionId: number; deadline: number; intervalId: Timer | null } | null = null;
   private quizCountdown: { deadline: number; intervalId: Timer | null } | null = null;
@@ -440,6 +447,7 @@ export class QuizController {
         checkerError: null,
         correctValue: null,
         timeUp: false,
+        pendingReview: false,
         timer: { text: '', warning: false, pending: true },
       },
       // A text question can be sent at once when it has a starting text
@@ -608,12 +616,19 @@ export class QuizController {
         checkerError: data.checker_error,
         correctValue: data.correct_value,
         timedOut,
+        pendingReview: data.pending_review === true,
       });
 
       // The whole-quiz time is over: the server closed the quiz, so the results are shown
       if (timedOut && this.boot.quiz_time_limit > 0 && data.test_completed) {
         this.answerLocked = false;
         await this.finishQuizAfterTimeUp();
+        return;
+      }
+
+      // The teacher checks this answer later: say so instead of right or wrong
+      if (data.pending_review === true) {
+        this.showPendingReviewFeedback();
         return;
       }
 
@@ -719,6 +734,20 @@ export class QuizController {
     this.setTest({ verdict });
   }
 
+  // An answer to a question that the teacher checks by hand (manual_check): no right or wrong yet.
+  private showPendingReviewFeedback() {
+    this.setQuestion({ textDisabled: true, pendingReview: true });
+    this.setSubmit({ hidden: true });
+    if (!this.boot.show_right_answer) {
+      // No continue button in this mode: time to read the message, then the next question
+      setTimeout(() => {
+        void this.continueToNextQuestion(true);
+      }, 1500);
+      return;
+    }
+    this.setContinue({ hidden: false, disabled: false });
+  }
+
   private showTimeUpMessage() {
     this.setQuestion({ timeUp: true });
   }
@@ -820,10 +849,41 @@ export class QuizController {
     this.showResults({ kind: 'client', results: this.testResults.slice() });
   }
 
+  // The server's results. While the teacher still checks some answers
+  // (manual_check) the page asks again every 5 seconds and draws the new results.
   private showCompletedTestResults(finalResults: FinalResults) {
     this.stopAllCountdowns();
+    this.schedulePendingReviewRefresh(finalResults.pending_count || 0);
+    if ((finalResults.pending_count || 0) > 0) this.sawPendingReview = true;
+    // Drawn again only when something changed, so the screen does not jump every 5 s
+    const resultsJson = JSON.stringify(finalResults);
+    if (resultsJson === this.lastFinalResultsJson && this.state.results.visible) return;
+    this.lastFinalResultsJson = resultsJson;
     this.update((state) => ({ ...state, loading: false }));
-    this.showResults({ kind: 'server', final: finalResults });
+    this.showResults({ kind: 'server', final: finalResults, sawPendingReview: this.sawPendingReview });
+  }
+
+  private schedulePendingReviewRefresh(pendingCount: number) {
+    clearTimeout(this.pendingReviewTimer);
+    this.pendingReviewTimer = undefined;
+    if (pendingCount > 0) {
+      this.pendingReviewTimer = setTimeout(() => void this.refreshPendingReview(), PENDING_REVIEW_REFRESH_MS);
+    }
+  }
+
+  private async refreshPendingReview() {
+    this.pendingReviewTimer = undefined;
+    try {
+      const response = await fetchWithRetry('api/verify-user/' + this.currentUserId);
+      const data: Reply = await response.json();
+      if (response.ok && data.valid && data.test_completed && data.final_results) {
+        this.showCompletedTestResults(data.final_results);
+        return;
+      }
+    } catch (error) {
+      console.error('Error refreshing results:', error);
+    }
+    this.pendingReviewTimer = setTimeout(() => void this.refreshPendingReview(), PENDING_REVIEW_REFRESH_MS);
   }
 
   private showResults(content: ResultsContent) {

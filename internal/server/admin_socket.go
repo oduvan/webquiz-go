@@ -9,7 +9,8 @@ import (
 // The admin WebSocket (/ws/admin) tells the admin page about students who
 // wait for approval (new_registration, registration_updated,
 // user_approved), the tunnel status (tunnel_status) and file transfer
-// requests. A page gets an initial_state message when it connects.
+// requests, and the manual check (review_status). A page gets an
+// initial_state message when it connects.
 
 // registrationFieldsLocked is _extract_registration_fields: the student's
 // values of the extra registration fields of the config, without the system
@@ -47,6 +48,7 @@ func (s *Server) adminInitialStateLocked(transferRequests []transfer.RequestView
 		"requires_approval": s.cfg.Registration.Approve,
 		"tunnel":            tunnelInfo,
 		"transfer_requests": transferRequests,
+		"review":            s.reviewStatusLocked(), // the manual check block of the admin panel
 	}
 }
 

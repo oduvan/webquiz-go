@@ -71,6 +71,9 @@ var pythonRoutes = []route{
 	{"GET", "/live-stats/", "local"},
 	{"GET", "/ws/live-stats", "local"},
 
+	{"GET", "/review/", "local"},
+	{"GET", "/ws/review", "admin"},
+
 	{"GET", "/", "public"},
 }
 
@@ -150,13 +153,13 @@ func TestUnknownPathsAndWrongMethods(t *testing.T) {
 	}
 }
 
-// Go's router sends /admin to /admin/ (also /files and /live-stats). aiohttp
+// Go's router sends /admin to /admin/ (also /files, /live-stats and /review). aiohttp
 // answered 404 there; the redirect makes the "Admin panel" address that the
 // CLI prints (without the slash) work.
 func TestPagesWithoutSlashRedirect(t *testing.T) {
 	t.Parallel()
 	ts := startForRoutes(t, testutil.Options{})
-	for _, path := range []string{"/admin", "/files", "/live-stats"} {
+	for _, path := range []string{"/admin", "/files", "/live-stats", "/review"} {
 		res := ts.NoRedirects().GetJSON(t, path)
 		if res.Status < 300 || res.Status > 399 || res.Header.Get("Location") != path+"/" {
 			t.Errorf("GET %s: %d Location %q, want a redirect to %s/", path, res.Status, res.Header.Get("Location"), path)

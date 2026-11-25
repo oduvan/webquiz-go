@@ -33,10 +33,11 @@ WebQuiz 2.0 is the Go rewrite of the Python/aiohttp WebQuiz 1.19 (<https://githu
 - `internal/i18n/` - student texts and API error texts (uk/en); `i18n.Tray` has the desktop menu texts, apart from the page texts
 - `internal/timelimits/` - quiz time limit rules
 - `internal/explanations/` - question explanations: Markdown -> safe HTML (goldmark)
+- `internal/review/` - the queue of answers that wait for the teacher's check (`manual_check`) and how they are handed to review pages (port of `manual_review.py`)
 - `internal/tunnel/` - SSH tunnel manager; `internal/transfer/` - file transfer between servers
 - `internal/netinfo/`, `internal/version/` - network addresses; version and repository address (`RepoURL`, `PagesURL` live only here)
 - `internal/testutil/` - `StartServer` (in-process server on a free port, temp folders), `BuildBinary`, `BuildDesktopBinary`
-- `web/` - five pages: `index.html` (quiz), `admin.html`, `files.html`, `live-stats.html`, `csv-table.html`; sources in `web/src/{quiz,admin,files,livestats,csvtable,shared}`; `web/build/gzip.ts` is the Vite plugin that writes the gzip copies
+- `web/` - six pages: `index.html` (quiz), `admin.html`, `files.html`, `live-stats.html`, `csv-table.html`, `review.html`; sources in `web/src/{quiz,admin,files,livestats,csvtable,review,shared}`; `web/build/gzip.ts` is the Vite plugin that writes the gzip copies
 - `e2e/` - Playwright tests; `e2e/fixtures/server.ts` starts the built binary in a temp folder
 - `scripts/screenshots.ts` - takes the screenshots of `docs/imgs` from the real binary; `scripts/icons` draws the desktop icons (`go run ./scripts/icons`; a test checks the committed files)
 - `migration/` - `python-tests.txt` (911 ids of the 1.19 tests) and the check that every id is ported (a normal Go test)
@@ -70,13 +71,14 @@ Same paths, methods, JSON fields, status codes and error texts as 1.19.
 - `POST /api/transfer/offer`, `GET /api/transfer/download/{token}/{type}/{filename}`, `POST /api/transfer/result`. The JSON must stay byte-compatible with the Python server (1.19 and 2.0 servers can send files to each other)
 
 **Pages (admin pages: local network only):**
-- `GET /` quiz page; `GET /admin/`, `/live-stats/`, `/files/` (also without the final slash), `GET /files/csv/{filename}` (`?question=`, `?user=`, `?embedded=1`); `/assets/`, `/imgs/`
+- `GET /` quiz page; `GET /admin/`, `/live-stats/`, `/files/`, `/review/` (also without the final slash), `GET /files/csv/{filename}` (`?question=`, `?user=`, `?embedded=1`); `/assets/`, `/imgs/`
 
 **WebSockets:**
-- `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only: admin approval, tunnel status, `transfer_request`, `transfer_request_removed`, `transfer_result`)
+- `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only: admin approval, tunnel status, `transfer_request`, `transfer_request_removed`, `transfer_result`; `review` in `initial_state` and `review_status` `{has_manual, pending_count, reviewers}`)
+- `WS /ws/review` (guard of the admin API, refused before the upgrade; ping every 30 s): server sends `review_state` `{item: {review_id, question, image, answer, correct_value, points} | null, pending_count, has_manual, already_decided}`; page sends `verdict` `{review_id, is_correct: bool}`, `take_shared`, `ping`
 
 ## Boot Data Contract
-Every HTML entry in `web/` has `<title>__WEBQUIZ_TITLE__</title>` and `<script id="webquiz-boot" type="application/json">__WEBQUIZ_BOOT__</script>`. The server replaces the title with HTML-escaped text and the marker with JSON where `<`, `>` and `&` are written as `\u003c`, `\u003e` and `\u0026` (so `</script>` in quiz text cannot end the script). Page data lives in `QuizBoot`, `AdminBoot`, `FilesBoot`, `LiveStatsBoot`, `CSVTableBoot` (`internal/server/pages.go`) and is read in `web/src/shared/boot.ts`. Asset URLs are relative on the quiz page (`./assets/`, `api/...`, `imgs/...`) because it is also served under `{base_url}/{socket_name}/`; admin pages may use absolute `/api/...` and the server rewrites their `./assets/` to `/assets/`.
+Every HTML entry in `web/` has `<title>__WEBQUIZ_TITLE__</title>` and `<script id="webquiz-boot" type="application/json">__WEBQUIZ_BOOT__</script>`. The server replaces the title with HTML-escaped text and the marker with JSON where `<`, `>` and `&` are written as `\u003c`, `\u003e` and `\u0026` (so `</script>` in quiz text cannot end the script). Page data lives in `QuizBoot`, `AdminBoot`, `FilesBoot`, `LiveStatsBoot`, `CSVTableBoot`, `ReviewBoot` (`internal/server/pages.go`) and is read in `web/src/shared/boot.ts`. Asset URLs are relative on the quiz page (`./assets/`, `api/...`, `imgs/...`) because it is also served under `{base_url}/{socket_name}/`; admin pages may use absolute `/api/...` and the server rewrites their `./assets/` to `/assets/`.
 
 ## Dev Commands
 
@@ -133,6 +135,7 @@ Screenshots of the docs: `make build && npm --prefix scripts ci && npm --prefix 
 - **Points**: default 1, decimals with at most 2 places, > 0; sums are rounded to 2 decimals and shown as whole numbers when whole (`normalize_points`/`sum_points` on the server, `formatPoints` in `web/src/shared/points.ts`)
 - **Start settings** - the admin start pop-up sends `settings` (show_right_answer, randomize_questions, show_answers_on_completion, show_final_list, show_explanation, time_limit) with `switch-quiz`; they are kept for that file's run and never written to the file. A restart of the same file keeps them; another file drops them
 - **Question explanations** - Markdown with goldmark, raw HTML shown as text, harmful links as plain text; sent only in the answer reply, never in the boot data
+- **Manual check** - `manual_check: true` makes a text question (`Question.IsText` = has `checker` or `IsManual`) whose answer a teacher marks right/wrong on `/review/`. The answer is stored with `PendingReview` (is_correct null in results, empty in CSV, live stats `"pending"`) and goes into `s.reviewQueue` (under `mu`). Each review page gets its own `review_state`, queued per client under `mu` (`review_socket.go`); one answer per page, `take_shared` to help, first verdict wins. A verdict updates the stored answer and CSV row, recalculates finished students' results (keeps `completed_at`), sends a live stats `state_update`, and sets `csvRewriteNeeded`: the next flush writes the answers CSV (and `answers_with_users`) again from `allResponses` through `<file>.tmp` + fsync + rename. `final_results` has `pending_count`; the results screen polls `verify-user` every 5 s while it is > 0. Design: `docs/superpowers/specs/2026-11-25-manual-check-design.md`
 - **Answer verdict** (new in 2.0) - while right answers are shown, `#answer-verdict` says "✓ Правильно" / "✗ Неправильно" (`answer_verdict_*` texts) left of "Continue", from the reply's `is_correct`. None for a timeout; gone on the next question and the explanation step
 - **Plain text, never HTML** - quiz text and student input are shown as plain text on every page (React escapes text; no `dangerouslySetInnerHTML` for them); explanation HTML comes only from the server renderer
 - **Dynamic answer visibility** - `show_answers_on_completion: true` reveals correct answers after all approved students complete; admin can force it (`force-show-answers`, resets on quiz switch)

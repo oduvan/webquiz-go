@@ -18,8 +18,8 @@ const questions = [
 ];
 
 describe('cells', () => {
-  it('counts right, wrong and timed-out answers as answered', () => {
-    expect(['ok', 'fail', 'timeout'].map(isAnsweredState)).toEqual([true, true, true]);
+  it('counts right, wrong, timed-out and waiting answers as answered', () => {
+    expect(['ok', 'fail', 'timeout', 'pending'].map(isAnsweredState)).toEqual([true, true, true, true]);
     expect(['think', 'empty', undefined].map(isAnsweredState)).toEqual([false, false, false]);
   });
   it('turns old text cells into objects', () => {
@@ -28,7 +28,7 @@ describe('cells', () => {
     });
   });
   it('shows an icon per state', () => {
-    expect(['think', 'ok', 'fail', 'timeout', 'empty'].map(stateIcon)).toEqual(['🟡', '🟢', '🔴', '⏱', '⚪']);
+    expect(['think', 'ok', 'fail', 'timeout', 'pending', 'empty'].map(stateIcon)).toEqual(['🟡', '🟢', '🔴', '⏱', '✍️', '⚪']);
   });
   it('writes seconds and minutes', () => {
     expect(formatTime(null)).toBeNull();
@@ -54,6 +54,15 @@ describe('statistics', () => {
       2: { correct_count: 1, total_attempts: 1 },
       3: { correct_count: 0, total_attempts: 1 },
     });
+  });
+  it('counts an answer that waits for the teacher as answered, not right, until the verdict', () => {
+    const waiting = { a: { 1: { state: 'pending', time_taken: 4 }, 2: { state: 'ok', time_taken: 1 } } };
+    expect(userStatistics(waiting, questions).a).toEqual({ correct_count: 1, total_answered: 2, earned_points: 0.2, attempted_points: 0.3 });
+    expect(questionStatistics(waiting, questions)[1]).toEqual({ correct_count: 0, total_attempts: 1 });
+    // The verdict comes as a normal state_update: the cell becomes "ok"
+    const decided = { a: { ...waiting.a, 1: { state: 'ok', time_taken: 4 } } };
+    expect(userStatistics(decided, questions).a).toEqual({ correct_count: 2, total_answered: 2, earned_points: 0.3, attempted_points: 0.3 });
+    expect(questionStatistics(decided, questions)[1]).toEqual({ correct_count: 1, total_attempts: 1 });
   });
   it('adds the points of all questions', () => {
     expect(totalPointsOf(questions)).toBe(1.3);

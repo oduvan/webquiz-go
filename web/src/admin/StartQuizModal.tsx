@@ -4,6 +4,7 @@ import type { StartSettingsDraft, TimeLimitMode } from './wizard';
 export interface StartModalState {
   filename: string;
   restart: boolean; // the quiz is the one running now
+  manualCount: number; // questions the teacher checks by hand (manual_check)
   settings: StartSettingsDraft;
   error: string;
   busy: boolean;
@@ -11,13 +12,30 @@ export interface StartModalState {
 
 // The pop-up shown before a quiz starts (#start-quiz-modal). The quiz file
 // gives the values; changes apply to this run only and are not saved.
+// Links to the review page, one per address.
+export function ReviewLinks({ id, urls }: { id: string; urls: string[] }) {
+  return (
+    <ul id={id}>
+      {urls.map((url) => (
+        <li key={url}>
+          <a href={url} target="_blank" rel="noopener">
+            {url}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function StartQuizModal({
   state,
+  reviewUrls,
   onChange,
   onConfirm,
   onClose,
 }: {
   state: StartModalState;
+  reviewUrls: string[]; // the review page's addresses, for the manual check note
   onChange: (settings: StartSettingsDraft) => void;
   onConfirm: () => void;
   onClose: () => void;
@@ -38,6 +56,14 @@ export function StartQuizModal({
           {state.filename + (state.restart ? T.restartSuffix : '')}
         </p>
         <p className="start-quiz-hint">{T.startHint}</p>
+        {/* The teacher checks some answers by hand: where to do it, before the quiz starts */}
+        <div id="start-manual-check-note" className="manual-check-note" style={{ display: state.manualCount > 0 ? 'block' : 'none' }}>
+          <strong>
+            ✍️ <span id="start-manual-check-count">{T.startManualCheckCount(state.manualCount)}</span>
+          </strong>
+          <div>{T.startManualCheckHint}</div>
+          {state.manualCount > 0 ? <ReviewLinks id="start-manual-check-links" urls={reviewUrls} /> : null}
+        </div>
         <div className="form-group">
           <label className="checkbox-label">
             <input

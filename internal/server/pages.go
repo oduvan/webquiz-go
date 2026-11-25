@@ -36,6 +36,7 @@ const (
 	filesPageFile     = "files.html"
 	liveStatsPageFile = "live-stats.html"
 	csvTablePageFile  = "csv-table.html"
+	reviewPageFile    = "review.html"
 )
 
 // The states of the quiz page.
@@ -150,6 +151,16 @@ type LiveStatsBoot struct{}
 // The page reads the file name from its own address.
 type CSVTableBoot struct{}
 
+// ReviewBoot is the boot data of the review page (/review/), where teachers
+// mark answers to manual_check questions right or wrong. The page holds no
+// answers: it logs in like the admin panel and gets them over /ws/review.
+type ReviewBoot struct {
+	IsTrustedIP  bool              `json:"is_trusted_ip"` // IS_TRUSTED_IP: no master key needed
+	Language     string            `json:"language"`      // the interface language: "uk" or "en"
+	Translations map[string]string `json:"translations"`  // TRANSLATIONS_JSON: the review_* texts and the others
+	Version      string            `json:"version"`       // WEBQUIZ_VERSION
+}
+
 // The two markers of a built page.
 const (
 	titleMarker = "<title>__WEBQUIZ_TITLE__</title>"
@@ -243,7 +254,7 @@ func interfaceLanguage(language string) string {
 
 // clientQuestions is the question list of the quiz page, without the
 // answers: for a choice question its options, is_multiple_choice and (for
-// several answers) min_correct; for a text question (one with "checker")
+// several answers) min_correct; for a text question (Question.IsText)
 // type "text" and default_value. Every question has id, points and
 // time_limit (effective seconds, 0 = none); question, image and file only
 // when set (file as "/attach/<name>").
@@ -501,6 +512,22 @@ func (s *Server) readConfigForForm(path string) (string, any) {
 // serveLiveStatsPage is serve_live_stats_page (/live-stats/).
 func (s *Server) serveLiveStatsPage(w http.ResponseWriter, _ *http.Request) error {
 	return s.servePage(w, liveStatsPageFile, liveStatsPageTitle, LiveStatsBoot{})
+}
+
+// serveReviewPage is serve_review_page (/review/). Its title is the
+// review_title text of the config language.
+func (s *Server) serveReviewPage(w http.ResponseWriter, r *http.Request) error {
+	trusted := s.isTrustedIP(getClientIP(r))
+	var boot ReviewBoot
+	s.withLock(func() {
+		boot = ReviewBoot{
+			IsTrustedIP:  trusted,
+			Language:     interfaceLanguage(s.cfg.Language),
+			Translations: s.translations,
+			Version:      version.Version,
+		}
+	})
+	return s.servePage(w, reviewPageFile, boot.Translations["review_title"], boot)
 }
 
 // serveCSVTablePage is serve_csv_table_page (/files/csv/{filename}).
