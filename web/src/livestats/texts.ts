@@ -18,4 +18,5 @@ export const TEXTS = {
   questionLabel: (number: number) => 'Q' + number,
   correctTitle: (name: string, stats: string) => name + ' - Correct: ' + stats,
   pointsTitle: (points: string) => points + ' points',
+  manualTitle: 'Manual verification',
 };

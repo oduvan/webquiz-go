@@ -6,6 +6,7 @@ import {
   formatTime,
   groupUsers,
   imageFilename,
+  isManualQuestion,
   pointsOf,
   questionStatistics,
   stateIcon,
@@ -34,6 +35,12 @@ function QuestionHeader({ question, index, stats }: { question: LiveQuestion; in
       📎
     </span>
   ) : null;
+  // Marker for a question that is checked manually (manual_check)
+  const manualIndicator = isManualQuestion(question) ? (
+    <span className="manual-check-indicator" title={TEXTS.manualTitle}>
+      ✍️
+    </span>
+  ) : null;
   const pointsIndicator =
     points !== 1 ? (
       <span className="points-indicator" title={TEXTS.pointsTitle(formatPoints(points))}>
@@ -53,6 +60,7 @@ function QuestionHeader({ question, index, stats }: { question: LiveQuestion; in
             {name}
             {fileIndicator}
             {pointsIndicator}
+            {manualIndicator}
           </div>
           <div className="question-stats">{statsText}</div>
         </div>
@@ -69,6 +77,7 @@ function QuestionHeader({ question, index, stats }: { question: LiveQuestion; in
           {text}
           {fileIndicator}
           {pointsIndicator}
+          {manualIndicator}
         </div>
         <div className="question-stats">{statsText}</div>
       </div>

@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -77,17 +78,18 @@ func TestLanguagesAndKeyCount(t *testing.T) {
 	}
 }
 
-// The texts of the manual check: the student page and the review page.
+// The texts of the manual check: the student page and the review page (as in translations.py).
 func TestManualCheckTexts(t *testing.T) {
 	cases := map[string]map[string]string{
 		"uk": {
-			"pending_review_notice": "⏳ Учитель ще не перевірив ваших відповідей: {n}. Сторінка оновиться сама.",
+			"pending_review_notice": "⏳ Відповідей чекає ручної перевірки: {n}. Сторінка оновиться сама.",
+			"review_help_text":      "Відповіді, відкриті на інших сторінках перевірки: {n}. Можна допомогти: тоді ви бачите ту саму відповідь, і зараховується перше рішення.",
 			"review_title":          "✍️ Перевірка відповідей",
 			"review_help_button":    "🤝 Допомогти з перевіркою",
 		},
 		"en": {
-			"pending_review_saved": "✍️ Your answer is saved. The teacher will check it; you will see the result at the end of the quiz.",
-			"pending_review_row":   "⏳ Waiting for the teacher",
+			"pending_review_saved": "✍️ Your answer is saved. It will be checked manually; you will see the result at the end of the quiz.",
+			"pending_review_row":   "⏳ Waiting for manual verification",
 			"review_waiting_count": "Waiting for a check: {n}",
 			"review_login_error":   "Wrong key",
 		},
@@ -146,6 +148,24 @@ func TestTextsMatchPython(t *testing.T) {
 		for key, want := range texts {
 			if got := Get(lang)[key]; got != want {
 				t.Errorf("%s.%s = %q, want %q", lang, key, got, want)
+			}
+		}
+	}
+}
+
+// Students and review pages see "manual verification", never a "teacher"
+// (test_texts_never_say_teacher of WebQuiz 1.x).
+func TestManualCheckTextsNeverSayTeacher(t *testing.T) {
+	for _, lang := range Languages {
+		for key, text := range Get(lang) {
+			if !strings.HasPrefix(key, "pending_review") && !strings.HasPrefix(key, "review_") {
+				continue
+			}
+			lowered := strings.ToLower(text)
+			for _, word := range []string{"teacher", "вчител", "учител"} {
+				if strings.Contains(lowered, word) {
+					t.Errorf("%s.%s says %q: %q", lang, key, word, text)
+				}
 			}
 		}
 	}

@@ -571,6 +571,22 @@ body {
   margin-right: 5px;
 }
 
+.admin-page .question-indicator.manual-check-indicator {
+  font-size: 12px;
+  font-weight: bold;
+  color: #856404;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 0 6px;
+  opacity: 1;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .admin-page .question-indicator.manual-check-indicator {
+  color: #f0d68a;
+}
+
 .admin-page .question-indicator.points-indicator {
   color: darkgoldenrod;
   font-weight: bold;

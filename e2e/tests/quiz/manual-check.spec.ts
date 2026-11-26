@@ -23,7 +23,9 @@ async function answerManualThenChoice(page: Page) {
   await page.locator('#submit-answer-btn').click();
   const message = page.locator('#checker-feedback .pending-review-message');
   await expect(message).toBeVisible();
-  await expect(message).toContainText('teacher will check it');
+  await expect(message).toContainText('It will be checked manually');
+  // The student page never mentions a teacher
+  expect((await page.locator('body').innerText()).toLowerCase()).not.toContain('teacher');
   // No right or wrong yet
   await expect(page.locator('#answer-verdict')).toHaveCount(0);
   await page.locator('#continue-btn').click();
@@ -53,21 +55,22 @@ test('the results wait for the teacher and update by themselves', async ({ page,
 
   const notice = page.locator('#pending-review-notice');
   await expect(notice).toBeVisible({ timeout: 10000 });
-  await expect(notice).toContainText('not checked yet: 1');
+  await expect(notice).toContainText('Answers waiting for manual verification: 1');
   const waitingRows = page.locator('.results-table tr.pending-review-row');
   await expect(waitingRows).toHaveCount(1);
-  await expect(waitingRows.first()).toContainText('Waiting for the teacher');
+  await expect(waitingRows.first()).toContainText('Waiting for manual verification');
+  expect((await page.locator('#results').innerText()).toLowerCase()).not.toContain('teacher');
 
   await teacherDecides(browser, server.url, 'correct');
 
   const done = page.locator('#pending-review-done');
   await expect(done).toBeVisible({ timeout: 12000 });
-  await expect(done).toContainText('checked all your answers');
+  await expect(done).toContainText('All your answers have been verified');
   await expect(waitingRows).toHaveCount(0);
   await expect(page.locator('#results-content')).toContainText('2/2');
 });
 
-test('without right answers the page moves on after "the teacher will check it"', async ({ page, launch }) => {
+test('without right answers the page moves on after "it will be checked manually"', async ({ page, launch }) => {
   const server = await launch({ config: EN, quizzes: quiz({ show_right_answer: false }) });
   await registerUser(page, server.url, 'Student');
   await waitForQuestionText(page, 'Why is the sky blue?');

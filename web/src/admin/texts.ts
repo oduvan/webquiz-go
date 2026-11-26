@@ -79,8 +79,8 @@ export const T = {
   zeroMeansNoLimit: '0 = без обмеження',
   ownLimitsStay: 'Питання з власним обмеженням часу у файлі тесту залишають його.',
   // Questions the teacher checks by hand (manual_check)
-  startManualCheckCount: (count: number) => `Питань, які перевіряєте ви вручну: ${count}.`,
-  startManualCheckHint: 'Відкрийте сторінку перевірки на телефоні (у тій самій мережі, вхід з головним ключем):',
+  startManualCheckCount: (count: number) => `Питань з ручною перевіркою: ${count}.`,
+  startManualCheckHint: 'Сторінка перевірки:',
   start: '▶️ Запустити',
   cancel: '❌ Скасувати',
   restarting: 'Restarting...',
@@ -150,10 +150,12 @@ export const T = {
   defaultValueLabel: 'Початкове Значення (показується користувачу):',
   defaultValuePlaceholder: 'Введіть початкове значення для відображення...',
   correctValueLabel: 'Правильна Відповідь (показується при помилці):',
-  sampleValueLabel: 'Зразок відповіді (показується вчителю на сторінці перевірки):',
-  manualCheckLabel: '✍️ Перевіряє вчитель вручну',
-  manualCheckHint:
-    'Учень вводить відповідь, а вчитель позначає її правильною чи ні на сторінці перевірки (/review/). Правильна відповідь вище показується вчителю як зразок.',
+  sampleValueLabel: 'Зразок відповіді (показується на сторінці перевірки):',
+  manualCheckLabel: '✍️ Ручна перевірка',
+  manualCheckHint: 'Відповідь перевіряють вручну на сторінці перевірки (/review/). Правильна відповідь вище показується там як зразок.',
+  // The marker of a folded question that is checked manually
+  manualCheckIndicator: '✍️ вручну',
+  manualCheckIndicatorTitle: 'Ручна перевірка',
   correctValuePlaceholder: 'Введіть правильну відповідь...',
   checkerLabel: 'Перевірка (Python код):',
   chooseTemplate: '-- Оберіть шаблон --',

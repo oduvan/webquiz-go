@@ -92,7 +92,7 @@ test('two teachers: the second one can help with the same answer, the first verd
   await other.request.post(server.url + '/api/admin/auth', { data: { master_key: 'test123' } });
   await other.goto(server.url + '/review/');
   // The only answer is open on the first page: the second page offers help
-  await expect(other.locator('#help-text')).toContainText('Answers open on other teachers\' pages: 1');
+  await expect(other.locator('#help-text')).toContainText('Answers open on other review pages: 1');
   await other.locator('#help-button').click();
   await expect(other.locator('#item-answer')).toHaveText('Because');
 

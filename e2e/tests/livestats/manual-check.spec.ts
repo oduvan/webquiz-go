@@ -18,6 +18,13 @@ test('a waiting answer shows ✍️, then the verdict', async ({ page, browser, 
   await page.goto(server.url + '/live-stats/');
   await request.post(server.url + '/api/submit-answer', { data: { user_id: userId, question_id: 1, selected_answer: 'Because' } });
 
+  // The manual question's column header carries ✍️, the other one does not
+  const headers = page.locator('#statsTable thead th');
+  const marker = headers.nth(1).locator('.manual-check-indicator');
+  await expect(marker).toHaveText('✍️');
+  await expect(marker).toHaveAttribute('title', 'Manual verification');
+  await expect(headers.nth(2).locator('.manual-check-indicator')).toHaveCount(0);
+
   const cell = page.locator(`#cell-${userId}-1`);
   await expect(cell).toHaveClass(/state-pending/);
   await expect(cell).toContainText('✍️');

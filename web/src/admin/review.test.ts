@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { manualQuestionCount, reviewPageUrls, reviewStatusOf } from './review';
+import { T } from './texts';
 
 describe('manual check in the admin panel', () => {
   it('counts the questions with manual_check: true', () => {
@@ -29,5 +30,23 @@ describe('manual check in the admin panel', () => {
   it('reads the review status of the admin socket', () => {
     expect(reviewStatusOf({ has_manual: true, pending_count: 3, reviewers: 1 })).toEqual({ has_manual: true, pending_count: 3, reviewers: 1 });
     expect(reviewStatusOf(undefined)).toBeNull();
+  });
+});
+
+describe('admin texts of the manual check', () => {
+  it('never say "teacher" and say nothing about the master key in the start note', () => {
+    const texts = [
+      T.startManualCheckCount(2),
+      T.startManualCheckHint,
+      T.sampleValueLabel,
+      T.manualCheckLabel,
+      T.manualCheckHint,
+      T.manualCheckIndicator,
+      T.manualCheckIndicatorTitle,
+    ];
+    texts.forEach((text) => expect(text.toLowerCase()).not.toMatch(/teacher|вчител|учител/));
+    expect(T.startManualCheckCount(2)).toBe('Питань з ручною перевіркою: 2.');
+    expect(T.startManualCheckHint).toBe('Сторінка перевірки:');
+    expect(T.manualCheckLabel).toBe('✍️ Ручна перевірка');
   });
 });

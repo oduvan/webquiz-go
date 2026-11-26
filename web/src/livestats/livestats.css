@@ -275,6 +275,10 @@
   cursor: help;
 }
 
+.manual-check-indicator {
+  margin-left: 4px;
+}
+
 .points-indicator {
   margin-left: 4px;
   color: #ffc107;

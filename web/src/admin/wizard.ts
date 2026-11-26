@@ -220,6 +220,7 @@ export function hasAnyExplanation(questions: QuestionDraft[]): boolean {
 // What the collapsed header shows next to the question number.
 export interface Indicators {
   stick: boolean;
+  manual: boolean; // a text question that is checked manually ("✍️ вручну")
   image: boolean;
   file: boolean;
   points: number | null; // shown with a trophy when it is not 1
@@ -229,6 +230,7 @@ export function indicatorsOf(question: QuestionDraft): Indicators {
   const points = roundPoints(parseFloat(question.points) || 1);
   return {
     stick: question.stick,
+    manual: question.type === 'text' && question.manualCheck,
     image: question.image.trim() !== '',
     file: question.file.trim() !== '',
     points: points !== 1 ? points : null,

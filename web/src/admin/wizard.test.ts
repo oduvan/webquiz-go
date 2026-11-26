@@ -379,6 +379,10 @@ describe('header and explanation helpers', () => {
     expect(indicatorsOf(question({ points: '' })).points).toBeNull();
     expect(indicatorsOf(question({ points: '0.5' })).points).toBe(0.5);
     expect(indicatorsOf(question({ image: ' ', file: 'a', stick: true }))).toMatchObject({ image: false, file: true, stick: true });
+    // The manual check marker: only for a text question with the checkbox on
+    expect(indicatorsOf(question({ type: 'text', manualCheck: true })).manual).toBe(true);
+    expect(indicatorsOf(question({ type: 'text', manualCheck: false })).manual).toBe(false);
+    expect(indicatorsOf(question({ type: 'single', manualCheck: true })).manual).toBe(false);
   });
 
   it('names the fold button by its state', () => {

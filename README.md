@@ -8,7 +8,7 @@ This is version 2.0, written in Go. It is one program file with no other parts t
 
 - Quizzes are plain YAML files. You can edit them by hand or in the visual editor of the admin panel.
 - Question types: one correct answer, several correct answers, and a text answer checked by a small piece of code or by the teacher.
-- Answers the teacher checks by hand (`manual_check: true`): teachers mark each typed answer right or wrong on a review page made for a phone (`/review/`). Several teachers can check at once. The student's results screen updates by itself when the teacher decides.
+- Answers the teacher checks by hand (`manual_check: true`): teachers mark each typed answer right or wrong on a review page made for a phone (`/review/`, same master key and session as the other admin pages, asked once per device). Several teachers can check at once. The student sees "it will be checked manually" (the student page never mentions a teacher), and the results screen updates by itself after the verdict. The editor marks such questions with **✍️ вручну** in the question list; live stats mark their columns with ✍️.
 - Pictures, files for download, explanations in Markdown, points (also decimals), and time limits.
 - Random question order for each student.
 - Optional approval of each student by the teacher.

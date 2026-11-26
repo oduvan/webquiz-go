@@ -3,6 +3,7 @@ import {
   formatTime,
   groupUsers,
   imageFilename,
+  isManualQuestion,
   isAnsweredState,
   normalizeStatsData,
   questionStatistics,
@@ -80,6 +81,15 @@ describe('groupUsers', () => {
     expect(groups.all).toEqual(['100000', '200000', '300000', '400000']);
     expect(groups.inProgress).toEqual(['300000']);
     expect(groups.completed).toEqual(['200000', '100000', '400000']);
+  });
+});
+
+describe('isManualQuestion', () => {
+  it('is true only for manual_check: true', () => {
+    expect(isManualQuestion({ id: 1, manual_check: true })).toBe(true);
+    expect(isManualQuestion({ id: 1, manual_check: 'yes' })).toBe(false);
+    expect(isManualQuestion({ id: 1 })).toBe(false);
+    expect(isManualQuestion(undefined)).toBe(false);
   });
 });
 

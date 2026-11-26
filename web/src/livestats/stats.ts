@@ -163,6 +163,11 @@ export function stateIcon(state: string): string {
   }
 }
 
+// A question whose answers are checked manually (manual_check: true): its header gets ✍️.
+export function isManualQuestion(question: LiveQuestion | undefined): boolean {
+  return Boolean(question) && question!.manual_check === true;
+}
+
 // The name shown for an image-only question: the file name without its extension.
 export function imageFilename(path: unknown): string {
   const parts = plain(path).split('/');

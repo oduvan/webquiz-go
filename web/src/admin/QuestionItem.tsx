@@ -193,6 +193,11 @@ export const QuestionItem = memo(function QuestionItem({
                 🔗
               </span>
             ) : null}
+            {indicators.manual ? (
+              <span className="question-indicator manual-check-indicator" title={T.manualCheckIndicatorTitle}>
+                {T.manualCheckIndicator}
+              </span>
+            ) : null}
             {indicators.image ? (
               <span className="question-indicator" title={T.imageIndicator}>
                 🖼️
