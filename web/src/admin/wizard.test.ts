@@ -379,6 +379,10 @@ describe('header and explanation helpers', () => {
     expect(indicatorsOf(question({ points: '' })).points).toBeNull();
     expect(indicatorsOf(question({ points: '0.5' })).points).toBe(0.5);
     expect(indicatorsOf(question({ image: ' ', file: 'a', stick: true }))).toMatchObject({ image: false, file: true, stick: true });
+    // The manual check marker: only for a text question with the checkbox on
+    expect(indicatorsOf(question({ type: 'text', manualCheck: true })).manual).toBe(true);
+    expect(indicatorsOf(question({ type: 'text', manualCheck: false })).manual).toBe(false);
+    expect(indicatorsOf(question({ type: 'single', manualCheck: true })).manual).toBe(false);
   });
 
   it('names the fold button by its state', () => {
@@ -449,5 +453,31 @@ describe('other helpers', () => {
     expect(formatFileSize(512)).toBe('512 B');
     expect(formatFileSize(1536)).toBe('1.5 KB');
     expect(formatFileSize(1048576)).toBe('1 MB');
+  });
+});
+
+describe('manual check in the editor', () => {
+  it('reads manual_check: true as a text question checked by the teacher', () => {
+    const draft = draftFromQuiz({
+      questions: [
+        { question: 'By hand', manual_check: true, correct_value: 'Sample' },
+        { question: 'Code', checker: 'assert x' },
+      ],
+    });
+    expect(draft.questions[0].type).toBe('text');
+    expect(draft.questions[0].manualCheck).toBe(true);
+    expect(draft.questions[0].correctValue).toBe('Sample');
+    expect(draft.questions[1].manualCheck).toBe(false);
+  });
+
+  it('saves manual_check instead of the checker code, and drops it when turned off', () => {
+    const draft = draftFromQuiz({ questions: [{ question: 'Type it', correct_value: 'x', checker: "assert user_answer == 'x'" }] });
+    draft.questions[0].manualCheck = true;
+    expect(wizardData(draft).questions).toEqual([{ question: 'Type it', correct_value: 'x', manual_check: true }]);
+
+    const back = draftFromQuiz({ questions: [{ question: 'By hand', manual_check: true }] });
+    back.questions[0].manualCheck = false;
+    back.questions[0].checker = 'assert True';
+    expect(wizardData(back).questions).toEqual([{ question: 'By hand', checker: 'assert True' }]);
   });
 });

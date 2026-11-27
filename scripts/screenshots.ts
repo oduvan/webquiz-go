@@ -5,6 +5,10 @@
 //   npm --prefix scripts ci
 //   npm --prefix scripts run screenshots
 //
+// To take only some groups of shots, name them after "--", for example
+// "npm --prefix scripts run screenshots -- review" (groups: fresh, classroom,
+// review).
+//
 // The script starts servers with a small sample quiz (in Ukrainian, because the
 // screenshots are shared by docs/uk and docs/en), drives the pages with
 // Playwright, and writes PNG files to docs/imgs. It does not touch the mac_*.png
@@ -478,14 +482,62 @@ async function classroom(browser: Browser): Promise<void> {
   }
 }
 
+// The review page on a phone: a teacher checks a typed answer (manual_check).
+async function reviewPage(browser: Browser): Promise<void> {
+  const quiz = {
+    title: 'Фізика, 8 клас',
+    show_right_answer: true,
+    questions: [
+      {
+        question: 'Чому небо блакитне? Поясніть коротко.',
+        manual_check: true,
+        correct_value: 'Через розсіювання Релея: синє світло розсіюється в повітрі сильніше за червоне.',
+        points: 2,
+      },
+      { question: 'Скільки буде 2 + 2?', options: ['3', '4', '5'], correct_answer: 1 },
+    ],
+  };
+  const server = await startServer({ quizzes: { 'default.yaml': quiz } });
+  try {
+    const answers = [
+      'Сонячне світло розсіюється в атмосфері, і синього розсіюється найбільше.',
+      'Бо воно відбиває море.',
+    ];
+    for (const [i, name] of ['Олена', 'Андрій'].entries()) {
+      const userId = await register(server, name);
+      await answerQuestions(server, userId, [answers[i]]);
+    }
+    const { context, page } = await newPage(browser, 390, 760);
+    await page.goto(server.url + '/review/');
+    await page.locator('#master-key-input').fill(MASTER_KEY);
+    await page.locator('#login-button').click();
+    await page.locator('#item-card').waitFor();
+    await page.screenshot({ path: shot('review.png'), fullPage: true });
+    await context.close();
+  } finally {
+    await server.stop();
+  }
+}
+
+const GROUPS: Record<string, (browser: Browser) => Promise<void>> = {
+  fresh: freshStart,
+  classroom,
+  review: reviewPage,
+};
+
 async function main(): Promise<void> {
   if (!existsSync(binary)) {
     throw new Error(`Binary not found: ${binary}. Run "make build" first, or set WEBQUIZ_BINARY.`);
   }
+  const wanted = process.argv.slice(2);
+  for (const name of wanted) {
+    if (!GROUPS[name]) throw new Error(`Unknown group ${name}; the groups are ${Object.keys(GROUPS).join(', ')}`);
+  }
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
   try {
-    await freshStart(browser);
-    await classroom(browser);
+    for (const [name, take] of Object.entries(GROUPS)) {
+      if (wanted.length === 0 || wanted.includes(name)) await take(browser);
+    }
   } finally {
     await browser.close();
   }

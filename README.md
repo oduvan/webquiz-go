@@ -7,7 +7,8 @@ This is version 2.0, written in Go. It is one program file with no other parts t
 ## What it can do
 
 - Quizzes are plain YAML files. You can edit them by hand or in the visual editor of the admin panel.
-- Question types: one correct answer, several correct answers, and a text answer checked by a small piece of code.
+- Question types: one correct answer, several correct answers, and a text answer checked by a small piece of code or by the teacher.
+- Answers the teacher checks by hand (`manual_check: true`): teachers mark each typed answer right or wrong on a review page made for a phone (`/review/`, same master key and session as the other admin pages, asked once per device). Several teachers can check at once. The student sees "it will be checked manually" (the student page never mentions a teacher), and the results screen updates by itself after the verdict. The editor marks such questions with **✍️ вручну** in the question list; live stats mark their columns with ✍️.
 - Pictures, files for download, explanations in Markdown, points (also decimals), and time limits.
 - Random question order for each student.
 - Optional approval of each student by the teacher.
@@ -68,7 +69,7 @@ npm --prefix harness ci && npm --prefix harness test   # unit tests of the class
 
 Go tests start servers in the same process on a free port. Playwright tests start the built program on a free port in a new temporary folder. No test uses a fixed port.
 
-To retake the screenshots of the docs: `make build`, then `npm --prefix scripts ci` and `npm --prefix scripts run screenshots`.
+To retake the screenshots of the docs: `make build`, then `npm --prefix scripts ci` and `npm --prefix scripts run screenshots`. To retake only some of them, name the groups: `npm --prefix scripts run screenshots -- review` (groups: `fresh`, `classroom`, `review`).
 
 ## Project layout
 
@@ -83,10 +84,11 @@ To retake the screenshots of the docs: `make build`, then `npm --prefix scripts 
 | `internal/pyval/` | Python-like YAML and value rules, so 1.19 files read the same |
 | `internal/i18n/` | Texts in Ukrainian and English |
 | `internal/timelimits/`, `internal/explanations/` | Time limits, Markdown explanations |
+| `internal/review/` | The queue of answers that wait for the teacher's check, and how they are handed to review pages |
 | `internal/tunnel/`, `internal/transfer/` | SSH tunnel and file transfer between servers |
 | `internal/netinfo/`, `internal/version/` | Network addresses, version and repository address |
 | `internal/testutil/` | Helpers that start servers for tests |
-| `web/` | React and Tailwind pages (quiz, admin, files, live stats, CSV table) |
+| `web/` | React and Tailwind pages (quiz, admin, files, live stats, CSV table, answer review) |
 | `e2e/` | Playwright tests |
 | `harness/` | Classroom test harness: a real server, real browsers, scripted and AI agent students (see `harness/README.md`) |
 | `scripts/` | Screenshot script for the docs; `scripts/icons` draws the icons of the desktop version |

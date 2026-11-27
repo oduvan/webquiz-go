@@ -20,7 +20,7 @@
 //   - json.go: request JSON (readJSON keeps numbers as json.Number) and
 //     answers (writeJSON, writeError, notImplemented).
 //   - pages.go: the boot data of each page (QuizBoot, AdminBoot, FilesBoot,
-//     LiveStatsBoot, CSVTableBoot), renderPage, the quiz page file
+//     LiveStatsBoot, CSVTableBoot, ReviewBoot), renderPage, the quiz page file
 //     static_dir/index.html, the admin pages.
 //   - static.go: "/", /imgs/, /assets/ (with the gzip copies of the build)
 //     and the static folder.
@@ -44,7 +44,12 @@
 //     editor's lists and the explanation preview). yamldump.go: quiz files
 //     written like PyYAML's yaml.dump.
 //   - websocket.go: the WebSocket hub (serveWebSocket, broadcastLiveStats,
-//     broadcastAdmin).
+//     broadcastAdmin; serveWebSocketWith for a socket with its own messages
+//     and a heartbeat).
+//   - review_socket.go: the manual check (manual_check: true): the review
+//     queue (internal/review) under mu, the verdict, /ws/review and the
+//     review_status messages of the admin pages. Each review page gets its
+//     own review_state, queued per client under mu.
 //   - tunnel.go: the SSH tunnel manager and its status messages.
 //   - admin_config.go: config save with hot reload and rollback (a form save
 //     is written only when config.CheckMerge accepts the merged text), the

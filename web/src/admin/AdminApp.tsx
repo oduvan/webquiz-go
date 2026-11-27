@@ -7,6 +7,7 @@ import {
   DownloadableQuizzesSection,
   NetworkInfoSection,
   PendingUsersSection,
+  ManualReviewSection,
   ShowAnswersSection,
   TransferRequestsSection,
   TunnelSection,
@@ -15,6 +16,7 @@ import {
   type TunnelView,
 } from './Panels';
 import { QuizEditor, type EditorStart } from './QuizEditor';
+import { manualQuestionCount, reviewPageUrls, reviewStatusOf, type ReviewStatus } from './review';
 import { connectAdminSocket } from './socket';
 import { StartQuizModal, type StartModalState } from './StartQuizModal';
 import { T } from './texts';
@@ -48,6 +50,8 @@ function quizLabel(quiz: QuizEntry, current: string | null): string {
 }
 
 export function AdminApp({ boot }: { boot: AdminBoot }) {
+  // The review page's addresses for the manual check note and block (phones use the network addresses)
+  const reviewUrls = reviewPageUrls(boot.network_info.urls, window.location.origin);
   const showMessage = useShowMessage();
   const [loggedIn, setLoggedIn] = useState(false);
   const [masterKey, setMasterKey] = useState('');
@@ -73,6 +77,7 @@ export function AdminApp({ boot }: { boot: AdminBoot }) {
   const [transferErrors, setTransferErrors] = useState<Record<string, string>>({});
   const [transferBusy, setTransferBusy] = useState<Record<string, 'accept' | 'reject'>>({});
   const [tunnel, setTunnel] = useState<(TunnelView & { url: string }) | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<ReviewStatus | null>(null); // the manual check block
   const [tunnelBusy, setTunnelBusy] = useState(false);
 
   // Footer
@@ -192,6 +197,10 @@ export function AdminApp({ boot }: { boot: AdminBoot }) {
         }
         if (data.tunnel) applyTunnel(data.tunnel);
         setTransfers(requestsById(data.transfer_requests));
+        setReviewStatus(reviewStatusOf(data.review));
+        break;
+      case 'review_status':
+        setReviewStatus(reviewStatusOf(data));
         break;
       case 'transfer_request':
         setTransfers((current) => ({ ...current, [data.request.id]: data.request }));
@@ -284,6 +293,7 @@ export function AdminApp({ boot }: { boot: AdminBoot }) {
     setStartModal({
       filename,
       restart: filename === currentQuiz,
+      manualCount: manualQuestionCount(parsed),
       settings: startSettingsFromQuiz(parsed),
       error: '',
       busy: false,
@@ -705,6 +715,8 @@ export function AdminApp({ boot }: { boot: AdminBoot }) {
 
             <PendingUsersSection visible={pendingVisible} users={pendingUsers} onApprove={(id) => void approveUser(id)} />
 
+            <ManualReviewSection status={reviewStatus} urls={reviewUrls} />
+
             <TransferRequestsSection
               requests={transfers}
               choices={transferChoices}
@@ -744,6 +756,8 @@ export function AdminApp({ boot }: { boot: AdminBoot }) {
               <a href="/files/">{T.fileManager}</a>
               <span className="separator">|</span>
               <a href="/live-stats/">{T.liveStats}</a>
+              <span className="separator">|</span>
+              <a href="/review/">{T.review}</a>
             </div>
 
             <div className="admin-footer">
@@ -784,6 +798,7 @@ export function AdminApp({ boot }: { boot: AdminBoot }) {
       {startModal ? (
         <StartQuizModal
           state={startModal}
+          reviewUrls={reviewUrls}
           onChange={(settings) => setStartModal((modal) => modal && { ...modal, settings })}
           onConfirm={() => void confirmStartQuiz()}
           onClose={() => setStartModal(null)}

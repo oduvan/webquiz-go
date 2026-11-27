@@ -571,6 +571,22 @@ body {
   margin-right: 5px;
 }
 
+.admin-page .question-indicator.manual-check-indicator {
+  font-size: 12px;
+  font-weight: bold;
+  color: #856404;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 0 6px;
+  opacity: 1;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .admin-page .question-indicator.manual-check-indicator {
+  color: #f0d68a;
+}
+
 .admin-page .question-indicator.points-indicator {
   color: darkgoldenrod;
   font-weight: bold;
@@ -990,6 +1006,41 @@ body {
   border: 2px solid var(--warning-border);
   border-radius: 8px;
   padding: 20px;
+}
+
+/* Manual check by the teacher: the start pop-up note and the panel block */
+.manual-check-note,
+.admin-page .manual-review-status {
+  background: var(--warning-bg);
+  border: 2px solid var(--warning-border);
+  border-radius: 8px;
+  padding: 12px 15px;
+  margin: 10px 0 15px 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .manual-review-status {
+  margin-top: 30px;
+}
+
+.admin-page .manual-review-status h3 {
+  margin-top: 0;
+}
+
+.manual-review-hint {
+  margin-top: 6px;
+}
+
+.manual-check-note ul,
+.admin-page .manual-review-status ul {
+  margin: 6px 0 0 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.manual-check-note a,
+.admin-page .manual-review-status a {
+  word-break: break-all;
 }
 
 .admin-page .empty-note {

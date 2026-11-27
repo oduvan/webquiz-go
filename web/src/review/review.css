@@ -1,0 +1,212 @@
+/* The review page: one answer at a time, big buttons, made for a phone. */
+:root {
+  --review-muted: #666666;
+  --review-answer-bg: #fff8e1;
+  --review-answer-border: #ffc107;
+  --review-sample-bg: #eef5ff;
+  --review-ok: #28a745;
+  --review-fail: #dc3545;
+  --review-notice-bg: #fff3cd;
+  --review-notice-fg: #856404;
+  --review-error-bg: #f8d7da;
+  --review-error-fg: #721c24;
+}
+
+[data-theme='dark'] {
+  --review-muted: #aaaaaa;
+  --review-answer-bg: #3d3a1a;
+  --review-answer-border: #c99a06;
+  --review-sample-bg: #1e2a3a;
+  --review-notice-bg: #3d3a1a;
+  --review-notice-fg: #f0d68a;
+  --review-error-bg: #3a1a1a;
+  --review-error-fg: #f5b5bb;
+}
+
+.review-page {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.review-page h1 {
+  font-size: 22px;
+  font-weight: bold;
+  margin: 4px 56px 12px 0;
+}
+
+.review-card {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.review-status-bar {
+  margin-bottom: 12px;
+  font-weight: bold;
+}
+
+.review-connection-banner,
+.review-notice,
+.review-login-error {
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.review-connection-banner,
+.review-login-error {
+  background: var(--review-error-bg);
+  color: var(--review-error-fg);
+}
+
+.review-notice {
+  background: var(--review-notice-bg);
+  color: var(--review-notice-fg);
+}
+
+.review-label {
+  display: block;
+  font-size: 13px;
+  color: var(--review-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 12px 0 4px 0;
+}
+
+#question-label {
+  margin-top: 0;
+}
+
+.review-question-text,
+.review-answer-text,
+.review-sample-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.review-question-image {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  margin-top: 8px;
+  border-radius: 6px;
+}
+
+.review-answer-text {
+  background: var(--review-answer-bg);
+  border-left: 4px solid var(--review-answer-border);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 19px;
+}
+
+.review-sample-text {
+  background: var(--review-sample-bg);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.review-points {
+  margin-top: 10px;
+  color: var(--review-muted);
+}
+
+.review-verdict-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.review-verdict-buttons button {
+  flex: 1;
+  min-height: 64px;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.review-verdict-buttons button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#verdict-correct {
+  background: var(--review-ok);
+}
+
+#verdict-incorrect {
+  background: var(--review-fail);
+}
+
+.review-idle {
+  text-align: center;
+  padding: 40px 16px;
+  font-size: 17px;
+  color: var(--review-muted);
+}
+
+.review-help-button {
+  min-height: 48px;
+  padding: 0 20px;
+  font-size: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.review-help-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.login-title {
+  font-weight: bold;
+}
+
+.login-form input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  font-size: 17px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--fg);
+  margin: 8px 0 12px 0;
+}
+
+.login-form button {
+  width: 100%;
+  min-height: 48px;
+  font-size: 17px;
+  border: none;
+  border-radius: 6px;
+  background: #007bff;
+  color: white;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .review-page {
+    padding: 12px;
+  }
+
+  .review-verdict-buttons {
+    flex-direction: column;
+  }
+}

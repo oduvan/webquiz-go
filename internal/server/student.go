@@ -667,6 +667,10 @@ func (s *Server) submitLocked(sub *submission) (int, map[string]any, *checkJob, 
 	}
 
 	timeTaken := s.questionElapsedLocked(userID, questionID, now)
+	if question.IsManual() {
+		// The teacher checks the answer: nothing to grade now
+		return http.StatusOK, s.recordAnswerLocked(userID, question, sub.answer, timeTaken, now, recordAnswer, nil), nil, nil
+	}
 	g := sub.grade
 	if g == nil || g.quiz != s.quiz || g.questionID != questionID {
 		if runsChecker(question) {
@@ -689,7 +693,9 @@ const (
 // recordAnswerLocked is _record_answer: it stores an answer or a timeout,
 // moves the student on, updates the live stats and the final results, and
 // returns the reply for the page. A timeout is an empty, wrong answer: no
-// checker runs and no points are earned. now is when the answer arrived (or
+// checker runs and no points are earned. An answer to a manual_check
+// question (g is nil) waits for the teacher: it is stored as not correct
+// with 0 points and pending_review, and goes into the review queue. now is when the answer arrived (or
 // the time ran out): the next question becomes available then, as Python
 // set question_ready_times before the checker ran. The caller holds mu.
 func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selected any, timeTaken seconds, now time.Time, kind recordKind, g *grade) map[string]any {
@@ -706,8 +712,10 @@ func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selec
 	s.questionReadyTimes[userID] = now
 
 	isText := question.IsText()
+	// An answer to a manual_check question waits for the teacher: correctness is unknown
+	pending := question.IsManual() && !timedOut
 	correct, checkerError := false, ""
-	if !timedOut {
+	if !timedOut && !pending {
 		correct = g.correct
 		if isText {
 			checkerError = g.checkerError
@@ -725,22 +733,25 @@ func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selec
 	}
 	questionText := valueOr(question, "question", "")
 
-	s.userResponses = append(s.userResponses, &answerRow{
+	row := &answerRow{
 		UserID:         userID,
 		Username:       user.Username,
 		Question:       questionText,
 		SelectedAnswer: selectedText,
 		CorrectAnswer:  correctAnswer,
 		IsCorrect:      correct,
+		PendingReview:  pending, // is_correct stays empty in the CSV until the teacher decides
 		TimeTaken:      timeTaken,
-	})
+	}
+	s.userResponses = append(s.userResponses, row)
+	s.allResponses = append(s.allResponses, row)
 
 	questionPoints := question.Points()
 	earnedPoints := 0.0
 	if correct {
 		earnedPoints = questionPoints
 	}
-	s.userAnswers[userID] = append(s.userAnswers[userID], &answerRecord{
+	record := &answerRecord{
 		Question:       questionText,
 		Image:          question["image"],
 		File:           attachmentValue(question),
@@ -752,13 +763,20 @@ func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selec
 		EarnedPoints:   earnedPoints,
 		CheckerError:   checkerError,
 		TimedOut:       timedOut,
-	})
+		PendingReview:  pending, // removed when the teacher decides
+	}
+	s.userAnswers[userID] = append(s.userAnswers[userID], record)
+	if pending {
+		s.addToReviewLocked(userID, question, selectedText, record, row)
+	}
 	s.userProgress[userID] = questionID
 
 	state := "fail"
 	switch {
 	case timedOut:
 		state = "timeout"
+	case pending:
+		state = "pending"
 	case correct:
 		state = "ok"
 	}
@@ -785,7 +803,16 @@ func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selec
 	if timedOut {
 		reply["timed_out"] = true // so the page can say "time is up" even when correct answers are hidden
 	}
-	if s.quiz.ShowRightAnswer {
+	if pending {
+		reply["pending_review"] = true // always sent: the page says the teacher will check the answer
+	}
+	if s.quiz.ShowRightAnswer && pending {
+		// Nothing to show yet: no correctness, no sample answer
+		reply["is_text_question"] = true
+		if html, ok := s.quiz.ExplanationsHTML[questionID]; ok && s.quiz.ShowExplanation {
+			reply["explanation_html"] = html
+		}
+	} else if s.quiz.ShowRightAnswer {
 		reply["is_correct"] = correct
 		if isText {
 			reply["is_text_question"] = true
@@ -824,11 +851,16 @@ func (s *Server) recordAnswerLocked(userID string, question quiz.Question, selec
 		"completed":       completed,
 		"completed_at":    completedAt,
 	})
+	if pending {
+		s.reviewChangedLocked(nil)
+	}
 
 	outcome := "Incorrect"
 	switch {
 	case timedOut:
 		outcome = "Time ran out"
+	case pending:
+		outcome = "Waits for the teacher"
 	case correct:
 		outcome = "Correct"
 	}

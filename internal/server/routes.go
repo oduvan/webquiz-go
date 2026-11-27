@@ -72,6 +72,10 @@ func (s *Server) routes() http.Handler {
 	handle("GET /live-stats/{$}", localOnly, s.serveLiveStatsPage) // pages.go
 	handle("GET /ws/live-stats", localOnly, s.websocketLiveStats)  // websocket.go
 
+	// Manual check of answers by teachers (review_socket.go)
+	handle("GET /review/{$}", localOnly, s.serveReviewPage) // pages.go
+	handle("GET /ws/review", adminOnly, s.websocketReview)
+
 	// The quiz page and the static folders (static.go)
 	handle("GET /{$}", public, s.serveIndexPage)
 	handle("GET /imgs", public, s.serveImages)

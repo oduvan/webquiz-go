@@ -78,6 +78,9 @@ export const T = {
   seconds: 'Секунди:',
   zeroMeansNoLimit: '0 = без обмеження',
   ownLimitsStay: 'Питання з власним обмеженням часу у файлі тесту залишають його.',
+  // Questions the teacher checks by hand (manual_check)
+  startManualCheckCount: (count: number) => `Питань з ручною перевіркою: ${count}.`,
+  startManualCheckHint: 'Сторінка перевірки:',
   start: '▶️ Запустити',
   cancel: '❌ Скасувати',
   restarting: 'Restarting...',
@@ -147,6 +150,12 @@ export const T = {
   defaultValueLabel: 'Початкове Значення (показується користувачу):',
   defaultValuePlaceholder: 'Введіть початкове значення для відображення...',
   correctValueLabel: 'Правильна Відповідь (показується при помилці):',
+  sampleValueLabel: 'Зразок відповіді (показується на сторінці перевірки):',
+  manualCheckLabel: '✍️ Ручна перевірка',
+  manualCheckHint: 'Відповідь перевіряють вручну на сторінці перевірки (/review/). Правильна відповідь вище показується там як зразок.',
+  // The marker of a folded question that is checked manually
+  manualCheckIndicator: '✍️ вручну',
+  manualCheckIndicatorTitle: 'Ручна перевірка',
   correctValuePlaceholder: 'Введіть правильну відповідь...',
   checkerLabel: 'Перевірка (Python код):',
   chooseTemplate: '-- Оберіть шаблон --',
@@ -243,6 +252,13 @@ export const T = {
   answersShown: (completed: unknown, total: unknown) => `Відповіді відкрито! (${completed}/${total} учнів завершили тест)`,
   showAnswersFailed: 'Помилка відкриття відповідей',
 
+  // ---- Manual check by the teacher ----
+  manualReviewTitle: '✍️ Ручна перевірка',
+  manualReviewWaiting: 'Чекають перевірки: ',
+  manualReviewReviewers: ' · Сторінок перевірки відкрито: ',
+  manualReviewNobody: '⚠️ Ніхто не перевіряє відповіді. Відкрийте сторінку перевірки:',
+  manualReviewPage: 'Сторінка перевірки:',
+
   // ---- Quizzes to download ----
   downloadableTitle: 'Доступні Quiz для Завантаження:',
   folder: (folder: string) => `Папка: ${folder}`,
@@ -281,6 +297,7 @@ export const T = {
   backToQuiz: '← Назад до Quiz',
   fileManager: '📁 File Manager',
   liveStats: '📊 Live Stats',
+  review: '✍️ Перевірка відповідей',
   versionPrefix: 'WebQuiz v',
   documentation: '📄 Документація',
   updateAvailable: '⬆️ Update available: ',

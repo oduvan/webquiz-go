@@ -36,6 +36,20 @@ export function fillText(text: string, values: Record<string, string | number>):
   return result;
 }
 
+// The note of the results screen while the teacher checks answers by hand
+// (manual_check): how many still wait, or, once a waiting answer was seen on
+// this screen, that all are checked. null when there is nothing to say.
+export function pendingReviewNotice(
+  pendingCount: number | undefined,
+  sawPendingReview: boolean,
+  T: Translations,
+): { kind: 'waiting' | 'done'; text: string } | null {
+  const count = pendingCount || 0;
+  if (count > 0) return { kind: 'waiting', text: fillText(T.pending_review_notice, { n: count }) };
+  if (sawPendingReview) return { kind: 'done', text: T.pending_review_done };
+  return null;
+}
+
 // The points badge of a question: "🏆 2 бали" / "🏆 0.5 балів" (Ukrainian has two plural forms).
 export function pointsBadgeText(points: number, T: Translations): string {
   const word = Number.isInteger(points) && points >= 2 && points <= 4 ? T.points_2_4 : T.points_other;

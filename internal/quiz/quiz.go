@@ -26,10 +26,18 @@ func (q Question) ID() int {
 	return int(id)
 }
 
-// IsText tells whether this is a text input question: it has a "checker" key.
+// IsText tells whether this is a text input question: it has a "checker"
+// key, or the teacher checks it by hand (IsManual).
 func (q Question) IsText() bool {
 	_, ok := q["checker"]
-	return ok
+	return ok || q.IsManual()
+}
+
+// IsManual tells whether the teacher checks the answers by hand: the question
+// has manual_check: true (a real true, like Python's "is True").
+func (q Question) IsManual() bool {
+	manual, ok := q["manual_check"].(bool)
+	return ok && manual
 }
 
 // IsMultipleChoice tells whether correct_answer is a list.

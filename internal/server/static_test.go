@@ -128,7 +128,7 @@ func TestAssetsAreServed(t *testing.T) {
 		}
 	}
 
-	for _, page := range []string{"/admin/", "/files/", "/live-stats/", "/files/csv/answers.csv"} {
+	for _, page := range []string{"/admin/", "/files/", "/live-stats/", "/files/csv/answers.csv", "/review/"} {
 		res := admin.GetJSON(t, page)
 		if res.Status != 200 || res.Header.Get("Content-Type") != "text/html; charset=utf-8" {
 			t.Errorf("GET %s: %d %q", page, res.Status, res.Header.Get("Content-Type"))

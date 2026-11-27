@@ -275,6 +275,10 @@
   cursor: help;
 }
 
+.manual-check-indicator {
+  margin-left: 4px;
+}
+
 .points-indicator {
   margin-left: 4px;
   color: #ffc107;
@@ -338,6 +342,17 @@
 .state-empty {
   background: var(--live-empty);
   color: #6c757d;
+}
+
+/* Answered, waiting for the teacher's check (manual_check) */
+.state-pending {
+  background: var(--live-think);
+  color: #856404;
+  box-shadow: inset 0 0 0 2px #ffc107;
+}
+
+[data-theme='dark'] .state-pending {
+  color: #ffc107;
 }
 
 [data-theme='dark'] .state-think {

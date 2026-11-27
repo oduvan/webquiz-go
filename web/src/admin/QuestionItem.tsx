@@ -193,6 +193,11 @@ export const QuestionItem = memo(function QuestionItem({
                 🔗
               </span>
             ) : null}
+            {indicators.manual ? (
+              <span className="question-indicator manual-check-indicator" title={T.manualCheckIndicatorTitle}>
+                {T.manualCheckIndicator}
+              </span>
+            ) : null}
             {indicators.image ? (
               <span className="question-indicator" title={T.imageIndicator}>
                 🖼️
@@ -369,7 +374,7 @@ export const QuestionItem = memo(function QuestionItem({
             />
           </div>
           <div className="form-group">
-            <label>{T.correctValueLabel}</label>
+            <label>{question.manualCheck ? T.sampleValueLabel : T.correctValueLabel}</label>
             <textarea
               className="correct-value-input code-field"
               placeholder={T.correctValuePlaceholder}
@@ -377,7 +382,20 @@ export const QuestionItem = memo(function QuestionItem({
               onChange={(event) => actions.update(key, { correctValue: event.target.value })}
             />
           </div>
-          <div className="form-group">
+          <div className="form-group manual-check-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                className="manual-check-input"
+                checked={question.manualCheck}
+                onChange={(event) => actions.update(key, { manualCheck: event.target.checked })}
+              />
+              {T.manualCheckLabel}
+            </label>
+            <small>{T.manualCheckHint}</small>
+          </div>
+          {/* The checker code is not used while the teacher checks by hand */}
+          <div className="form-group checker-group" style={{ display: question.manualCheck ? 'none' : '' }}>
             <label>{T.checkerLabel}</label>
             <div className="checker-template-row">
               <select

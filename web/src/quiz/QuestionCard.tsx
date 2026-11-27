@@ -83,6 +83,7 @@ function TextAnswer({ view, controller }: { view: QuestionView; controller: Quiz
         onChange={(event) => controller.setTextAnswer(event.target.value)}
       />
       <div id="checker-feedback">
+        {view.pendingReview ? <div className="pending-review-message">{T.pending_review_saved}</div> : null}
         {view.checkerError ? <div className="checker-error">⚠️ {view.checkerError}</div> : null}
         {view.correctValue ? (
           <div className="correct-value-display">

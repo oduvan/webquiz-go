@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import type { DownloadableQuiz, NetworkURL } from '../shared/boot';
 import { plain } from '../shared/text';
 import type { ShowMessage } from './messages';
+import type { ReviewStatus } from './review';
+import { ReviewLinks } from './StartQuizModal';
 import { T } from './texts';
 import type { PendingUser, TransferChoice, TransferFile, TransferRequest } from './types';
 import { fieldNameToLabel, formatFileSize } from './wizard';
@@ -209,6 +211,27 @@ export function ShowAnswersSection({
           {forced ? T.answersAlreadyShown : T.showAnswers}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---- Manual check: shown while the running quiz has questions the teacher checks ----
+
+export function ManualReviewSection({ status, urls }: { status: ReviewStatus | null; urls: string[] }) {
+  const visible = status !== null && status.has_manual;
+  return (
+    <div id="manual-review-section" className={'manual-review-status' + (visible ? '' : ' hidden')}>
+      <h3>{T.manualReviewTitle}</h3>
+      <div>
+        {T.manualReviewWaiting}
+        <strong id="manual-review-pending">{status ? status.pending_count : 0}</strong>
+        {T.manualReviewReviewers}
+        <strong id="manual-review-reviewers">{status ? status.reviewers : 0}</strong>
+      </div>
+      <div id="manual-review-no-reviewers" className="manual-review-hint">
+        {status && status.reviewers > 0 ? T.manualReviewPage : T.manualReviewNobody}
+      </div>
+      {visible ? <ReviewLinks id="manual-review-links" urls={urls} /> : null}
     </div>
   );
 }

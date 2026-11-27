@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -70,9 +71,35 @@ func TestLanguagesAndKeyCount(t *testing.T) {
 	if Default != "uk" {
 		t.Errorf("Default = %q", Default)
 	}
-	// translations.py has 70 keys in each language. 2.0 adds 2: the answer verdict.
-	if n := len(Get("uk")); n != 72 {
-		t.Errorf("uk has %d keys, want 72 (the 70 of translations.py and 2 new ones): %v", n, keys(Get("uk")))
+	// translations.py has 91 keys in each language (70, and 21 for the manual
+	// check of answers). 2.0 adds 2: the answer verdict.
+	if n := len(Get("uk")); n != 93 {
+		t.Errorf("uk has %d keys, want 93 (the 91 of translations.py and 2 new ones): %v", n, keys(Get("uk")))
+	}
+}
+
+// The texts of the manual check: the student page and the review page (as in translations.py).
+func TestManualCheckTexts(t *testing.T) {
+	cases := map[string]map[string]string{
+		"uk": {
+			"pending_review_notice": "⏳ Відповідей чекає ручної перевірки: {n}. Сторінка оновиться сама.",
+			"review_help_text":      "Відповіді, відкриті на інших сторінках перевірки: {n}. Можна допомогти: тоді ви бачите ту саму відповідь, і зараховується перше рішення.",
+			"review_title":          "✍️ Перевірка відповідей",
+			"review_help_button":    "🤝 Допомогти з перевіркою",
+		},
+		"en": {
+			"pending_review_saved": "✍️ Your answer is saved. It will be checked manually; you will see the result at the end of the quiz.",
+			"pending_review_row":   "⏳ Waiting for manual verification",
+			"review_waiting_count": "Waiting for a check: {n}",
+			"review_login_error":   "Wrong key",
+		},
+	}
+	for lang, texts := range cases {
+		for key, want := range texts {
+			if got := Get(lang)[key]; got != want {
+				t.Errorf("%s.%s = %q, want %q", lang, key, got, want)
+			}
+		}
 	}
 }
 
@@ -121,6 +148,24 @@ func TestTextsMatchPython(t *testing.T) {
 		for key, want := range texts {
 			if got := Get(lang)[key]; got != want {
 				t.Errorf("%s.%s = %q, want %q", lang, key, got, want)
+			}
+		}
+	}
+}
+
+// Students and review pages see "manual verification", never a "teacher"
+// (test_texts_never_say_teacher of WebQuiz 1.x).
+func TestManualCheckTextsNeverSayTeacher(t *testing.T) {
+	for _, lang := range Languages {
+		for key, text := range Get(lang) {
+			if !strings.HasPrefix(key, "pending_review") && !strings.HasPrefix(key, "review_") {
+				continue
+			}
+			lowered := strings.ToLower(text)
+			for _, word := range []string{"teacher", "вчител", "учител"} {
+				if strings.Contains(lowered, word) {
+					t.Errorf("%s.%s says %q: %q", lang, key, word, text)
+				}
 			}
 		}
 	}
