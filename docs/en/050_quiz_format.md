@@ -558,7 +558,7 @@ Some answers cannot be checked by code: a short explanation, an opinion, an answ
 - On the results screen, answers that are not checked yet are highlighted in yellow and marked "⏳ Waiting for manual verification". A note above says how many are waiting. The screen updates by itself every few seconds, so the student does not need to reload the page
 - The score counts only checked answers. A right answer gets the question's points, a wrong one gets 0
 
-In the quiz editor, a text question has the checkbox **"✍️ Ручна перевірка"** (manual check). While it is on, the checker code is hidden and not saved, and the folded question shows the **"✍️ вручну"** mark in the question list.
+In the quiz editor, a text question has the checkbox **"✍️ Ручна перевірка"** (manual check). While it is on, the checker code is hidden and not saved, and the folded question shows the **✍️** mark in the question list.
 
 How to check the answers is described in the admin chapter, section "Answer Review".
 

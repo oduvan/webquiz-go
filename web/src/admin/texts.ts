@@ -154,7 +154,7 @@ export const T = {
   manualCheckLabel: '✍️ Ручна перевірка',
   manualCheckHint: 'Відповідь перевіряють вручну на сторінці перевірки (/review/). Правильна відповідь вище показується там як зразок.',
   // The marker of a folded question that is checked manually
-  manualCheckIndicator: '✍️ вручну',
+  manualCheckIndicator: '✍️',
   manualCheckIndicatorTitle: 'Ручна перевірка',
   correctValuePlaceholder: 'Введіть правильну відповідь...',
   checkerLabel: 'Перевірка (Python код):',
