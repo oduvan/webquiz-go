@@ -1,0 +1,51 @@
+name: Update release notes
+
+# Puts the current .github/release-notes/v<version>.md into a release that is
+# already published, for example after screenshots were added to it. Only the
+# hand-written part changes: the title line above it and the part the release
+# workflow writes below it ("This release includes:", downloads, installation)
+# stay as they are.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version of the release to update (e.g. 2.1.0)'
+        required: true
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace the hand-written part of the release notes
+        run: |
+          NOTES_FILE=".github/release-notes/v$VERSION.md"
+          if [ ! -f "$NOTES_FILE" ]; then
+            echo "There is no $NOTES_FILE"
+            exit 1
+          fi
+          gh release view "v$VERSION" --json body --jq .body > old_body.md
+          python3 - "$NOTES_FILE" <<'EOF'
+          import sys
+
+          notes = open(sys.argv[1], encoding="utf-8").read().strip("\n")
+          body = open("old_body.md", encoding="utf-8").read()
+          # The release workflow writes: the title line, an empty line, the notes
+          # file, then its own part, which starts with "This release includes:"
+          marker = "\nThis release includes:"
+          at = body.find(marker)
+          if at < 0:
+              sys.exit("The release text has no 'This release includes:' line")
+          title = "\n".join(body.split("\n")[:2])
+          new_body = title + "\n" + notes + "\n\n" + body[at + 1:]
+          open("new_body.md", "w", encoding="utf-8").write(new_body)
+          EOF
+          gh release edit "v$VERSION" --notes-file new_body.md
+          echo "Updated the notes of release v$VERSION from $NOTES_FILE"
