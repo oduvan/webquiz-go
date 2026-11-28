@@ -102,10 +102,10 @@ test('the editor saves manual_check and hides the checker code', async ({ page, 
   });
   await adminLogin(page, server.url);
   await selectAndEditQuiz(page);
-  // Folded questions: only the manual one carries the "✍️ вручну" marker
+  // Folded questions: only the manual one carries the ✍️ marker (only the icon, like 🔗 🖼️ 📎)
   const markers = questionItems(page).locator('.manual-check-indicator');
   await expect(markers).toHaveCount(1);
-  await expect(questionItems(page).nth(1).locator('.manual-check-indicator')).toHaveText('✍️ вручну');
+  await expect(questionItems(page).nth(1).locator('.manual-check-indicator')).toHaveText('✍️');
   await expect(questionItems(page).nth(1).locator('.manual-check-indicator')).toHaveAttribute('title', 'Ручна перевірка');
   const first = await expandQuestion(page, 0);
   const second = await expandQuestion(page, 1);
@@ -121,7 +121,7 @@ test('the editor saves manual_check and hides the checker code', async ({ page, 
   await expect(first.locator('.manual-check-input').locator('xpath=..')).toHaveText('✍️ Ручна перевірка');
   expect((await first.locator('.text-question-fields').innerText()).toLowerCase()).not.toMatch(/вчител|учител/);
   // The marker appears at once
-  await expect(first.locator('.manual-check-indicator')).toHaveText('✍️ вручну');
+  await expect(first.locator('.manual-check-indicator')).toHaveText('✍️');
   await expect(markers).toHaveCount(2);
   // ... and goes away at once when the question is no longer a text question
   await scriptClick(first.locator('.manual-check-input'));

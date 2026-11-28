@@ -220,7 +220,7 @@ export function hasAnyExplanation(questions: QuestionDraft[]): boolean {
 // What the collapsed header shows next to the question number.
 export interface Indicators {
   stick: boolean;
-  manual: boolean; // a text question that is checked manually ("✍️ вручну")
+  manual: boolean; // a text question that is checked manually (the ✍️ icon)
   image: boolean;
   file: boolean;
   points: number | null; // shown with a trophy when it is not 1
